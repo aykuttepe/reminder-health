@@ -488,7 +488,7 @@ function MainApp() {
       setDiagnosticsLogs(logger.getLogs());
     });
     setDiagnosticsLogs(logger.getLogs());
-    logger.info('System', 'Uygulama açıldı (Reminder Health v0.2.0)');
+    logger.info('System', 'Uygulama açıldı (Reminder Health v0.2.1)');
     return () => unsub();
   }, []);
 
@@ -1736,7 +1736,7 @@ function MainApp() {
 
                   {/* SÜRÜM BİLGİSİ */}
                   <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 16 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#a9dfca' }}>Reminder Health v0.2.0 (Release)</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#a9dfca' }}>Reminder Health v0.2.1 (Release)</Text>
                     <Text style={{ fontSize: 11, color: '#68778d', marginTop: 2 }}>Karekod & Senkronizasyon · Güncel Sürüm</Text>
                   </View>
                 </>
