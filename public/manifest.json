@@ -1,0 +1,10 @@
+{
+  "name": "Reminder Health · İlaç Hatırlatıcı",
+  "short_name": "Reminder Health",
+  "description": "Yetişkinler için klinik ilaç ve döngüsel dozaj takip uygulaması",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#081624",
+  "theme_color": "#081624"
+}
