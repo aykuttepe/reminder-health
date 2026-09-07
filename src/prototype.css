@@ -804,3 +804,268 @@
   to { transform: rotate(360deg); }
 }
 
+/* ==========================================================================
+   Web Diagnostics & Error Logger Styles
+   ========================================================================== */
+.diag-card-web {
+  background: #152332;
+  border: 1px solid #203244;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.diag-header-web {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.diag-status-badge-web {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.diag-status-badge-web.ok {
+  background: #143532;
+  color: var(--mint);
+  border: 1px solid #225e53;
+}
+.diag-status-badge-web.error {
+  background: #381616;
+  color: #fca5a5;
+  border: 1px solid #6e2727;
+}
+.diag-actions-row-web {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.diag-action-btn-web {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.diag-action-btn-web.primary {
+  background: #172c3d;
+  border: 1px solid #244763;
+  color: #38bdf8;
+}
+.diag-action-btn-web.primary:hover {
+  background: #1e384e;
+}
+.diag-action-btn-web.danger {
+  background: #2b171a;
+  border: 1px solid #522929;
+  color: #ff9696;
+}
+.diag-action-btn-web.danger:hover {
+  background: #3b1c20;
+}
+.diag-simulation-box-web {
+  padding-top: 10px;
+  border-top: 1px solid #1c2d3e;
+}
+.diag-sim-label-web {
+  display: block;
+  font-size: 11px;
+  color: #8e9eaf;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.diag-sim-buttons-web {
+  display: flex;
+  gap: 8px;
+}
+.diag-sim-btn-web {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.diag-sim-btn-web.warn {
+  background: #281a13;
+  border: 1px solid #573318;
+  color: #f0b484;
+}
+.diag-sim-btn-web.error {
+  background: #33171a;
+  border: 1px solid #66282e;
+  color: #fca5a5;
+}
+.diag-sim-btn-web:hover {
+  opacity: 0.85;
+}
+.diag-filters-web {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.diag-filter-chip-web {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: #101d29;
+  border: 1px solid #203244;
+  color: #adb3bf;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.diag-filter-chip-web.active {
+  background: #163832;
+  border-color: var(--mint);
+  color: var(--mint);
+  font-weight: 700;
+}
+.diag-empty-web {
+  background: #152332;
+  border: 1px solid #203244;
+  border-radius: 12px;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.diag-empty-web strong {
+  color: #f5f3f0;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.diag-empty-web p {
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 4px 0 0 0;
+}
+.diag-logs-list-web {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diag-log-item-web {
+  background: #152332;
+  border: 1px solid #203244;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.diag-log-item-web:hover {
+  background: #18283a;
+}
+.diag-log-item-web.err {
+  border-color: #542020;
+}
+.diag-log-item-web.warn {
+  border-color: #4d3018;
+}
+.diag-log-item-header-web {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.diag-log-item-tag-web {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.diag-level-pill-web {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.diag-level-pill-web.info {
+  background: #102534;
+  color: #7dd3fc;
+}
+.diag-level-pill-web.warn {
+  background: #36220f;
+  color: #f0b484;
+}
+.diag-level-pill-web.error,
+.diag-level-pill-web.fatal {
+  background: #3d1616;
+  color: #fca5a5;
+}
+.diag-tag-name-web {
+  color: var(--mint);
+  font-size: 11px;
+  font-weight: 600;
+}
+.diag-time-str-web {
+  color: #68778d;
+  font-size: 11px;
+}
+.diag-log-message-web {
+  color: #f5f3f0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.diag-toggle-detail-web {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.diag-toggle-detail-web small {
+  color: #68778d;
+  font-size: 10.5px;
+}
+.diag-expanded-details-web {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1c2d3e;
+}
+.diag-detail-block-web {
+  margin-bottom: 6px;
+}
+.diag-detail-block-web small {
+  display: block;
+  font-size: 9.5px;
+  color: #94a3b8;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.diag-detail-block-web pre {
+  margin: 0;
+  padding: 6px 8px;
+  background: #0d1822;
+  border-radius: 6px;
+  font-size: 10.5px;
+  color: #cbd5e1;
+  font-family: monospace;
+  overflow-x: auto;
+}
+.diag-breadcrumbs-trail-web {
+  background: #0d1822;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.diag-breadcrumb-line-web {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+  margin-bottom: 2px;
+}
+.diag-stack-pre-web {
+  color: #fca5a5 !important;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple } from '@phosphor-icons/react';
+import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple, Bug } from '@phosphor-icons/react';
 import { BottomSheet, KeyboardInput, MobileScroll, useKeyboard, useKeyboardInsets } from './mobile';
 import { parseITSKarekod } from './itsParser';
 import { findMedicineByGTIN, type CatalogMedicine } from './data/medCatalog';
@@ -11,6 +11,8 @@ import {
   validateBackupJSON,
   type SyncDose,
 } from './syncManager';
+import { webLogger, type LogEntry, type LogLevel } from './logger';
+import { WebErrorBoundary } from './components/ErrorBoundary';
 
 type Tab = 'Bugün' | 'İlaçlarım' | 'Geçmiş' | 'Ayarlar';
 type SettingsSubPage =
@@ -23,7 +25,8 @@ type SettingsSubPage =
   | 'privacy'
   | 'experience'
   | 'sync'
-  | 'reset';
+  | 'reset'
+  | 'diagnostics';
 type MealCondition = 'tok' | 'ac' | 'yemekle' | 'farketmez';
 type MedicineForm = 'tablet' | 'kapsul' | 'damla' | 'surup';
 type FrequencyType = 'everyday' | 'alternate' | 'cycle' | 'variable';
@@ -562,7 +565,7 @@ function loadStoredSettings(): PrototypeSettings {
   return DEFAULT_SETTINGS;
 }
 
-export default function Prototype() {
+function InnerPrototype() {
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [doses, setDoses] = useState<Dose[]>(loadStoredDoses);
@@ -570,6 +573,11 @@ export default function Prototype() {
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<number>(6);
   const [expanded, setExpanded] = useState(false);
   const [editor, setEditor] = useState<Partial<Dose> | null>(null);
+
+  // Diagnostics & Logger State
+  const [diagnosticsLogs, setDiagnosticsLogs] = useState<LogEntry[]>(() => webLogger.getLogs());
+  const [diagnosticsFilter, setDiagnosticsFilter] = useState<'ALL' | 'ERROR' | 'WARN'>('ALL');
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('1 tablet');
   const [time, setTime] = useState('09:00');
@@ -664,6 +672,16 @@ export default function Prototype() {
 
   const keyboard = useKeyboard();
   const { bottomInset } = useKeyboardInsets();
+
+  useEffect(() => {
+    webLogger.init();
+    const unsub = webLogger.subscribe(() => {
+      setDiagnosticsLogs(webLogger.getLogs());
+    });
+    setDiagnosticsLogs(webLogger.getLogs());
+    webLogger.info('System', 'Web prototip başlatıldı (Reminder Health v0.2.0)');
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     try {
@@ -851,6 +869,7 @@ export default function Prototype() {
     keyboard.hide();
     const previous = doses;
     const target = doses.find(d => d.id === id);
+    webLogger.breadcrumb(`İlaç silindi: ${target?.name ?? id}`);
     setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt: Date.now(), updatedAt: Date.now() } : d));
     closeEditor();
     setTab('İlaçlarım');
@@ -859,6 +878,7 @@ export default function Prototype() {
 
   const navigate = (nextTab: Tab) => {
     keyboard.hide();
+    webLogger.breadcrumb(`Sekme değiştirildi: ${nextTab}`);
     setTab(nextTab);
     setSettingsSubPage('main');
     setEditor(null);
@@ -1053,6 +1073,7 @@ export default function Prototype() {
 
   const handleSyncNow = async () => {
     keyboard.hide();
+    webLogger.breadcrumb(`Sunucu eşitlemesi başlatıldı: ${serverUrl}`);
     setSyncStatus('syncing');
     setSyncStatusMsg('Eşitleniyor...');
     try {
@@ -1080,14 +1101,17 @@ export default function Prototype() {
         const activeCount = response.doses.filter(d => !d.deletedAt).length;
         setSyncStatusMsg(`Eşitlendi (${activeCount} aktif ilaç)`);
         setToast({ text: 'Eşitleme tamamlandı' });
+        webLogger.info('Sync', `Sunucu ile eşitlendi (${activeCount} aktif ilaç)`);
       } else {
         setSyncStatus('error');
         setSyncStatusMsg(response.message || 'Eşitleme başarısız');
+        webLogger.warn('Sync', `Sunucu yanıtı başarısız: ${response.message}`, { serverUrl });
       }
     } catch (err: any) {
       setSyncStatus('error');
       setSyncStatusMsg(err.message || 'Bağlantı hatası');
       setToast({ text: 'Eşitleme başarısız oldu' });
+      webLogger.error('Sync', 'Sunucu bağlantı hatası', err, { serverUrl });
     }
   };
 
@@ -1925,6 +1949,7 @@ export default function Prototype() {
                       {settingsSubPage === 'experience' && 'Deneyim & Titreşim'}
                       {settingsSubPage === 'sync' && 'Senkronizasyon & Yedekleme'}
                       {settingsSubPage === 'reset' && 'Verileri Sıfırla'}
+                      {settingsSubPage === 'diagnostics' && 'Hata & Tanılama Günlüğü'}
                     </h3>
                   </div>
                 )}
@@ -2032,7 +2057,26 @@ export default function Prototype() {
                         <CaretRight size={18} className="settings-menu-arrow" />
                       </button>
 
-                      {/* 9. Verileri Sıfırla */}
+                      {/* 9. Hata & Tanılama Günlüğü */}
+                      <button type="button" className="settings-menu-item" onClick={() => setSettingsSubPage('diagnostics')}>
+                        <div className="settings-menu-icon" style={{ background: '#281a17', color: '#f0b484' }}>
+                          <Bug size={22} weight="bold" />
+                        </div>
+                        <div className="settings-menu-text">
+                          <span className="settings-menu-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            Hata & Tanılama Günlüğü
+                            {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
+                              <span style={{ background: '#4c1d1d', color: '#fca5a5', fontSize: '10px', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} Hata
+                              </span>
+                            )}
+                          </span>
+                          <span className="settings-menu-desc">Sistem logları, yakalanan hatalar ve kaza raporları</span>
+                        </div>
+                        <CaretRight size={18} className="settings-menu-arrow" />
+                      </button>
+
+                      {/* 10. Verileri Sıfırla */}
                       <button type="button" className="settings-menu-item" onClick={() => setSettingsSubPage('reset')}>
                         <div className="settings-menu-icon" style={{ background: '#361c22', color: '#ff9696' }}>
                           <ArrowCounterClockwise size={22} weight="bold" />
@@ -2589,7 +2633,193 @@ export default function Prototype() {
                   </div>
                 )}
 
-                {/* SUB PAGE 9: VERİLERİ SIFIRLA */}
+                {/* SUB PAGE 9: HATA & TANILAMA GÜNLÜĞÜ */}
+                {settingsSubPage === 'diagnostics' && (
+                  <div className="settings-group" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
+                    <h3 className="settings-group-title"><Bug size={18} style={{ color: '#f0b484' }} /> Hata & Tanılama Günlüğü</h3>
+
+                    {/* Summary & Toolbar Card */}
+                    <div className="diag-card-web">
+                      <div className="diag-header-web">
+                        <div>
+                          <strong style={{ color: '#f5f3f0', fontSize: '13px' }}>Sistem Sağlık Durumu</strong>
+                          <p style={{ color: '#94a3b8', fontSize: '11.5px', margin: '2px 0 0 0' }}>
+                            {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length > 0
+                              ? `${diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} hata kaydı mevcut`
+                              : 'Sistem kararlı, aktif hata yok'}
+                          </p>
+                        </div>
+                        <div className={`diag-status-badge-web ${diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? 'error' : 'ok'}`}>
+                          {diagnosticsLogs.length} / 100 Kayıt
+                        </div>
+                      </div>
+
+                      <div className="diag-actions-row-web">
+                        <button
+                          type="button"
+                          className="diag-action-btn-web primary"
+                          onClick={() => {
+                            const text = webLogger.exportLogsAsText();
+                            if (navigator.clipboard) {
+                              navigator.clipboard.writeText(text);
+                              setToast({ text: 'Tanılama günlüğü panoya kopyalandı' });
+                            }
+                          }}
+                        >
+                          <UploadSimple size={15} />
+                          <span>Günlüğü Kopyala</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="diag-action-btn-web danger"
+                          onClick={() => {
+                            if (window.confirm('Tüm hata ve tanılama kayıtları silinsin mi?')) {
+                              webLogger.clearLogs();
+                              setToast({ text: 'Tanılama günlüğü temizlendi' });
+                            }
+                          }}
+                        >
+                          <Trash size={15} />
+                          <span>Temizle</span>
+                        </button>
+                      </div>
+
+                      {/* Test Error Generation */}
+                      <div className="diag-simulation-box-web">
+                        <span className="diag-sim-label-web">Hata Test & Simülasyonu:</span>
+                        <div className="diag-sim-buttons-web">
+                          <button
+                            type="button"
+                            className="diag-sim-btn-web warn"
+                            onClick={() => {
+                              webLogger.warn('Test', 'Kullanıcı tarafından test uyarısı üretildi.', { source: 'WebDiagnosticsUI' });
+                              setToast({ text: '⚠️ Test uyarısı günlüğe eklendi' });
+                            }}
+                          >
+                            ⚠️ Test Uyarısı (WARN)
+                          </button>
+                          <button
+                            type="button"
+                            className="diag-sim-btn-web error"
+                            onClick={() => {
+                              try {
+                                throw new Error('Kullanıcı kontrollü web test hatası (Simüle Edilmiş)');
+                              } catch (err) {
+                                webLogger.error('Test', 'Simüle edilmiş hata yakalandı.', err, { origin: 'WebManualTrigger' });
+                              }
+                              setToast({ text: '💥 Test hatası yakalandı ve kaydedildi' });
+                            }}
+                          >
+                            💥 Test Hatası (ERROR)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="diag-filters-web">
+                      {(['ALL', 'ERROR', 'WARN'] as const).map(f => {
+                        const count = f === 'ALL'
+                          ? diagnosticsLogs.length
+                          : f === 'ERROR'
+                          ? diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length
+                          : diagnosticsLogs.filter(l => l.level === 'WARN').length;
+                        return (
+                          <button
+                            key={f}
+                            type="button"
+                            className={`diag-filter-chip-web ${diagnosticsFilter === f ? 'active' : ''}`}
+                            onClick={() => setDiagnosticsFilter(f)}
+                          >
+                            {f === 'ALL' ? 'Tümü' : f === 'ERROR' ? 'Hatalar' : 'Uyarılar'} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Log list */}
+                    {diagnosticsLogs
+                      .filter(l => {
+                        if (diagnosticsFilter === 'ERROR') return l.level === 'ERROR' || l.level === 'FATAL';
+                        if (diagnosticsFilter === 'WARN') return l.level === 'WARN';
+                        return true;
+                      })
+                      .length === 0 ? (
+                      <div className="diag-empty-web">
+                        <CheckCircle size={36} color="var(--mint)" />
+                        <strong>Tertemiz!</strong>
+                        <p>{diagnosticsFilter === 'ALL' ? 'Henüz kaydedilmiş bir sistem günlüğü bulunmuyor.' : 'Seçili filtreye uygun kayıt yok.'}</p>
+                      </div>
+                    ) : (
+                      <div className="diag-logs-list-web">
+                        {diagnosticsLogs
+                          .filter(l => {
+                            if (diagnosticsFilter === 'ERROR') return l.level === 'ERROR' || l.level === 'FATAL';
+                            if (diagnosticsFilter === 'WARN') return l.level === 'WARN';
+                            return true;
+                          })
+                          .map(log => {
+                            const isExpanded = expandedLogId === log.id;
+                            const isErr = log.level === 'ERROR' || log.level === 'FATAL';
+                            const isWarn = log.level === 'WARN';
+
+                            return (
+                              <div
+                                key={log.id}
+                                className={`diag-log-item-web ${isErr ? 'err' : isWarn ? 'warn' : 'info'}`}
+                                onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                              >
+                                <div className="diag-log-item-header-web">
+                                  <div className="diag-log-item-tag-web">
+                                    <span className={`diag-level-pill-web ${log.level.toLowerCase()}`}>{log.level}</span>
+                                    <span className="diag-tag-name-web">[{log.tag}]</span>
+                                  </div>
+                                  <span className="diag-time-str-web">{log.timeStr}</span>
+                                </div>
+                                <div className="diag-log-message-web">{log.message}</div>
+
+                                {(log.stack || (log.breadcrumbs && log.breadcrumbs.length > 0) || log.details) && (
+                                  <div className="diag-toggle-detail-web">
+                                    <small>{isExpanded ? 'Detayları Gizle ▲' : 'Detayları Gör ▼'}</small>
+                                  </div>
+                                )}
+
+                                {isExpanded && (
+                                  <div className="diag-expanded-details-web">
+                                    {log.details && (
+                                      <div className="diag-detail-block-web">
+                                        <small>DETAYLAR:</small>
+                                        <pre>{JSON.stringify(log.details, null, 2)}</pre>
+                                      </div>
+                                    )}
+                                    {log.breadcrumbs && log.breadcrumbs.length > 0 && (
+                                      <div className="diag-detail-block-web">
+                                        <small>SON AYAK İZLERİ (BREADCRUMBS):</small>
+                                        <div className="diag-breadcrumbs-trail-web">
+                                          {log.breadcrumbs.map((b, bi) => (
+                                            <div key={bi} className="diag-breadcrumb-line-web">{b}</div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {log.stack && (
+                                      <div className="diag-detail-block-web">
+                                        <small style={{ color: '#fca5a5' }}>STACK TRACE:</small>
+                                        <pre className="diag-stack-pre-web">{log.stack}</pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SUB PAGE 10: VERİLERİ SIFIRLA */}
                 {settingsSubPage === 'reset' && (
                   <div className="settings-group" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
                     <h3 className="settings-group-title"><ArrowCounterClockwise size={18} style={{ color: '#ff9696' }} /> Verileri Sıfırla</h3>
@@ -2698,4 +2928,12 @@ export default function Prototype() {
       </div>
     )}
   </div>;
+}
+
+export default function Prototype() {
+  return (
+    <WebErrorBoundary>
+      <InnerPrototype />
+    </WebErrorBoundary>
+  );
 }

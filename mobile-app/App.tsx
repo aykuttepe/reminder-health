@@ -56,6 +56,8 @@ import {
   validateBackupJSON,
   type SyncDose,
 } from './src/syncManager';
+import { logger, type LogEntry, type LogLevel } from './src/logger';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 LogBox.ignoreLogs([
   'Cannot connect to Expo CLI',
@@ -73,7 +75,8 @@ export type SettingsSubPage =
   | 'privacy'
   | 'experience'
   | 'sync'
-  | 'reset';
+  | 'reset'
+  | 'diagnostics';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
@@ -293,7 +296,7 @@ function TimeSlotPicker({
   );
 }
 
-export default function App() {
+function MainApp() {
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [today, setToday] = useState(localDateKey);
@@ -310,6 +313,11 @@ export default function App() {
   const [expandedTaken, setExpandedTaken] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  // Diagnostics & Logger State
+  const [diagnosticsLogs, setDiagnosticsLogs] = useState<LogEntry[]>([]);
+  const [diagnosticsFilter, setDiagnosticsFilter] = useState<'ALL' | 'ERROR' | 'WARN'>('ALL');
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -460,15 +468,29 @@ export default function App() {
       return;
     }
     try {
+      logger.breadcrumb(`Doz ertelendi: ${dose.name} (${time}) +${minutes}dk`);
       await cancelDoseRepeatNotifications(dose.id, time, date);
       await snoozeNotification({ ...dose, time, statusDate: date, amount: getCycleInfo(dose, date).todayAmount }, minutes, soundSettingsRef.current);
       setDoses(previous => previous.map(d => d.id === dose.id ? { ...d, snooze: minutes } : d));
       showToast(`⏱️ Hatırlatıcı ${minutes} dakika ertelendi`);
     } catch (error) {
+      logger.error('Notifications', `Doz erteleme hatası: ${dose.name}`, error);
       console.error('Snooze failed', error);
       showToast('Erteleme kurulamadı. Lütfen tekrar deneyin.');
     }
   };
+
+  // Initialize Logger and Global JS Handlers
+  useEffect(() => {
+    void logger.init();
+    logger.setupGlobalErrorHandlers();
+    const unsub = logger.subscribe(() => {
+      setDiagnosticsLogs(logger.getLogs());
+    });
+    setDiagnosticsLogs(logger.getLogs());
+    logger.info('System', 'Uygulama açıldı (Reminder Health v0.2.0)');
+    return () => unsub();
+  }, []);
 
   // Initialize Notifications and Request Permissions
   useEffect(() => {
@@ -684,8 +706,9 @@ export default function App() {
       if (current) setScheduleInfo(summary.refreshAfter
         ? `Hatırlatma planı ${new Date(summary.refreshAfter).toLocaleString('tr-TR')} tarihine kadar hazır. Uygulamayı bu tarihten önce açın; plan otomatik yenilenir.`
         : null);
+      logger.info('Notifications', `Bildirim planı senkronize edildi (${doses.length} ilaç)`);
     }).catch(error => {
-      console.error('Notification sync failed', error);
+      logger.error('Notifications', 'Bildirim senkronizasyon hatası', error);
       if (current) setScheduleInfo('Hatırlatmalar güncellenemedi. İzinleri kontrol edip uygulamayı yeniden açın.');
     });
     return () => { current = false; };
@@ -770,8 +793,11 @@ export default function App() {
     triggerHaptic();
     const previous = doses;
     const date = localDateKey();
+    logger.breadcrumb(`Doz eylemi: ${slot.dose.name} (${slot.time}) -> ${status}`);
     setDoses(current => current.map(d => d.id === slot.doseId ? updateDoseSlot(d, slot.time, date, status) : d));
-    if (status !== 'pending') cancelDoseRepeatNotifications(slot.doseId, slot.time).catch(console.error);
+    if (status !== 'pending') cancelDoseRepeatNotifications(slot.doseId, slot.time).catch(err => {
+      logger.warn('Notifications', `Tekrar bildirimi iptal edilemedi: ${slot.dose.name}`, { error: String(err) });
+    });
     showToast(`${slot.dose.name} (${slot.time}) ${status === 'taken' ? 'alındı' : status === 'skipped' ? 'atlandı' : 'kaydı geri alındı'}`, previous);
   };
   const takeSlot = (slot: ScheduledSlot) => applySlot(slot, 'taken');
@@ -899,9 +925,11 @@ export default function App() {
     }
 
     if (editingId) {
+      logger.breadcrumb(`İlaç güncellendi: ${name.trim()} (${amount.trim()})`);
       setDoses(ds => ds.map(d => d.id === editingId ? { ...d, ...patch } : d));
       showToast('İlaç güncellendi');
     } else {
+      logger.breadcrumb(`Yeni ilaç eklendi: ${name.trim()} (${amount.trim()})`);
       setDoses(ds => [...ds, { id: Date.now(), ...patch, status: 'pending', statusDate: today, slotStatuses: {} }]);
       showToast('Yeni ilaç eklendi');
     }
@@ -909,6 +937,7 @@ export default function App() {
   };
 
   const deleteDose = (id: number) => {
+    logger.breadcrumb(`İlaç silindi: id=${id}`);
     const prev = doses;
     setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt: Date.now(), updatedAt: Date.now() } : d));
     setEditorOpen(false);
@@ -934,6 +963,7 @@ export default function App() {
 
   const handleSyncNow = async () => {
     triggerHaptic();
+    logger.breadcrumb(`Sunucu eşitlemesi başlatıldı: ${serverUrl}`);
     setSyncStatus('syncing');
     setSyncStatusMsg('Eşitleniyor...');
     try {
@@ -961,14 +991,17 @@ export default function App() {
         const activeCount = response.doses.filter(d => !d.deletedAt).length;
         setSyncStatusMsg(`Eşitlendi (${activeCount} aktif ilaç)`);
         showToast('Eşitleme tamamlandı');
+        logger.info('Sync', `Sunucu ile başarıyla eşitlendi (${activeCount} aktif ilaç)`);
       } else {
         setSyncStatus('error');
         setSyncStatusMsg(response.message || 'Eşitleme başarısız');
+        logger.warn('Sync', `Sunucu eşitleme başarısız yanıt döndü: ${response.message}`, { serverUrl });
       }
     } catch (err: any) {
       setSyncStatus('error');
       setSyncStatusMsg(err.message || 'Bağlantı hatası');
       showToast('Eşitleme başarısız oldu');
+      logger.error('Sync', 'Sunucu eşitleme hatası', err, { serverUrl });
     }
   };
 
@@ -1479,6 +1512,7 @@ export default function App() {
                     {settingsSubPage === 'experience' && 'Uygulama Deneyimi'}
                     {settingsSubPage === 'sync' && 'Senkronizasyon & Yedekleme'}
                     {settingsSubPage === 'reset' && 'Veri ve Sıfırlama'}
+                    {settingsSubPage === 'diagnostics' && 'Hata & Tanılama Günlüğü'}
                   </Text>
                 </View>
               )}
@@ -1656,9 +1690,34 @@ export default function App() {
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
 
+                    {/* 9. Hata & Tanılama Günlüğü */}
+                    <TouchableOpacity
+                      style={styles.menuListItem}
+                      onPress={() => { triggerHaptic(); setSettingsSubPage('diagnostics'); }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.menuIconBox, { backgroundColor: '#281a17' }]}>
+                        <Ionicons name="bug-outline" size={22} color="#f0b484" />
+                      </View>
+                      <View style={styles.menuTextContainer}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.menuItemTitle}>Hata & Tanılama Günlüğü</Text>
+                          {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
+                            <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                              <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
+                                {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} Hata
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.menuItemSub}>Sistem logları, yakalanan hatalar ve kaza raporları</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                    </TouchableOpacity>
+
                     <View style={styles.menuListDivider} />
 
-                    {/* 9. Veri & Sıfırlama */}
+                    {/* 10. Veri & Sıfırlama */}
                     <TouchableOpacity
                       style={styles.menuListItem}
                       onPress={() => { triggerHaptic(); setSettingsSubPage('reset'); }}
@@ -2511,7 +2570,273 @@ export default function App() {
                 </>
               )}
 
-              {/* SUB PAGE 9: SIFIRLA */}
+              {/* SUB PAGE 9: HATA & TANILAMA GÜNLÜĞÜ */}
+              {settingsSubPage === 'diagnostics' && (
+                <>
+                  <View style={styles.settingGroupHeader}>
+                    <Ionicons name="bug-outline" size={16} color="#f0b484" />
+                    <Text style={[styles.settingGroupTitle, { color: '#f0b484' }]}>HATA & TANILAMA GÜNLÜĞÜ</Text>
+                  </View>
+
+                  {/* Summary & Action Card */}
+                  <View style={styles.settingCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1, paddingRight: 10 }}>
+                        <Text style={styles.settingTitle}>Sistem Sağlık Durumu</Text>
+                        <Text style={styles.settingSub}>
+                          {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length > 0
+                            ? `${diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} hata kaydı mevcut`
+                            : 'Sistem kararlı, aktif hata yok'}
+                        </Text>
+                      </View>
+                      <View style={{
+                        backgroundColor: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? '#381616' : '#143532',
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? '#6e2727' : '#225e53',
+                      }}>
+                        <Text style={{
+                          color: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? '#fca5a5' : '#a9dfca',
+                          fontSize: 12,
+                          fontWeight: '700',
+                        }}>
+                          {diagnosticsLogs.length} / 100 Kayıt
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Action buttons */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                      <TouchableOpacity
+                        style={[styles.diagActionBtn, { backgroundColor: '#172c3d', borderColor: '#244763' }]}
+                        onPress={async () => {
+                          triggerHaptic();
+                          const text = logger.exportLogsAsText();
+                          try {
+                            await Share.share({
+                              title: 'Reminder Health Tanılama Günlüğü',
+                              message: text,
+                            });
+                          } catch (err) {
+                            Alert.alert('Paylaşılamadı', 'Günlük panoya aktarılamadı.');
+                          }
+                        }}
+                      >
+                        <Ionicons name="share-outline" size={16} color="#38bdf8" />
+                        <Text style={[styles.diagActionBtnText, { color: '#38bdf8' }]}>Paylaş / Dışa Aktar</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.diagActionBtn, { backgroundColor: '#2b171a', borderColor: '#522929' }]}
+                        onPress={() => {
+                          triggerHaptic();
+                          Alert.alert(
+                            'Logları Temizle',
+                            'Tüm hata ve tanılama kayıtları silinsin mi?',
+                            [
+                              { text: 'Vazgeç', style: 'cancel' },
+                              {
+                                text: 'Temizle',
+                                style: 'destructive',
+                                onPress: () => {
+                                  logger.clearLogs();
+                                  showToast('Tanılama günlüğü temizlendi');
+                                }
+                              }
+                            ]
+                          );
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#ff9696" />
+                        <Text style={[styles.diagActionBtnText, { color: '#ff9696' }]}>Temizle</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Test Error Generation */}
+                    <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#203244' }}>
+                      <Text style={{ fontSize: 11.5, color: '#8e9eaf', marginBottom: 8, fontWeight: '600' }}>
+                        Hata Test ve Tanılama Simülasyonu:
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={[styles.diagTestBtn, { backgroundColor: '#281a13', borderColor: '#573318' }]}
+                          onPress={() => {
+                            triggerHaptic();
+                            logger.warn('Test', 'Kullanıcı tarafından test uyarısı üretildi.', { source: 'DiagnosticsUI' });
+                            showToast('⚠️ Test uyarısı günlüğe eklendi');
+                          }}
+                        >
+                          <Text style={[styles.diagTestBtnText, { color: '#f0b484' }]}>⚠️ Test Uyarısı (WARN)</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.diagTestBtn, { backgroundColor: '#33171a', borderColor: '#66282e' }]}
+                          onPress={() => {
+                            triggerHaptic();
+                            try {
+                              throw new Error('Kullanıcı kontrollü test hatası (Simüle Edilmiş Hata)');
+                            } catch (e) {
+                              logger.error('Test', 'Simüle edilmiş hata yakalandı.', e, { origin: 'ManualTrigger' });
+                            }
+                            showToast('💥 Test hatası yakalandı ve kaydedildi');
+                          }}
+                        >
+                          <Text style={[styles.diagTestBtnText, { color: '#fca5a5' }]}>💥 Test Hatası (ERROR)</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Filter Tabs */}
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    {(['ALL', 'ERROR', 'WARN'] as const).map(f => {
+                      const count = f === 'ALL'
+                        ? diagnosticsLogs.length
+                        : f === 'ERROR'
+                        ? diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length
+                        : diagnosticsLogs.filter(l => l.level === 'WARN').length;
+                      return (
+                        <TouchableOpacity
+                          key={f}
+                          style={[
+                            styles.choiceChip,
+                            diagnosticsFilter === f && styles.choiceChipActive,
+                            { paddingVertical: 8 }
+                          ]}
+                          onPress={() => {
+                            triggerHaptic();
+                            setDiagnosticsFilter(f);
+                          }}
+                        >
+                          <Text style={[
+                            styles.choiceChipText,
+                            diagnosticsFilter === f && styles.choiceChipTextActive,
+                            { fontSize: 12 }
+                          ]}>
+                            {f === 'ALL' ? 'Tümü' : f === 'ERROR' ? 'Hatalar' : 'Uyarılar'} ({count})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Log List */}
+                  {diagnosticsLogs
+                    .filter(l => {
+                      if (diagnosticsFilter === 'ERROR') return l.level === 'ERROR' || l.level === 'FATAL';
+                      if (diagnosticsFilter === 'WARN') return l.level === 'WARN';
+                      return true;
+                    })
+                    .length === 0 ? (
+                    <View style={[styles.settingCard, { alignItems: 'center', paddingVertical: 32 }]}>
+                      <Ionicons name="checkmark-circle-outline" size={44} color="#a9dfca" />
+                      <Text style={{ color: '#f5f3f0', fontSize: 15, fontWeight: '700', marginTop: 10 }}>
+                        Tertemiz!
+                      </Text>
+                      <Text style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
+                        {diagnosticsFilter === 'ALL'
+                          ? 'Henüz kaydedilmiş bir sistem günlüğü veya hata bulunmuyor.'
+                          : 'Seçili filtreye uygun kayıt bulunmuyor.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    diagnosticsLogs
+                      .filter(l => {
+                        if (diagnosticsFilter === 'ERROR') return l.level === 'ERROR' || l.level === 'FATAL';
+                        if (diagnosticsFilter === 'WARN') return l.level === 'WARN';
+                        return true;
+                      })
+                      .map(log => {
+                        const isExpanded = expandedLogId === log.id;
+                        const isErr = log.level === 'ERROR' || log.level === 'FATAL';
+                        const isWarn = log.level === 'WARN';
+                        const badgeBg = isErr ? '#3d1616' : isWarn ? '#36220f' : '#102534';
+                        const badgeColor = isErr ? '#fca5a5' : isWarn ? '#f0b484' : '#7dd3fc';
+
+                        return (
+                          <TouchableOpacity
+                            key={log.id}
+                            style={[
+                              styles.diagCard,
+                              {
+                                borderColor: isErr ? '#542020' : isWarn ? '#4d3018' : '#203244',
+                              }
+                            ]}
+                            onPress={() => {
+                              triggerHaptic();
+                              setExpandedLogId(isExpanded ? null : log.id);
+                            }}
+                            activeOpacity={0.75}
+                          >
+                            {/* Log Header Row */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ backgroundColor: badgeBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                  <Text style={{ color: badgeColor, fontSize: 10, fontWeight: '800' }}>{log.level}</Text>
+                                </View>
+                                <Text style={{ color: '#a9dfca', fontSize: 11, fontWeight: '600' }}>[{log.tag}]</Text>
+                              </View>
+                              <Text style={{ color: '#68778d', fontSize: 11 }}>{log.timeStr}</Text>
+                            </View>
+
+                            {/* Log Message */}
+                            <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '500', lineHeight: 18 }}>
+                              {log.message}
+                            </Text>
+
+                            {/* Expandable Indicator */}
+                            {(log.stack || (log.breadcrumbs && log.breadcrumbs.length > 0) || log.details) && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8, gap: 4 }}>
+                                <Text style={{ color: '#68778d', fontSize: 11 }}>{isExpanded ? 'Gizle' : 'Detayları Gör'}</Text>
+                                <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={12} color="#68778d" />
+                              </View>
+                            )}
+
+                            {/* Expanded Details */}
+                            {isExpanded && (
+                              <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1c2d3e' }}>
+                                {log.details && (
+                                  <View style={{ marginBottom: 8 }}>
+                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>DETAYLAR:</Text>
+                                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>
+                                      {JSON.stringify(log.details, null, 2)}
+                                    </Text>
+                                  </View>
+                                )}
+
+                                {log.breadcrumbs && log.breadcrumbs.length > 0 && (
+                                  <View style={{ marginBottom: 8 }}>
+                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 3 }}>SON EYLEMLER (BREADCRUMBS):</Text>
+                                    {log.breadcrumbs.map((b, bi) => (
+                                      <Text key={bi} style={{ color: '#94a3b8', fontSize: 10, fontFamily: 'monospace', marginBottom: 1 }}>
+                                        {b}
+                                      </Text>
+                                    ))}
+                                  </View>
+                                )}
+
+                                {log.stack && (
+                                  <View>
+                                    <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>STACK TRACE:</Text>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                      <Text style={{ color: '#fca5a5', fontSize: 10, fontFamily: 'monospace' }}>
+                                        {log.stack}
+                                      </Text>
+                                    </ScrollView>
+                                  </View>
+                                )}
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })
+                  )}
+                </>
+              )}
+
+              {/* SUB PAGE 10: SIFIRLA */}
               {settingsSubPage === 'reset' && (
                 <>
                   <View style={styles.settingGroupHeader}>
@@ -2548,6 +2873,7 @@ export default function App() {
                 if (t.id === 'Ayarlar' && tab === 'Ayarlar') {
                   setSettingsSubPage('main');
                 }
+                logger.breadcrumb(`Sekme değiştirildi: ${t.id}`);
                 setTab(t.id);
               }}
             >
@@ -2987,7 +3313,15 @@ export default function App() {
       </View>
     </SafeAreaView>
   </SafeAreaProvider>
-);
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -3744,5 +4078,42 @@ const styles = StyleSheet.create({
     color: '#a9dfca',
     fontSize: 13.5,
     fontWeight: '700',
+  },
+
+  // Diagnostics Styles
+  diagActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  diagActionBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  diagTestBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diagTestBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  diagCard: {
+    backgroundColor: '#152332',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#203244',
   },
 });
