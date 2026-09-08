@@ -52,11 +52,25 @@ export const mealLabels: Record<string, string> = {
   farketmez: 'Aç/tok fark etmez',
 };
 
+export const mealLabelsEn: Record<string, string> = {
+  tok: 'After meal',
+  ac: 'Before meal',
+  yemekle: 'With meal',
+  farketmez: 'With or without food',
+};
+
 export const formLabels: Record<string, string> = {
   tablet: 'Tablet',
   kapsul: 'Kapsül',
   damla: 'Damla',
   surup: 'Şurup',
+};
+
+export const formLabelsEn: Record<string, string> = {
+  tablet: 'Tablet',
+  kapsul: 'Capsule',
+  damla: 'Drops',
+  surup: 'Syrup',
 };
 
 export const SOUND_PROFILE_OPTIONS: SoundProfileOption[] = [
@@ -178,49 +192,57 @@ export function buildNotificationContent(
     isRepeat?: boolean;
     repeatIndex?: number;
     timeStr?: string;
+    lang?: 'tr' | 'en';
   }
 ): { title: string; body: string } {
-  const { privateMode = false, hideDoseAmount = false, isRepeat = false, repeatIndex = 1 } = options;
+  const { privateMode = false, hideDoseAmount = false, isRepeat = false, repeatIndex = 1, lang = 'tr' } = options;
+  const isEn = lang === 'en';
 
   if (privateMode) {
     return {
-      title: isRepeat ? '⚠️ UYARI: İlaç Vakti (Onay Bekliyor)' : '⏰ İlaç Vakti',
+      title: isRepeat
+        ? (isEn ? '⚠️ WARNING: Medication Time (Pending Confirmation)' : '⚠️ UYARI: İlaç Vakti (Onay Bekliyor)')
+        : (isEn ? '⏰ Medication Time' : '⏰ İlaç Vakti'),
       body: isRepeat
-        ? 'Planlı ilacınız henüz onaylanmadı. Lütfen ilacınızı alınız.'
-        : 'Planlı ilacınızı alma zamanı geldi.',
+        ? (isEn ? 'Your scheduled medication has not been confirmed yet. Please take your medication.' : 'Planlı ilacınız henüz onaylanmadı. Lütfen ilacınızı alınız.')
+        : (isEn ? 'It is time to take your scheduled medication.' : 'Planlı ilacınızı alma zamanı geldi.'),
     };
   }
 
   const title = isRepeat
-    ? `⚠️ UYARI: ${dose.name} Henüz İçilmedi! (+${repeatIndex * 3} dk)`
-    : `⏰ ${dose.name} Vakti${hideDoseAmount ? '' : ` (${dose.amount})`}`;
+    ? (isEn ? `⚠️ WARNING: ${dose.name} Not Taken Yet! (+${repeatIndex * 3} min)` : `⚠️ UYARI: ${dose.name} Henüz İçilmedi! (+${repeatIndex * 3} dk)`)
+    : (isEn ? `⏰ ${dose.name} Time${hideDoseAmount ? '' : ` (${dose.amount})`}` : `⏰ ${dose.name} Vakti${hideDoseAmount ? '' : ` (${dose.amount})`}`);
 
   const lines: string[] = [];
 
   // Line 1: Dosage, meal timing & medicine form
-  const meal = dose.mealCondition ? (mealLabels[dose.mealCondition] ?? dose.mealCondition) : 'Zamanında';
-  const form = dose.form ? (formLabels[dose.form] ?? dose.form) : '';
+  const mealsMap = isEn ? mealLabelsEn : mealLabels;
+  const formsMap = isEn ? formLabelsEn : formLabels;
+  const meal = dose.mealCondition ? (mealsMap[dose.mealCondition] ?? dose.mealCondition) : (isEn ? 'On time' : 'Zamanında');
+  const form = dose.form ? (formsMap[dose.form] ?? dose.form) : '';
   const formStr = form ? ` (${form})` : '';
-  const amountStr = hideDoseAmount ? 'Planlı doz' : dose.amount;
-  lines.push(`💊 Doz: ${amountStr} · ${meal}${formStr}`);
+  const amountStr = hideDoseAmount ? (isEn ? 'Scheduled dose' : 'Planlı doz') : dose.amount;
+  lines.push(isEn ? `💊 Dose: ${amountStr} · ${meal}${formStr}` : `💊 Doz: ${amountStr} · ${meal}${formStr}`);
 
   // Line 2: Clinical instructions / notes
   if (dose.instructions && dose.instructions.trim().length > 0) {
-    lines.push(`ℹ️ Talimat: ${dose.instructions.trim()}`);
+    lines.push(isEn ? `ℹ️ Instructions: ${dose.instructions.trim()}` : `ℹ️ Talimat: ${dose.instructions.trim()}`);
   }
 
   // Line 3: Stock status & critical threshold warning
   if (dose.stock !== undefined) {
     const threshold = dose.stockThreshold !== undefined ? dose.stockThreshold : 5;
     const isCritical = dose.stock <= threshold;
-    lines.push(`📦 Kalan Stok: ${dose.stock} adet${isCritical ? ' ⚠️ (Kritik Seviye!)' : ''}`);
+    const unitStr = isEn ? (dose.stock === 1 ? 'unit' : 'units') : 'adet';
+    const critStr = isEn ? ' ⚠️ (Critical Level!)' : ' ⚠️ (Kritik Seviye!)';
+    lines.push(isEn ? `📦 Remaining Stock: ${dose.stock} ${unitStr}${isCritical ? critStr : ''}` : `📦 Kalan Stok: ${dose.stock} adet${isCritical ? critStr : ''}`);
   }
 
   // Line 4: Call to action or 3-minute repeat persistent warning (always sound + vibration)
   if (isRepeat) {
-    lines.push(`⚠️ Bu ilaç henüz onaylanmadı! Onaylanana kadar her 3 dakikada bir sesli ve titreşimli uyarılacaksınız.`);
+    lines.push(isEn ? `⚠️ This medication has not been confirmed! You will be alerted every 3 minutes with sound and vibration until confirmed.` : `⚠️ Bu ilaç henüz onaylanmadı! Onaylanana kadar her 3 dakikada bir sesli ve titreşimli uyarılacaksınız.`);
   } else {
-    lines.push(`🔔 Vakti geldiğinde alıp uygulamadan onaylayınız.`);
+    lines.push(isEn ? `🔔 Please take it when it is time and confirm in the app.` : `🔔 Vakti geldiğinde alıp uygulamadan onaylayınız.`);
   }
 
   return {
@@ -642,6 +664,7 @@ export interface SyncNotificationOptions {
   hideDoseAmount?: boolean;
   repeatNagEnabled?: boolean;
   repeatNagCount?: number;
+  lang?: 'tr' | 'en';
 }
 
 export type ScheduleSummary = { count: number; refreshAfter: string | null };
@@ -797,6 +820,7 @@ export async function scheduleTestNotification(
     soundType?: NotificationSoundType;
     hideDoseAmount?: boolean;
     repeatNagEnabled?: boolean;
+    lang?: 'tr' | 'en';
   }
 ): Promise<void> {
   if (testTimer) {
@@ -807,16 +831,17 @@ export async function scheduleTestNotification(
   const soundType = soundOptions?.soundType ?? 'default';
   const hideDoseAmount = soundOptions?.hideDoseAmount ?? false;
   const repeatNagEnabled = soundOptions?.repeatNagEnabled ?? true;
+  const lang = soundOptions?.lang ?? 'tr';
   const isSilent = !soundEnabled || soundType === 'silent';
   const channel = SOUND_CHANNELS[isSilent ? 'silent' : soundType];
 
   const mockDose: NotificationDose = firstDose ?? {
     id: 999,
-    name: 'Örnek İlaç',
-    amount: '1 tablet',
+    name: lang === 'en' ? 'Sample Medicine' : 'Örnek İlaç',
+    amount: lang === 'en' ? '1 tablet' : '1 tablet',
     time: '09:00',
     mealCondition: 'tok',
-    instructions: 'Kullanım talimatına göre alınız.',
+    instructions: lang === 'en' ? 'Take according to directions.' : 'Kullanım talimatına göre alınız.',
     stock: 30,
     stockThreshold: 5,
     form: 'tablet',
@@ -827,6 +852,7 @@ export async function scheduleTestNotification(
     hideDoseAmount,
     isRepeat: false,
     timeStr: mockDose.time,
+    lang,
   });
 
   // 1. Native OS-Level Primary Notification (3 seconds)
@@ -858,6 +884,7 @@ export async function scheduleTestNotification(
         isRepeat: true,
         repeatIndex: 1,
         timeStr: mockDose.time,
+        lang,
       });
 
       const repeatSound = isSilent

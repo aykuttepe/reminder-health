@@ -68,6 +68,7 @@ export type Tab = 'Bugün' | 'İlaçlarım' | 'Geçmiş' | 'Ayarlar';
 export type SettingsSubPage =
   | 'main'
   | 'profile'
+  | 'language'
   | 'notifications'
   | 'reminders'
   | 'reliability'
@@ -77,6 +78,7 @@ export type SettingsSubPage =
   | 'sync'
   | 'reset'
   | 'diagnostics';
+import { getTranslations, type Language } from './src/i18n/translations';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
@@ -105,6 +107,7 @@ const STORAGE_KEY_DOSES = 'rutin_native_doses';
 const STORAGE_KEY_SETTINGS = 'rutin_native_settings';
 const STORAGE_KEY_LEARNED_MEDS = 'rutin_native_learned_meds';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_native_sync_config';
+const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
 
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 
@@ -404,6 +407,42 @@ function MainApp() {
     setSlotTime(index, adjustTimeMinutes(current, delta));
   };
 
+  // Language & i18n
+  const [language, setLanguage] = useState<Language>('tr');
+  const t = getTranslations(language);
+
+  const updateLanguage = async (newLang: Language) => {
+    setLanguage(newLang);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_LANGUAGE, newLang);
+      logger.info('Settings', `Dil değiştirildi: ${newLang}`);
+    } catch (err) {
+      console.error('Failed to save language setting', err);
+    }
+  };
+
+  const getMealLabel = (cond?: MealCondition | string) => {
+    if (!cond) return language === 'en' ? 'On time' : 'Zamanında';
+    switch (cond) {
+      case 'tok': return t.mealTok;
+      case 'ac': return t.mealAc;
+      case 'yemekle': return t.mealYemekle;
+      case 'farketmez': return t.mealFarketmez;
+      default: return cond;
+    }
+  };
+
+  const getFormLabel = (form?: MedicineForm | string) => {
+    if (!form) return t.formTablet;
+    switch (form) {
+      case 'tablet': return t.formTablet;
+      case 'kapsul': return t.formKapsul;
+      case 'damla': return t.formDamla;
+      case 'surup': return t.formSurup;
+      default: return form;
+    }
+  };
+
   // Settings
   const [privateMode, setPrivateMode] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -453,6 +492,7 @@ function MainApp() {
     soundType,
     privateMode,
     hideDoseAmount,
+    lang: language,
   });
   soundSettingsRef.current = {
     enabled: notifications,
@@ -460,6 +500,7 @@ function MainApp() {
     soundType,
     privateMode,
     hideDoseAmount,
+    lang: language,
   };
 
   const snoozeDose = async (dose: Dose, time: string, date = localDateKey(), minutes = 3) => {
@@ -546,9 +587,13 @@ function MainApp() {
       AsyncStorage.getItem(STORAGE_KEY_SETTINGS),
       AsyncStorage.getItem(STORAGE_KEY_LEARNED_MEDS),
       AsyncStorage.getItem(STORAGE_KEY_SYNC_CONFIG),
+      AsyncStorage.getItem(STORAGE_KEY_LANGUAGE),
     ])
-      .then(([doseData, settingData, learnedData, syncData]) => {
+      .then(([doseData, settingData, learnedData, syncData, langData]) => {
         if (!mounted) return;
+        if (langData === 'tr' || langData === 'en') {
+          setLanguage(langData);
+        }
         if (doseData) {
           const parsed = JSON.parse(doseData);
           if (Array.isArray(parsed)) {
@@ -702,14 +747,17 @@ function MainApp() {
       hideDoseAmount,
       repeatNagEnabled,
       repeatNagCount,
+      lang: language,
     }).then(summary => {
       if (current) setScheduleInfo(summary.refreshAfter
-        ? `Hatırlatma planı ${new Date(summary.refreshAfter).toLocaleString('tr-TR')} tarihine kadar hazır. Uygulamayı bu tarihten önce açın; plan otomatik yenilenir.`
+        ? (language === 'en'
+            ? `Reminder schedule ready until ${new Date(summary.refreshAfter).toLocaleString('en-US')}. Open the app before this date to automatically refresh.`
+            : `Hatırlatma planı ${new Date(summary.refreshAfter).toLocaleString('tr-TR')} tarihine kadar hazır. Uygulamayı bu tarihten önce açın; plan otomatik yenilenir.`)
         : null);
       logger.info('Notifications', `Bildirim planı senkronize edildi (${doses.length} ilaç)`);
     }).catch(error => {
       logger.error('Notifications', 'Bildirim senkronizasyon hatası', error);
-      if (current) setScheduleInfo('Hatırlatmalar güncellenemedi. İzinleri kontrol edip uygulamayı yeniden açın.');
+      if (current) setScheduleInfo(language === 'en' ? 'Could not update reminders. Check permissions and restart app.' : 'Hatırlatmalar güncellenemedi. İzinleri kontrol edip uygulamayı yeniden açın.');
     });
     return () => { current = false; };
   }, [
@@ -723,6 +771,7 @@ function MainApp() {
     hideDoseAmount,
     repeatNagEnabled,
     repeatNagCount,
+    language,
   ]);
 
   // Computed Slots for Today
@@ -732,12 +781,12 @@ function MainApp() {
   const activeTodayDoses: Dose[] = [];
 
   unpausedDoses.forEach(d => {
-    const dur = getDurationInfo(d, today);
+    const dur = getDurationInfo(d, today, language);
     if (dur.isExpired) {
       completedDoses.push(d);
       return;
     }
-    const cyc = getCycleInfo(d, today);
+    const cyc = getCycleInfo(d, today, language);
     if (!dur.hasStarted || !cyc.isActiveToday) {
       offCycleDoses.push(d);
       return;
@@ -747,8 +796,8 @@ function MainApp() {
 
   const todaySlots: ScheduledSlot[] = [];
   activeTodayDoses.forEach(d => {
-    const info = getCycleInfo(d, today);
-    const durInfo = getDurationInfo(d, today);
+    const info = getCycleInfo(d, today, language);
+    const durInfo = getDurationInfo(d, today, language);
     const dTimes = d.times && d.times.length > 0 ? d.times : [d.time];
     dTimes.forEach(t => {
       const status = slotStatus(d, t, today);
@@ -773,7 +822,7 @@ function MainApp() {
   const historySlots = doses.flatMap(dose => {
     const times = new Set([...(dose.times?.length ? dose.times : [dose.time]), ...Object.keys(dose.dailyStatuses?.[selectedHistoryDate] ?? {})]);
     return [...times].map(time => ({ dose, time, status: slotStatus(dose, time, selectedHistoryDate),
-      todayAmount: getCycleInfo(dose, selectedHistoryDate).todayAmount, slotId: `${dose.id}_${time}` }));
+      todayAmount: getCycleInfo(dose, selectedHistoryDate, language).todayAmount, slotId: `${dose.id}_${time}` }));
   }).filter(slot => slot.status !== 'pending').sort((a, b) => a.time.localeCompare(b.time));
 
 
@@ -1104,7 +1153,7 @@ function MainApp() {
                 }}
               >
                 <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                <Text style={styles.pushBannerActionTakeText}>İlaç İçildi</Text>
+                <Text style={styles.pushBannerActionTakeText}>{t.take}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1120,7 +1169,7 @@ function MainApp() {
                 }}
               >
                 <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
-                <Text style={styles.pushBannerActionSnoozeText}>3 Dk Ertele</Text>
+                <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3m' : '3 Dk Ertele'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1135,11 +1184,11 @@ function MainApp() {
                       ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'skipped') : d));
                   }
                   setActiveBannerNotification(null);
-                  showToast('❌ İlaç atlandı olarak işaretlendi');
+                  showToast(language === 'en' ? '❌ Marked as skipped' : '❌ İlaç atlandı olarak işaretlendi');
                 }}
               >
                 <Ionicons name="close-circle-outline" size={15} color="#f87171" />
-                <Text style={styles.pushBannerActionSkipText}>Atla</Text>
+                <Text style={styles.pushBannerActionSkipText}>{t.skip}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1149,19 +1198,28 @@ function MainApp() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>{tab}</Text>
+            <Text style={styles.headerTitle}>
+              {tab === 'Bugün' && t.tabToday}
+              {tab === 'İlaçlarım' && t.tabMedicines}
+              {tab === 'Geçmiş' && t.tabHistory}
+              {tab === 'Ayarlar' && t.tabSettings}
+            </Text>
             <Text style={styles.headerSubtitle}>
               {tab === 'Bugün' || tab === 'Geçmiş'
-                ? dateFromKey(today).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })
+                ? dateFromKey(today).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })
                 : tab === 'İlaçlarım'
-                  ? 'Kullanım planın, bir arada.'
-                  : (userName ? `Merhaba ${userName}, sana uygun bir rutin.` : 'Sana uygun bir rutin.')}
+                  ? (language === 'en' ? 'Your medication plan, all in one place.' : 'Kullanım planın, bir arada.')
+                  : (userName
+                      ? (language === 'en' ? `Hello ${userName}, a routine tailored to you.` : `Merhaba ${userName}, sana uygun bir rutin.`)
+                      : (language === 'en' ? 'A routine tailored to you.' : 'Sana uygun bir rutin.'))}
             </Text>
           </View>
           {tab === 'Bugün' && (
             <View style={styles.progressBadge}>
               <Ionicons name="checkmark-circle" size={16} color="#a9dfca" />
-              <Text style={styles.progressText}>{todaySlots.length} dozdan {takenSlots.length}'i alındı</Text>
+              <Text style={styles.progressText}>
+                {language === 'en' ? `${takenSlots.length} of ${todaySlots.length} doses taken` : `${todaySlots.length} dozdan ${takenSlots.length}'i alındı`}
+              </Text>
             </View>
           )}
           {tab === 'İlaçlarım' && (
@@ -1200,18 +1258,18 @@ function MainApp() {
               {/* Next Dose Hero */}
               {nextSlot ? (
                 <View style={styles.heroCard}>
-                  <Text style={styles.heroEyebrow}>SIRADAKİ İLACIN</Text>
+                  <Text style={styles.heroEyebrow}>{t.nextDose.toUpperCase()}</Text>
                   <Text style={styles.heroTime}>{nextSlot.time}</Text>
                   <Text style={styles.heroName}>{nextSlot.dose.name}</Text>
 
                   <View style={styles.chipsRow}>
                     <View style={styles.chipMeal}>
                       <MaterialCommunityIcons name="silverware-fork-knife" size={13} color="#a9dfca" />
-                      <Text style={styles.chipMealText}>{mealLabels[nextSlot.dose.mealCondition ?? 'tok']}</Text>
+                      <Text style={styles.chipMealText}>{getMealLabel(nextSlot.dose.mealCondition)}</Text>
                     </View>
                     <View style={styles.chipForm}>
                       <MaterialCommunityIcons name="pill" size={13} color="#f5f3f0" />
-                      <Text style={styles.chipFormText}>{formLabels[nextSlot.dose.form ?? 'tablet']}</Text>
+                      <Text style={styles.chipFormText}>{getFormLabel(nextSlot.dose.form)}</Text>
                     </View>
                     {nextSlot.dose.frequencyType && nextSlot.dose.frequencyType !== 'everyday' && (
                       <View style={styles.chipCycle}>
@@ -1229,46 +1287,46 @@ function MainApp() {
                       <View style={[styles.chipStock, nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) && styles.chipStockLow]}>
                         <MaterialCommunityIcons name="package-variant" size={13} color={nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) ? '#f0b484' : '#adb3bf'} />
                         <Text style={[styles.chipStockText, nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) && styles.chipStockLowText]}>
-                          {formatStock(nextSlot.dose.stock)} adet
+                          {formatStock(nextSlot.dose.stock)} {language === 'en' ? (nextSlot.dose.stock === 1 ? 'unit' : 'units') : 'adet'}
                         </Text>
                       </View>
                     )}
                   </View>
 
                   <Text style={styles.heroAmount}>
-                    {nextSlot.todayAmount} {nextSlot.dose.instructions ? `· ${nextSlot.dose.instructions}` : '· Planına göre'}
+                    {nextSlot.todayAmount} {nextSlot.dose.instructions ? `· ${nextSlot.dose.instructions}` : (language === 'en' ? '· As scheduled' : '· Planına göre')}
                   </Text>
 
                   <TouchableOpacity style={styles.takeBtn} onPress={() => takeSlot(nextSlot)}>
                     <Ionicons name="checkmark" size={28} color="#092326" />
-                    <Text style={styles.takeBtnText}>Aldım</Text>
+                    <Text style={styles.takeBtnText}>{t.take}</Text>
                   </TouchableOpacity>
 
                   <View style={styles.heroSecondaryActions}>
                     <TouchableOpacity style={styles.heroSecBtn} onPress={() => void snoozeDose(nextSlot.dose, nextSlot.time, today, snoozeMinutes)}>
                       <Ionicons name="alarm-outline" size={18} color="#adb3bf" />
-                      <Text style={styles.heroSecBtnText}>Tekrar hatırlat</Text>
+                      <Text style={styles.heroSecBtnText}>{t.snooze}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.heroSecBtn} onPress={() => skipSlot(nextSlot)}>
                       <Ionicons name="close-circle-outline" size={18} color="#adb3bf" />
-                      <Text style={styles.heroSecBtnText}>Atladım</Text>
+                      <Text style={styles.heroSecBtnText}>{t.skip}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ) : todaySlots.length > 0 ? (
                 <View style={styles.emptyCard}>
                   <Ionicons name="checkmark-circle" size={54} color="#a9dfca" />
-                  <Text style={styles.emptyCardTitle}>Bugünün planı tamam</Text>
-                  <Text style={styles.emptyCardSub}>{takenSlots.length} doz alındı, bekleyen doz yok.</Text>
+                  <Text style={styles.emptyCardTitle}>{t.allDone}</Text>
+                  <Text style={styles.emptyCardSub}>{language === 'en' ? `${takenSlots.length} doses taken, no pending doses.` : `${takenSlots.length} doz alındı, bekleyen doz yok.`}</Text>
                 </View>
               ) : (
                 <View style={styles.emptyCard}>
                   <Ionicons name="medical-outline" size={54} color="#a9dfca" />
-                  <Text style={styles.emptyCardTitle}>Henüz İlaç Eklenmedi</Text>
-                  <Text style={styles.emptyCardSub}>Günlük dozlarınızı ve saatlerinizi takip etmek için ilk ilacınızı ekleyin.</Text>
+                  <Text style={styles.emptyCardTitle}>{t.noMedsTodayTitle}</Text>
+                  <Text style={styles.emptyCardSub}>{t.noMedsTodayDesc}</Text>
                   <TouchableOpacity style={[styles.takeBtn, { marginTop: 18 }]} onPress={() => openEditor()}>
                     <Ionicons name="add" size={24} color="#092326" />
-                    <Text style={styles.takeBtnText}>İlaç Ekle</Text>
+                    <Text style={styles.takeBtnText}>{t.addFirstMedicine}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1278,18 +1336,22 @@ function MainApp() {
                 <View style={styles.offCycleBox}>
                   <View style={styles.offCycleHeader}>
                     <Ionicons name="sync" size={16} color="#a9dfca" />
-                    <Text style={styles.offCycleHeaderText}>Bugün Planlanmayanlar ({offCycleDoses.length} İlaç)</Text>
+                    <Text style={styles.offCycleHeaderText}>
+                      {language === 'en' ? `Not Scheduled Today (${offCycleDoses.length} Meds)` : `Bugün Planlanmayanlar (${offCycleDoses.length} İlaç)`}
+                    </Text>
                   </View>
                   {offCycleDoses.map(d => {
-                    const info = getCycleInfo(d, today);
+                    const info = getCycleInfo(d, today, language);
                     return (
                       <View key={d.id} style={styles.offCycleItem}>
                         <View>
                           <Text style={styles.offCycleItemName}>{d.name}</Text>
-                          <Text style={styles.offCycleItemSub}>{getDurationInfo(d, today).hasStarted ? info.phaseLabel : 'Henüz Başlamadı'} · Bugün doz yok</Text>
+                          <Text style={styles.offCycleItemSub}>
+                            {getDurationInfo(d, today, language).hasStarted ? info.phaseLabel : (language === 'en' ? 'Not Started Yet' : 'Henüz Başlamadı')} · {language === 'en' ? 'No dose today' : 'Bugün doz yok'}
+                          </Text>
                         </View>
                         <View style={styles.offBadge}>
-                          <Text style={styles.offBadgeText}>Beklemede</Text>
+                          <Text style={styles.offBadgeText}>{language === 'en' ? 'Off Day' : 'Beklemede'}</Text>
                         </View>
                       </View>
                     );
@@ -1302,18 +1364,20 @@ function MainApp() {
                 <View style={styles.completedBox}>
                   <View style={styles.completedHeader}>
                     <Ionicons name="checkmark-done-circle" size={16} color="#34d399" />
-                    <Text style={styles.completedHeaderText}>Tedavisi Tamamlananlar ({completedDoses.length} İlaç)</Text>
+                    <Text style={styles.completedHeaderText}>
+                      {language === 'en' ? `Completed Treatments (${completedDoses.length} Meds)` : `Tedavisi Tamamlananlar (${completedDoses.length} İlaç)`}
+                    </Text>
                   </View>
                   {completedDoses.map(d => (
                     <View key={d.id} style={styles.completedItem}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.completedItemName}>{d.name}</Text>
                         <Text style={styles.completedItemSub}>
-                          {d.durationDays} Günlük Tedavi Tamamlandı · {d.startDate} - {d.endDate}
+                          {language === 'en' ? `${d.durationDays}-Day Treatment Completed` : `${d.durationDays} Günlük Tedavi Tamamlandı`} · {d.startDate} - {d.endDate}
                         </Text>
                       </View>
                       <View style={styles.completedBadge}>
-                        <Text style={styles.completedBadgeText}>Tamamlandı</Text>
+                        <Text style={styles.completedBadgeText}>{language === 'en' ? 'Completed' : 'Tamamlandı'}</Text>
                       </View>
                     </View>
                   ))}
@@ -1322,7 +1386,7 @@ function MainApp() {
 
               {/* Remaining doses */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Günün Kalanında</Text>
+                <Text style={styles.sectionTitle}>{t.restOfDay}</Text>
               </View>
               {pendingSlots.slice(1).length > 0 ? (
                 pendingSlots.slice(1).map(slot => (
@@ -1331,7 +1395,7 @@ function MainApp() {
                     <View style={styles.doseRowMain}>
                       <Text style={styles.doseRowName}>{slot.dose.name}</Text>
                       <Text style={styles.doseRowSub}>
-                        {slot.todayAmount} · {mealLabels[slot.dose.mealCondition ?? 'tok']}
+                        {slot.todayAmount} · {getMealLabel(slot.dose.mealCondition)}
                         {slot.dose.frequencyType && slot.dose.frequencyType !== 'everyday' ? ` · ${slot.cycleInfo.phaseLabel}` : ''}
                         {!slot.durationInfo.isContinuous ? ` · ${slot.durationInfo.badgeText}` : ''}
                       </Text>
@@ -1342,13 +1406,15 @@ function MainApp() {
                   </View>
                 ))
               ) : (
-                <Text style={styles.quietEmpty}>Başka planlı doz bulunmuyor.</Text>
+                <Text style={styles.quietEmpty}>{language === 'en' ? 'No other scheduled doses.' : 'Başka planlı doz bulunmuyor.'}</Text>
               )}
 
               {/* Taken doses toggle */}
               <TouchableOpacity style={styles.takenToggle} onPress={() => setExpandedTaken(!expandedTaken)}>
                 <Ionicons name="clipboard-outline" size={20} color="#adb3bf" />
-                <Text style={styles.takenToggleText}>Alınanlar ({takenSlots.length} kayıt)</Text>
+                <Text style={styles.takenToggleText}>
+                  {language === 'en' ? `Taken (${takenSlots.length} records)` : `Alınanlar (${takenSlots.length} kayıt)`}
+                </Text>
                 <Ionicons name={expandedTaken ? 'chevron-up' : 'chevron-down'} size={18} color="#adb3bf" />
               </TouchableOpacity>
 
@@ -1359,7 +1425,9 @@ function MainApp() {
                       <Text style={styles.doseRowTime}>{slot.time}</Text>
                       <View style={styles.doseRowMain}>
                         <Text style={styles.doseRowName}>{slot.dose.name}</Text>
-                        <Text style={styles.doseRowSub}>{slot.todayAmount} · Alındı (Geri almak için dokun)</Text>
+                        <Text style={styles.doseRowSub}>
+                          {slot.todayAmount} · {language === 'en' ? 'Taken (Tap to revert)' : 'Alındı (Geri almak için dokun)'}
+                        </Text>
                       </View>
                       <Ionicons name="checkmark-circle" size={20} color="#a9dfca" />
                     </TouchableOpacity>
@@ -1372,24 +1440,26 @@ function MainApp() {
           {tab === 'İlaçlarım' && (
             <View>
               <View style={styles.medsHeader}>
-                <Text style={styles.sectionTitle}>GÜNLÜK PLAN ({doses.filter(d => !d.deletedAt).length} İlaç)</Text>
+                <Text style={styles.sectionTitle}>
+                  {language === 'en' ? `DAILY PLAN (${doses.filter(d => !d.deletedAt).length} Meds)` : `GÜNLÜK PLAN (${doses.filter(d => !d.deletedAt).length} İlaç)`}
+                </Text>
               </View>
               {doses.filter(d => !d.deletedAt).length === 0 ? (
                 <View style={[styles.emptyCard, { marginHorizontal: 0, marginBottom: 16 }]}>
                   <Ionicons name="medkit-outline" size={48} color="#a9dfca" />
-                  <Text style={styles.emptyCardTitle}>Kayıtlı İlaç Yok</Text>
-                  <Text style={styles.emptyCardSub}>Düzenli kullandığınız veya tedavi amaçlı ilaçlarınızı ekleyerek başlayın.</Text>
+                  <Text style={styles.emptyCardTitle}>{t.noMedsRecordedTitle}</Text>
+                  <Text style={styles.emptyCardSub}>{t.noMedsRecordedDesc}</Text>
                 </View>
               ) : (
                 doses.filter(d => !d.deletedAt).map(dose => {
-                  const cycleInfo = getCycleInfo(dose, today);
-                  const durationInfo = getDurationInfo(dose, today);
+                  const cycleInfo = getCycleInfo(dose, today, language);
+                  const durationInfo = getDurationInfo(dose, today, language);
                   const medTimes = dose.times && dose.times.length > 0 ? dose.times : [dose.time];
                   const isLow = (dose.stock ?? 10) <= (dose.stockThreshold ?? 5);
-                  let regimenText = 'Her gün';
-                  if (dose.frequencyType === 'alternate') regimenText = 'Gün aşırı';
-                  else if (dose.frequencyType === 'cycle') regimenText = `${dose.cyclePhase1Days || 3} gün al / ${dose.cyclePhase2Days || 4} gün ara`;
-                  else if (dose.frequencyType === 'variable') regimenText = `${dose.cyclePhase1Days || 4} gün ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3} gün ${dose.cyclePhase2Amount || '1 tab'}`;
+                  let regimenText = language === 'en' ? 'Every day' : 'Her gün';
+                  if (dose.frequencyType === 'alternate') regimenText = language === 'en' ? 'Alternate days' : 'Gün aşırı';
+                  else if (dose.frequencyType === 'cycle') regimenText = language === 'en' ? `${dose.cyclePhase1Days || 3}d on / ${dose.cyclePhase2Days || 4}d off` : `${dose.cyclePhase1Days || 3} gün al / ${dose.cyclePhase2Days || 4} gün ara`;
+                  else if (dose.frequencyType === 'variable') regimenText = language === 'en' ? `${dose.cyclePhase1Days || 4}d ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3}d ${dose.cyclePhase2Amount || '1 tab'}` : `${dose.cyclePhase1Days || 4} gün ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3} gün ${dose.cyclePhase2Amount || '1 tab'}`;
 
                   return (
                     <TouchableOpacity key={dose.id} style={styles.medCard} onPress={() => openEditor(dose)}>
@@ -1406,7 +1476,7 @@ function MainApp() {
                           )}
                           <View style={[styles.cycleTag, cycleInfo.phaseType === 'off' && styles.cycleTagOff]}>
                             <Text style={[styles.cycleTagText, cycleInfo.phaseType === 'off' && styles.cycleTagOffText]}>
-                              {cycleInfo.phaseType === 'off' ? 'Ara gününde' : cycleInfo.phaseLabel}
+                              {cycleInfo.phaseType === 'off' ? (language === 'en' ? 'Rest day' : 'Ara gününde') : cycleInfo.phaseLabel}
                             </Text>
                           </View>
                           <View style={[styles.stockPill, isLow && styles.stockPillLow]}>
@@ -1416,7 +1486,7 @@ function MainApp() {
                       </View>
                       <Text style={styles.medCardName}>{dose.name}</Text>
                       <Text style={styles.medCardSub}>
-                        {dose.amount} · {mealLabels[dose.mealCondition ?? 'tok']} · {regimenText}
+                        {dose.amount} · {getMealLabel(dose.mealCondition)} · {regimenText}
                         {dose.instructions ? ` · ${dose.instructions}` : ''}
                       </Text>
                       {!durationInfo.isContinuous && (
@@ -1500,19 +1570,20 @@ function MainApp() {
                     activeOpacity={0.7}
                   >
                     <Ionicons name="chevron-back" size={18} color="#a9dfca" />
-                    <Text style={styles.settingsBackBtnText}>Ayarlar</Text>
+                    <Text style={styles.settingsBackBtnText}>{t.tabSettings}</Text>
                   </TouchableOpacity>
                   <Text style={styles.settingsSubHeaderTitle} numberOfLines={1}>
-                    {settingsSubPage === 'profile' && 'Kullanıcı Profili'}
-                    {settingsSubPage === 'notifications' && 'Bildirim ve Ses Ayarları'}
-                    {settingsSubPage === 'reminders' && 'Hatırlatıcı & Erteleme'}
-                    {settingsSubPage === 'reliability' && 'Cihaz Güvenilirliği & Alarm'}
-                    {settingsSubPage === 'stock' && 'Stok ve Envanter'}
-                    {settingsSubPage === 'privacy' && 'Gizlilik & Kilit Ekranı'}
-                    {settingsSubPage === 'experience' && 'Uygulama Deneyimi'}
-                    {settingsSubPage === 'sync' && 'Senkronizasyon & Yedekleme'}
-                    {settingsSubPage === 'reset' && 'Veri ve Sıfırlama'}
-                    {settingsSubPage === 'diagnostics' && 'Hata & Tanılama Günlüğü'}
+                    {settingsSubPage === 'profile' && t.settingsProfile}
+                    {settingsSubPage === 'language' && t.settingsLanguage}
+                    {settingsSubPage === 'notifications' && t.settingsNotifications}
+                    {settingsSubPage === 'reminders' && t.settingsReminders}
+                    {settingsSubPage === 'reliability' && t.settingsReliability}
+                    {settingsSubPage === 'stock' && t.settingsStock}
+                    {settingsSubPage === 'privacy' && t.settingsPrivacy}
+                    {settingsSubPage === 'experience' && t.settingsExperience}
+                    {settingsSubPage === 'sync' && t.settingsSync}
+                    {settingsSubPage === 'reset' && t.settingsReset}
+                    {settingsSubPage === 'diagnostics' && t.settingsDiagnostics}
                   </Text>
                 </View>
               )}
@@ -1556,6 +1627,24 @@ function MainApp() {
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>Kullanıcı Profili</Text>
                         <Text style={styles.menuItemSub}>{userName ? `Hitap: ${userName}` : 'İsim ve hitap tercihlerini belirleyin'}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuListDivider} />
+
+                    {/* Dil / Language */}
+                    <TouchableOpacity
+                      style={styles.menuListItem}
+                      onPress={() => { triggerHaptic(); setSettingsSubPage('language'); }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.menuIconBox, { backgroundColor: '#13352c' }]}>
+                        <Ionicons name="globe-outline" size={22} color="#5eead4" />
+                      </View>
+                      <View style={styles.menuTextContainer}>
+                        <Text style={styles.menuItemTitle}>{t.settingsLanguage}</Text>
+                        <Text style={styles.menuItemSub}>{language === 'tr' ? 'Türkçe (Varsayılan)' : 'English'}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1770,6 +1859,72 @@ function MainApp() {
                         )}
                       </View>
                     </View>
+                  </View>
+                </>
+              )}
+
+              {/* SUB PAGE: DİL / LANGUAGE */}
+              {settingsSubPage === 'language' && (
+                <>
+                  <View style={styles.settingGroupHeader}>
+                    <Ionicons name="globe-outline" size={16} color="#a9dfca" />
+                    <Text style={styles.settingGroupTitle}>{t.languageTitle.toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.settingCard}>
+                    {/* Türkçe Card */}
+                    <TouchableOpacity
+                      style={[
+                        styles.languageOptionCard,
+                        language === 'tr' && styles.languageOptionCardActive,
+                      ]}
+                      onPress={() => {
+                        triggerHaptic();
+                        updateLanguage('tr');
+                        showToast('Dil Türkçe olarak ayarlandı');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={styles.languageOptionTitle}>Türkçe</Text>
+                          <View style={styles.languageDefaultBadge}>
+                            <Text style={styles.languageDefaultBadgeText}>Varsayılan</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.languageOptionSub}>Uygulama arayüzü ve bildirimler Türkçe görüntülenir</Text>
+                      </View>
+                      <Ionicons
+                        name={language === 'tr' ? 'radio-button-on' : 'radio-button-off'}
+                        size={22}
+                        color={language === 'tr' ? '#a9dfca' : '#4e6173'}
+                      />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuListDivider} />
+
+                    {/* English Card */}
+                    <TouchableOpacity
+                      style={[
+                        styles.languageOptionCard,
+                        language === 'en' && styles.languageOptionCardActive,
+                      ]}
+                      onPress={() => {
+                        triggerHaptic();
+                        updateLanguage('en');
+                        showToast('Language set to English');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.languageOptionTitle}>English</Text>
+                        <Text style={styles.languageOptionSub}>App interface and notifications will be displayed in English</Text>
+                      </View>
+                      <Ionicons
+                        name={language === 'en' ? 'radio-button-on' : 'radio-button-off'}
+                        size={22}
+                        color={language === 'en' ? '#a9dfca' : '#4e6173'}
+                      />
+                    </TouchableOpacity>
                   </View>
                 </>
               )}
@@ -2861,24 +3016,24 @@ function MainApp() {
         {/* Bottom Tab Navigation */}
         <View style={styles.bottomNav}>
           {[
-            { id: 'Bugün' as const, label: 'Bugün', icon: 'calendar' },
-            { id: 'İlaçlarım' as const, label: 'İlaçlarım', icon: 'medkit' },
-            { id: 'Geçmiş' as const, label: 'Geçmiş', icon: 'time' },
-            { id: 'Ayarlar' as const, label: 'Ayarlar', icon: 'settings' },
-          ].map(t => (
+            { id: 'Bugün' as const, label: t.tabToday, icon: 'calendar' },
+            { id: 'İlaçlarım' as const, label: t.tabMedicines, icon: 'medkit' },
+            { id: 'Geçmiş' as const, label: t.tabHistory, icon: 'time' },
+            { id: 'Ayarlar' as const, label: t.tabSettings, icon: 'settings' },
+          ].map(tabItem => (
             <TouchableOpacity
-              key={t.id}
+              key={tabItem.id}
               style={styles.navItem}
               onPress={() => {
-                if (t.id === 'Ayarlar' && tab === 'Ayarlar') {
+                if (tabItem.id === 'Ayarlar' && tab === 'Ayarlar') {
                   setSettingsSubPage('main');
                 }
-                logger.breadcrumb(`Sekme değiştirildi: ${t.id}`);
-                setTab(t.id);
+                logger.breadcrumb(`Sekme değiştirildi: ${tabItem.id}`);
+                setTab(tabItem.id);
               }}
             >
-              <Ionicons name={t.icon as any} size={22} color={tab === t.id ? '#a9dfca' : '#adb3bf'} />
-              <Text style={[styles.navLabel, tab === t.id && styles.navLabelActive]}>{t.label}</Text>
+              <Ionicons name={tabItem.icon as any} size={22} color={tab === tabItem.id ? '#a9dfca' : '#adb3bf'} />
+              <Text style={[styles.navLabel, tab === tabItem.id && styles.navLabelActive]}>{tabItem.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -2889,7 +3044,7 @@ function MainApp() {
             <Text style={styles.toastText} numberOfLines={2}>{toastText}</Text>
             {previousState && (
               <TouchableOpacity onPress={() => { setDoses(previousState.map(d => normalizeDoseDay(d))); setToastText(null); }}>
-                <Text style={styles.toastUndo}>Geri Al</Text>
+                <Text style={styles.toastUndo}>{t.undo}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -2902,9 +3057,9 @@ function MainApp() {
               <TouchableOpacity onPress={() => setEditorOpen(false)}>
                 <Ionicons name="close" size={26} color="#f5f3f0" />
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>{editingId ? 'İlacı Düzenle' : 'Yeni İlaç Ekle'}</Text>
+              <Text style={styles.modalTitle}>{editingId ? t.modalEditTitle : t.modalAddTitle}</Text>
               <TouchableOpacity onPress={saveDose}>
-                <Text style={styles.modalSaveBtn}>Kaydet</Text>
+                <Text style={styles.modalSaveBtn}>{t.save}</Text>
               </TouchableOpacity>
             </View>
 
@@ -3604,6 +3759,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     flex: 1,
+  },
+
+  // Language Options
+  languageOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  languageOptionCardActive: {},
+  languageOptionTitle: {
+    color: '#f5f3f0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  languageOptionSub: {
+    color: '#8e9fac',
+    fontSize: 12,
+    marginTop: 3,
+  },
+  languageDefaultBadge: {
+    backgroundColor: 'rgba(169, 223, 202, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  languageDefaultBadgeText: {
+    color: '#a9dfca',
+    fontSize: 10,
+    fontWeight: '600',
   },
 
   // Empty Card

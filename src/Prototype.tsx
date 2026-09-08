@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple, Bug } from '@phosphor-icons/react';
+import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple, Bug, Globe } from '@phosphor-icons/react';
 import { BottomSheet, KeyboardInput, MobileScroll, useKeyboard, useKeyboardInsets } from './mobile';
 import { parseITSKarekod } from './itsParser';
 import { findMedicineByGTIN, type CatalogMedicine } from './data/medCatalog';
@@ -13,11 +13,13 @@ import {
 } from './syncManager';
 import { webLogger, type LogEntry, type LogLevel } from './logger';
 import { WebErrorBoundary } from './components/ErrorBoundary';
+import { getTranslations, type Language } from './i18n/translations';
 
 type Tab = 'Bugün' | 'İlaçlarım' | 'Geçmiş' | 'Ayarlar';
 type SettingsSubPage =
   | 'main'
   | 'profile'
+  | 'language'
   | 'notifications'
   | 'reminders'
   | 'reliability'
@@ -92,13 +94,14 @@ function getCalendarDayDiff(startStr: string, endStr: string): number {
   return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / 86400000));
 }
 
-function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
+function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06', lang: 'tr' | 'en' = 'tr'): CycleInfo {
+  const isEn = lang === 'en';
   const freq = dose.frequencyType || 'everyday';
   if (freq === 'everyday') {
     return {
       isActiveToday: true,
       todayAmount: dose.amount,
-      phaseLabel: 'Her gün',
+      phaseLabel: isEn ? 'Every day' : 'Her gün',
       phaseType: 'active',
       currentDayInPhase: 1,
       totalDaysInPhase: 1,
@@ -113,7 +116,7 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
       return {
         isActiveToday: true,
         todayAmount: dose.amount,
-        phaseLabel: 'Gün aşırı · Alım günü',
+        phaseLabel: isEn ? 'Alternate days · Dose day' : 'Gün aşırı · Alım günü',
         phaseType: 'active',
         currentDayInPhase: 1,
         totalDaysInPhase: 1,
@@ -122,7 +125,7 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
       return {
         isActiveToday: false,
         todayAmount: '0',
-        phaseLabel: 'Gün aşırı · Ara günü',
+        phaseLabel: isEn ? 'Alternate days · Rest day' : 'Gün aşırı · Ara günü',
         phaseType: 'off',
         currentDayInPhase: 1,
         totalDaysInPhase: 1,
@@ -140,7 +143,7 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
       return {
         isActiveToday: true,
         todayAmount: dose.amount,
-        phaseLabel: `Alım günü (${dayInCycle + 1}/${p1Days})`,
+        phaseLabel: isEn ? `Dose day (${dayInCycle + 1}/${p1Days})` : `Alım günü (${dayInCycle + 1}/${p1Days})`,
         phaseType: 'active',
         currentDayInPhase: dayInCycle + 1,
         totalDaysInPhase: p1Days,
@@ -150,7 +153,7 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
       return {
         isActiveToday: false,
         todayAmount: '0',
-        phaseLabel: `Ara günü (${offDay}/${p2Days})`,
+        phaseLabel: isEn ? `Rest day (${offDay}/${p2Days})` : `Ara günü (${offDay}/${p2Days})`,
         phaseType: 'off',
         currentDayInPhase: offDay,
         totalDaysInPhase: p2Days,
@@ -170,18 +173,18 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
       return {
         isActiveToday: true,
         todayAmount: p1Amount,
-        phaseLabel: `1. Aşama (${dayInCycle + 1}/${p1Days} gün) · ${p1Amount}`,
+        phaseLabel: isEn ? `Phase 1 (${dayInCycle + 1}/${p1Days} days) · ${p1Amount}` : `1. Aşama (${dayInCycle + 1}/${p1Days} gün) · ${p1Amount}`,
         phaseType: 'active',
         currentDayInPhase: dayInCycle + 1,
         totalDaysInPhase: p1Days,
       };
     } else {
       const p2Day = dayInCycle - p1Days + 1;
-      const isOff = p2Amount === '0' || p2Amount.toLowerCase().includes('ara');
+      const isOff = p2Amount === '0' || p2Amount.toLowerCase().includes('ara') || p2Amount.toLowerCase().includes('rest');
       return {
         isActiveToday: !isOff,
         todayAmount: isOff ? '0' : p2Amount,
-        phaseLabel: isOff ? `Ara günü (${p2Day}/${p2Days})` : `2. Aşama (${p2Day}/${p2Days} gün) · ${p2Amount}`,
+        phaseLabel: isOff ? (isEn ? `Rest day (${p2Day}/${p2Days})` : `Ara günü (${p2Day}/${p2Days})`) : (isEn ? `Phase 2 (${p2Day}/${p2Days} days) · ${p2Amount}` : `2. Aşama (${p2Day}/${p2Days} gün) · ${p2Amount}`),
         phaseType: isOff ? 'off' : 'active',
         currentDayInPhase: p2Day,
         totalDaysInPhase: p2Days,
@@ -192,7 +195,7 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06'): CycleInfo {
   return {
     isActiveToday: true,
     todayAmount: dose.amount,
-    phaseLabel: 'Her gün',
+    phaseLabel: isEn ? 'Every day' : 'Her gün',
     phaseType: 'active',
     currentDayInPhase: 1,
     totalDaysInPhase: 1,
@@ -401,6 +404,18 @@ const STORAGE_KEY_DOSES = 'rutin_doses';
 const STORAGE_KEY_SETTINGS = 'rutin_settings';
 const STORAGE_KEY_LEARNED_MEDS = 'rutin_learned_meds_v1';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_sync_config';
+const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
+
+function loadStoredLanguage(): Language {
+  if (typeof window === 'undefined') return 'tr';
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_LANGUAGE);
+    if (saved === 'tr' || saved === 'en') return saved;
+  } catch (e) {
+    console.error('Failed to load language', e);
+  }
+  return 'tr';
+}
 
 function loadStoredDoses(): Dose[] {
   if (typeof window === 'undefined') return [];
@@ -566,6 +581,50 @@ function loadStoredSettings(): PrototypeSettings {
 }
 
 function InnerPrototype() {
+  const [language, setLanguage] = useState<Language>(loadStoredLanguage);
+  const t = getTranslations(language);
+
+  const updateLanguage = (newLang: Language) => {
+    setLanguage(newLang);
+    try {
+      localStorage.setItem(STORAGE_KEY_LANGUAGE, newLang);
+      webLogger.info('Settings', `Language changed: ${newLang}`);
+    } catch (e) {
+      console.error('Failed to save language', e);
+    }
+  };
+
+  const getMealLabel = (cond?: MealCondition | string) => {
+    if (!cond) return language === 'en' ? 'On time' : 'Zamanında';
+    switch (cond) {
+      case 'tok': return t.mealTok;
+      case 'ac': return t.mealAc;
+      case 'yemekle': return t.mealYemekle;
+      case 'farketmez': return t.mealFarketmez;
+      default: return cond;
+    }
+  };
+
+  const getFormLabel = (form?: MedicineForm | string) => {
+    if (!form) return t.formTablet;
+    switch (form) {
+      case 'tablet': return t.formTablet;
+      case 'kapsul': return t.formKapsul;
+      case 'damla': return t.formDamla;
+      case 'surup': return t.formSurup;
+      default: return form;
+    }
+  };
+
+  const getTabLabel = (tName: Tab) => {
+    switch (tName) {
+      case 'Bugün': return t.tabToday;
+      case 'İlaçlarım': return t.tabMedicines;
+      case 'Geçmiş': return t.tabHistory;
+      case 'Ayarlar': return t.tabSettings;
+    }
+  };
+
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [doses, setDoses] = useState<Dose[]>(loadStoredDoses);
@@ -767,12 +826,12 @@ function InnerPrototype() {
   };
 
   const unpausedDoses = doses.filter(d => !d.paused && !d.deletedAt);
-  const offCycleDoses = unpausedDoses.filter(d => !getCycleInfo(d, '2026-09-06').isActiveToday);
-  const activeTodayDoses = unpausedDoses.filter(d => getCycleInfo(d, '2026-09-06').isActiveToday);
+  const offCycleDoses = unpausedDoses.filter(d => !getCycleInfo(d, '2026-09-06', language).isActiveToday);
+  const activeTodayDoses = unpausedDoses.filter(d => getCycleInfo(d, '2026-09-06', language).isActiveToday);
 
   const todaySlots: ScheduledSlot[] = [];
   activeTodayDoses.forEach(d => {
-    const info = getCycleInfo(d, '2026-09-06');
+    const info = getCycleInfo(d, '2026-09-06', language);
     const dTimes = d.times && d.times.length > 0 ? d.times : [d.time];
     dTimes.forEach(t => {
       const status = d.slotStatuses?.[t] ?? (t === d.time ? d.status : 'pending');
@@ -1766,35 +1825,35 @@ function InnerPrototype() {
             )}
           </form>
         </> : <>
-          <header className="page-header"><div><h1>{tab}</h1><p>{tab === 'Bugün' || tab === 'Geçmiş' ? '6 Eylül 2026, Pazar' : tab === 'İlaçlarım' ? 'Kullanım planın, bir arada.' : 'Sana uygun bir rutin.'}</p></div>
-            {tab==='Bugün' && <span className="progress"><CheckCircle size={17}/><span>{todaySlots.length} dozdan {takenSlots.length}’{countSuffix(takenSlots.length)} alındı</span></span>}
-            {tab==='İlaçlarım' && <button className="icon-button add-button" aria-label="İlaç ekle" onClick={()=>openEditor()}><Plus size={24}/></button>}
+          <header className="page-header"><div><h1>{getTabLabel(tab)}</h1><p>{tab === 'Bugün' || tab === 'Geçmiş' ? (language === 'en' ? 'September 6, 2026, Sunday' : '6 Eylül 2026, Pazar') : tab === 'İlaçlarım' ? (language === 'en' ? 'Your medication plan, all in one place.' : 'Kullanım planın, bir arada.') : (userName ? (language === 'en' ? `Hello ${userName}, a routine tailored to you.` : `Merhaba ${userName}, sana uygun bir rutin.`) : (language === 'en' ? 'A routine tailored to you.' : 'Sana uygun bir rutin.'))}</p></div>
+            {tab==='Bugün' && <span className="progress"><CheckCircle size={17}/><span>{language === 'en' ? `${takenSlots.length} of ${todaySlots.length} doses taken` : `${todaySlots.length} dozdan ${takenSlots.length}’${countSuffix(takenSlots.length)} alındı`}</span></span>}
+            {tab==='İlaçlarım' && <button className="icon-button add-button" aria-label={t.addFirstMedicine} onClick={()=>openEditor()}><Plus size={24}/></button>}
           </header>
           {tab === 'Bugün' && <>
             <div className="reliability-status-pill" onClick={() => setTab('Ayarlar')}>
               <div className="status-pill-left">
                 <span className="proto-dot-pulse" />
                 <ShieldCheck size={14} weight="bold" />
-                <span>Alarmlar & 3 Dk Tekrarlar Tam Korumalı</span>
+                <span>{language === 'en' ? 'Alarms & 3-Min Repeat Fully Protected' : 'Alarmlar & 3 Dk Tekrarlar Tam Korumalı'}</span>
               </div>
-              <span className="status-pill-action">Pil / İzinler →</span>
+              <span className="status-pill-action">{language === 'en' ? 'Battery / Permissions →' : 'Pil / İzinler →'}</span>
             </div>
 
             {nextSlot ? <section className="next-dose" aria-label="Sıradaki ilaç">
-              <p className="eyebrow">SIRADAKİ İLACIN</p>
+              <p className="eyebrow">{t.nextDose.toUpperCase()}</p>
               <div className="hero-time">{nextSlot.time}</div>
               <h2 className="hero-name">{nextSlot.dose.name}</h2>
               <div className="hero-clinical-chips">
                 <span className="clinical-chip meal">
                   <ForkKnife size={14} weight="bold" />
-                  <span>{mealLabels[nextSlot.dose.mealCondition ?? 'tok']}</span>
+                  <span>{getMealLabel(nextSlot.dose.mealCondition)}</span>
                 </span>
                 <span className="clinical-chip form">
                   {(() => {
                     const Icon = formIcons[nextSlot.dose.form ?? 'tablet'] ?? Pill;
                     return <Icon size={14} weight="bold" />;
                   })()}
-                  <span>{formLabels[nextSlot.dose.form ?? 'tablet']}</span>
+                  <span>{getFormLabel(nextSlot.dose.form)}</span>
                 </span>
                 {nextSlot.dose.frequencyType && nextSlot.dose.frequencyType !== 'everyday' && (
                   <span className="clinical-chip cycle">
@@ -1805,21 +1864,21 @@ function InnerPrototype() {
                 {nextSlot.dose.stock !== undefined && (
                   <span className={`clinical-chip stock ${nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) ? 'low' : ''}`}>
                     {nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) ? <Warning size={14} weight="bold"/> : <Package size={14} />}
-                    <span>{formatStock(nextSlot.dose.stock)} adet{nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) ? ' (Azaldı!)' : ''}</span>
+                    <span>{formatStock(nextSlot.dose.stock)} {language === 'en' ? (nextSlot.dose.stock === 1 ? 'unit' : 'units') : 'adet'}{nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) ? (language === 'en' ? ' (Low!)' : ' (Azaldı!)') : ''}</span>
                   </span>
                 )}
               </div>
               <p className="dose-description">
                 <strong>{nextSlot.todayAmount}</strong>
-                {nextSlot.dose.instructions ? ` · ${nextSlot.dose.instructions}` : ' · Kullanım planına göre'}
+                {nextSlot.dose.instructions ? ` · ${nextSlot.dose.instructions}` : (language === 'en' ? ' · As scheduled' : ' · Kullanım planına göre')}
               </p>
-              {nextSlot.dose.snooze && <p className="snooze-note"><Bell size={16}/>{nextSlot.dose.snooze} dakika sonra tekrar hatırlatılacak</p>}
-              <button className="primary take-button" onClick={takeNextDose}><Check size={34}/><span>Aldım</span></button>
+              {nextSlot.dose.snooze && <p className="snooze-note"><Bell size={16}/>{language === 'en' ? `Will remind again in ${nextSlot.dose.snooze} minutes` : `${nextSlot.dose.snooze} dakika sonra tekrar hatırlatılacak`}</p>}
+              <button className="primary take-button" onClick={takeNextDose}><Check size={34}/><span>{t.take}</span></button>
               <div className="secondary-actions">
-                <button className="secondary" onClick={()=>setSnoozing(nextSlot.dose)}><Bell size={22}/><span>Tekrar hatırlat</span></button>
-                <button className="secondary" onClick={()=>skipSlot(nextSlot)}><Prohibit size={23}/>Atladım</button>
+                <button className="secondary" onClick={()=>setSnoozing(nextSlot.dose)}><Bell size={22}/><span>{t.snooze}</span></button>
+                <button className="secondary" onClick={()=>skipSlot(nextSlot)}><Prohibit size={23}/>{t.skip}</button>
               </div>
-            </section> : <section className="complete-state"><CheckCircle size={60} weight="light"/><h2>{todaySlots.length ? 'Bugünün planı tamam.' : 'İlk ilacını ekle.'}</h2><p>{todaySlots.length ? `${takenSlots.length} alındı, ${recordedSlots.length-takenSlots.length} atlandı.` : 'Günlük rutinin burada görünecek.'}</p><button className="primary" onClick={()=>todaySlots.length ? navigate('Geçmiş') : openEditor()}>{todaySlots.length ? 'Kayıtları gör' : 'İlaç ekle'}</button></section>}
+            </section> : <section className="complete-state"><CheckCircle size={60} weight="light"/><h2>{todaySlots.length ? t.allDone : t.noMedsTodayTitle}</h2><p>{todaySlots.length ? (language === 'en' ? `${takenSlots.length} taken, ${recordedSlots.length-takenSlots.length} skipped.` : `${takenSlots.length} alındı, ${recordedSlots.length-takenSlots.length} atlandı.`) : t.noMedsTodayDesc}</p><button className="primary" onClick={()=>todaySlots.length ? navigate('Geçmiş') : openEditor()}>{todaySlots.length ? (language === 'en' ? 'View history' : 'Kayıtları gör') : t.addFirstMedicine}</button></section>}
 
             {offCycleDoses.length > 0 && (
               <div className="off-cycle-section">
@@ -1937,26 +1996,27 @@ function InnerPrototype() {
                   <div className="settings-sub-header">
                     <button type="button" className="settings-back-btn" onClick={() => setSettingsSubPage('main')}>
                       <ArrowLeft size={16} weight="bold" />
-                      <span>Ayarlar</span>
+                      <span>{t.tabSettings}</span>
                     </button>
                     <h3 className="settings-sub-title">
-                      {settingsSubPage === 'profile' && 'Kullanıcı Profili'}
-                      {settingsSubPage === 'notifications' && 'Ses & Bildirimler'}
-                      {settingsSubPage === 'reminders' && 'Hatırlatıcı & Erteleme'}
-                      {settingsSubPage === 'reliability' && 'Güvenilirlik & Arka Plan'}
-                      {settingsSubPage === 'stock' && 'Stok & Envanter'}
-                      {settingsSubPage === 'privacy' && 'Görünüm & Gizlilik'}
-                      {settingsSubPage === 'experience' && 'Deneyim & Titreşim'}
-                      {settingsSubPage === 'sync' && 'Senkronizasyon & Yedekleme'}
-                      {settingsSubPage === 'reset' && 'Verileri Sıfırla'}
-                      {settingsSubPage === 'diagnostics' && 'Hata & Tanılama Günlüğü'}
+                      {settingsSubPage === 'profile' && t.settingsProfile}
+                      {settingsSubPage === 'language' && t.settingsLanguage}
+                      {settingsSubPage === 'notifications' && t.settingsNotifications}
+                      {settingsSubPage === 'reminders' && t.settingsReminders}
+                      {settingsSubPage === 'reliability' && t.settingsReliability}
+                      {settingsSubPage === 'stock' && t.settingsStock}
+                      {settingsSubPage === 'privacy' && t.settingsPrivacy}
+                      {settingsSubPage === 'experience' && t.settingsExperience}
+                      {settingsSubPage === 'sync' && t.settingsSync}
+                      {settingsSubPage === 'reset' && t.settingsReset}
+                      {settingsSubPage === 'diagnostics' && t.settingsDiagnostics}
                     </h3>
                   </div>
                 )}
 
                 {settingsSubPage === 'main' && (
                   <>
-                    <div className="theme-row"><Moon size={24}/><div><strong>Gece görünümü</strong><small>Sakin, koyu ve okunaklı.</small></div><span className="mint-label">Etkin</span></div>
+                    <div className="theme-row"><Moon size={24}/><div><strong>{language === 'en' ? 'Dark theme' : 'Gece görünümü'}</strong><small>{language === 'en' ? 'Calm, dark and legible.' : 'Sakin, koyu ve okunaklı.'}</small></div><span className="mint-label">{language === 'en' ? 'Active' : 'Etkin'}</span></div>
 
                     <div className="settings-menu-list">
                       {/* 1. Kullanıcı Profili */}
@@ -1965,8 +2025,20 @@ function InnerPrototype() {
                           <User size={22} weight="bold" />
                         </div>
                         <div className="settings-menu-text">
-                          <span className="settings-menu-title">Kullanıcı Profili</span>
-                          <span className="settings-menu-desc">{userName ? `Hitap: ${userName}` : 'İsim ve hitap tercihlerini düzenleyin'}</span>
+                          <span className="settings-menu-title">{t.settingsProfile}</span>
+                          <span className="settings-menu-desc">{userName ? `${language === 'en' ? 'Name:' : 'Hitap:'} ${userName}` : (language === 'en' ? 'Configure name & greeting preferences' : 'İsim ve hitap tercihlerini düzenleyin')}</span>
+                        </div>
+                        <CaretRight size={18} className="settings-menu-arrow" />
+                      </button>
+
+                      {/* Dil / Language */}
+                      <button type="button" className="settings-menu-item" onClick={() => setSettingsSubPage('language')}>
+                        <div className="settings-menu-icon" style={{ background: '#13352c', color: '#5eead4' }}>
+                          <Globe size={22} weight="bold" />
+                        </div>
+                        <div className="settings-menu-text">
+                          <span className="settings-menu-title">{t.settingsLanguage}</span>
+                          <span className="settings-menu-desc">{language === 'tr' ? 'Türkçe (Varsayılan)' : 'English'}</span>
                         </div>
                         <CaretRight size={18} className="settings-menu-arrow" />
                       </button>
@@ -2125,6 +2197,51 @@ function InnerPrototype() {
                         <PencilSimple size={18} />
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* SUB PAGE: DİL / LANGUAGE */}
+                {settingsSubPage === 'language' && (
+                  <div className="settings-detail-card">
+                    <div className="settings-section-head">
+                      <Globe size={18} weight="bold" className="settings-section-icon" />
+                      <h4>{t.languageTitle}</h4>
+                    </div>
+
+                    <div className="language-options-list">
+                      <button
+                        type="button"
+                        className={`language-option-btn ${language === 'tr' ? 'active' : ''}`}
+                        onClick={() => updateLanguage('tr')}
+                      >
+                        <div className="language-option-info">
+                          <div className="language-option-head">
+                            <span className="language-option-name">Türkçe</span>
+                            <span className="language-default-tag">Varsayılan</span>
+                          </div>
+                          <span className="language-option-desc">Uygulama arayüzü ve bildirimler Türkçe görüntülenir</span>
+                        </div>
+                        <div className={`language-radio ${language === 'tr' ? 'checked' : ''}`}>
+                          {language === 'tr' && <Check size={14} weight="bold" />}
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`language-option-btn ${language === 'en' ? 'active' : ''}`}
+                        onClick={() => updateLanguage('en')}
+                      >
+                        <div className="language-option-info">
+                          <div className="language-option-head">
+                            <span className="language-option-name">English</span>
+                          </div>
+                          <span className="language-option-desc">App interface and notifications will be displayed in English</span>
+                        </div>
+                        <div className={`language-radio ${language === 'en' ? 'checked' : ''}`}>
+                          {language === 'en' && <Check size={14} weight="bold" />}
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2844,11 +2961,11 @@ function InnerPrototype() {
         </>}
       </main>
     </MobileScroll>
-    {editor && <div className="editor-save" style={{bottom:bottomInset+12}}><button className="primary" type="submit" form="medicine-form"><Check size={24}/>{editor.id ? 'Değişiklikleri kaydet' : 'Planı kaydet'}</button></div>}
-    {!editor && <nav className="bottom-tabs" aria-label="Ana menü" style={{bottom:bottomInset}}>{tabs.map(({name:label,icon:Icon})=><button key={label} className={tab===label?'active':''} aria-current={tab===label?'page':undefined} onClick={()=>navigate(label)}><Icon size={29} weight="regular"/><span>{label}</span></button>)}</nav>}
-    {toast && <div className="toast" role="status" style={{bottom:bottomInset+86}}><span>{toast.text}</span>{toast.previous && <button onClick={()=>{setDoses(toast.previous!);setToast(null);}}>Geri al</button>}<button className="toast-close" onClick={()=>setToast(null)} aria-label="Bildirimi kapat"><X size={16}/></button></div>}
-    <BottomSheet open={!!snoozing} onOpenChange={open=>{if(!open)setSnoozing(null);}} title="Tekrar hatırlat" description={`${snoozing?.name ?? 'İlaç'} için bir süre seç. Kullanım saati değişmez.`} snap={0.49}>
-      <div className="snooze-options">{[5,10,15,30].map(minutes=><button key={minutes} className="secondary full" onClick={()=>{if(snoozing)change(snoozing.id,{snooze:minutes},`${minutes} dakika seçildi · önizleme`);setSnoozing(null);}}><Clock size={20}/>{minutes} dakika sonra<CaretRight size={18}/></button>)}<button className="text-button" onClick={()=>setSnoozing(null)}>Vazgeç</button></div>
+    {editor && <div className="editor-save" style={{bottom:bottomInset+12}}><button className="primary" type="submit" form="medicine-form"><Check size={24}/>{t.save}</button></div>}
+    {!editor && <nav className="bottom-tabs" aria-label="Ana menü" style={{bottom:bottomInset}}>{tabs.map(({name:label,icon:Icon})=><button key={label} className={tab===label?'active':''} aria-current={tab===label?'page':undefined} onClick={()=>navigate(label)}><Icon size={29} weight="regular"/><span>{getTabLabel(label)}</span></button>)}</nav>}
+    {toast && <div className="toast" role="status" style={{bottom:bottomInset+86}}><span>{toast.text}</span>{toast.previous && <button onClick={()=>{setDoses(toast.previous!);setToast(null);}}>{t.undo}</button>}<button className="toast-close" onClick={()=>setToast(null)} aria-label="Bildirimi kapat"><X size={16}/></button></div>}
+    <BottomSheet open={!!snoozing} onOpenChange={open=>{if(!open)setSnoozing(null);}} title={t.snooze} description={language === 'en' ? `Choose a snooze duration for ${snoozing?.name ?? 'medicine'}.` : `${snoozing?.name ?? 'İlaç'} için bir süre seç. Kullanım saati değişmez.`} snap={0.49}>
+      <div className="snooze-options">{[5,10,15,30].map(minutes=><button key={minutes} className="secondary full" onClick={()=>{if(snoozing)change(snoozing.id,{snooze:minutes},`${minutes} ${language === 'en' ? 'min selected · preview' : 'dakika seçildi · önizleme'}`);setSnoozing(null);}}><Clock size={20}/>{minutes} {language === 'en' ? 'minutes later' : 'dakika sonra'}<CaretRight size={18}/></button>)}<button className="text-button" onClick={()=>setSnoozing(null)}>{t.cancel}</button></div>
     </BottomSheet>
 
     {scannerOpen && (

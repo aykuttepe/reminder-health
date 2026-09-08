@@ -64,7 +64,7 @@ export function calculateEndDate(startDateStr: string, days: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export function getDurationInfo(dose: Dose, targetDateStr = localDateKey()): DurationInfo {
+export function getDurationInfo(dose: Dose, targetDateStr = localDateKey(), lang: 'tr' | 'en' = 'tr'): DurationInfo {
   const hasStarted = !dose.startDate || targetDateStr >= dose.startDate;
   if (!dose.durationMode || dose.durationMode === 'continuous') {
     return {
@@ -74,7 +74,7 @@ export function getDurationInfo(dose: Dose, targetDateStr = localDateKey()): Dur
       currentDay: 1,
       totalDays: 0,
       daysRemaining: 0,
-      badgeText: 'Sürekli Kullanım',
+      badgeText: lang === 'en' ? 'Continuous Use' : 'Sürekli Kullanım',
     };
   }
 
@@ -84,6 +84,17 @@ export function getDurationInfo(dose: Dose, targetDateStr = localDateKey()): Dur
   const isExpired = currentDay > totalDays;
   const daysRemaining = Math.max(0, totalDays - currentDay + 1);
 
+  let badgeText = '';
+  if (!hasStarted) {
+    badgeText = lang === 'en' ? 'Not Started Yet' : 'Henüz Başlamadı';
+  } else if (isExpired) {
+    badgeText = lang === 'en' ? 'Treatment Completed' : 'Tedavi Tamamlandı';
+  } else {
+    badgeText = lang === 'en'
+      ? `Treatment: Day ${currentDay}/${totalDays} (${daysRemaining} days left)`
+      : `Tedavi: ${currentDay}/${totalDays}. Gün (Kalan: ${daysRemaining} gün)`;
+  }
+
   return {
     isExpired,
     hasStarted,
@@ -91,9 +102,7 @@ export function getDurationInfo(dose: Dose, targetDateStr = localDateKey()): Dur
     currentDay,
     totalDays,
     daysRemaining,
-    badgeText: !hasStarted ? 'Henüz Başlamadı' : isExpired
-      ? 'Tedavi Tamamlandı'
-      : `Tedavi: ${currentDay}/${totalDays}. Gün (Kalan: ${daysRemaining} gün)`,
+    badgeText,
   };
 }
 
@@ -154,16 +163,17 @@ export function getCalendarDayDiff(startStr: string, endStr: string): number {
   return Math.round((Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate()) - Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate())) / 86400000);
 }
 
-export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleInfo {
+export function getCycleInfo(dose: Dose, targetDateStr = localDateKey(), lang: 'tr' | 'en' = 'tr'): CycleInfo {
+  const isEn = lang === 'en';
   if (dose.cycleStartDate && targetDateStr < dose.cycleStartDate) {
-    return { isActiveToday: false, todayAmount: '0', phaseLabel: 'Henüz Başlamadı', phaseType: 'off', currentDayInPhase: 0, totalDaysInPhase: 0 };
+    return { isActiveToday: false, todayAmount: '0', phaseLabel: isEn ? 'Not Started Yet' : 'Henüz Başlamadı', phaseType: 'off', currentDayInPhase: 0, totalDaysInPhase: 0 };
   }
   const freq = dose.frequencyType || 'everyday';
   if (freq === 'everyday') {
     return {
       isActiveToday: true,
       todayAmount: dose.amount,
-      phaseLabel: 'Her gün',
+      phaseLabel: isEn ? 'Every day' : 'Her gün',
       phaseType: 'active',
       currentDayInPhase: 1,
       totalDaysInPhase: 1,
@@ -178,7 +188,7 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleI
       return {
         isActiveToday: true,
         todayAmount: dose.amount,
-        phaseLabel: 'Gün aşırı · Alım günü',
+        phaseLabel: isEn ? 'Alternate days · Dose day' : 'Gün aşırı · Alım günü',
         phaseType: 'active',
         currentDayInPhase: 1,
         totalDaysInPhase: 1,
@@ -187,7 +197,7 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleI
       return {
         isActiveToday: false,
         todayAmount: '0',
-        phaseLabel: 'Gün aşırı · Ara günü',
+        phaseLabel: isEn ? 'Alternate days · Rest day' : 'Gün aşırı · Ara günü',
         phaseType: 'off',
         currentDayInPhase: 1,
         totalDaysInPhase: 1,
@@ -205,7 +215,7 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleI
       return {
         isActiveToday: true,
         todayAmount: dose.amount,
-        phaseLabel: `Alım günü (${dayInCycle + 1}/${p1Days})`,
+        phaseLabel: isEn ? `Dose day (${dayInCycle + 1}/${p1Days})` : `Alım günü (${dayInCycle + 1}/${p1Days})`,
         phaseType: 'active',
         currentDayInPhase: dayInCycle + 1,
         totalDaysInPhase: p1Days,
@@ -215,7 +225,7 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleI
       return {
         isActiveToday: false,
         todayAmount: '0',
-        phaseLabel: `Ara günü (${offDay}/${p2Days})`,
+        phaseLabel: isEn ? `Rest day (${offDay}/${p2Days})` : `Ara günü (${offDay}/${p2Days})`,
         phaseType: 'off',
         currentDayInPhase: offDay,
         totalDaysInPhase: p2Days,
@@ -235,18 +245,18 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleI
       return {
         isActiveToday: true,
         todayAmount: p1Amount,
-        phaseLabel: `1. Aşama (${dayInCycle + 1}/${p1Days} gün) · ${p1Amount}`,
+        phaseLabel: isEn ? `Phase 1 (${dayInCycle + 1}/${p1Days} days) · ${p1Amount}` : `1. Aşama (${dayInCycle + 1}/${p1Days} gün) · ${p1Amount}`,
         phaseType: 'active',
         currentDayInPhase: dayInCycle + 1,
         totalDaysInPhase: p1Days,
       };
     } else {
       const p2Day = dayInCycle - p1Days + 1;
-      const isOff = p2Amount === '0' || p2Amount.toLowerCase().includes('ara');
+      const isOff = p2Amount === '0' || p2Amount.toLowerCase().includes('ara') || p2Amount.toLowerCase().includes('rest');
       return {
         isActiveToday: !isOff,
         todayAmount: isOff ? '0' : p2Amount,
-        phaseLabel: isOff ? `Ara günü (${p2Day}/${p2Days})` : `2. Aşama (${p2Day}/${p2Days} gün) · ${p2Amount}`,
+        phaseLabel: isOff ? (isEn ? `Rest day (${p2Day}/${p2Days})` : `Ara günü (${p2Day}/${p2Days})`) : (isEn ? `Phase 2 (${p2Day}/${p2Days} days) · ${p2Amount}` : `2. Aşama (${p2Day}/${p2Days} gün) · ${p2Amount}`),
         phaseType: isOff ? 'off' : 'active',
         currentDayInPhase: p2Day,
         totalDaysInPhase: p2Days,
@@ -257,13 +267,12 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey()): CycleI
   return {
     isActiveToday: true,
     todayAmount: dose.amount,
-    phaseLabel: 'Her gün',
+    phaseLabel: isEn ? 'Every day' : 'Her gün',
     phaseType: 'active',
     currentDayInPhase: 1,
     totalDaysInPhase: 1,
   };
 }
-
 
 export function slotStatus(dose: Dose, time: string, date = localDateKey()): Dose['status'] {
   if (dose.statusDate !== date) return dose.dailyStatuses?.[date]?.[time] ?? 'pending';
