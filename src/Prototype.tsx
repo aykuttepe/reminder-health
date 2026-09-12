@@ -779,7 +779,7 @@ function InnerPrototype() {
       setDiagnosticsLogs(webLogger.getLogs());
     });
     setDiagnosticsLogs(webLogger.getLogs());
-    webLogger.info('System', 'Web prototip başlatıldı (Reminder Health v0.2.1)');
+    webLogger.info('System', 'Web prototip başlatıldı (Reminder Health v0.2.3)');
     return () => unsub();
   }, []);
 
@@ -2431,7 +2431,7 @@ function InnerPrototype() {
                     <div className="info-note"><ShieldCheck size={22}/><p>Bu bir etkileşimli prototip. İlaç planınız ve tercihleriniz bu tarayıcıda yerel olarak güvenle saklanır.</p></div>
 
                     <div style={{ textAlign: 'center', marginTop: '16px', marginBottom: '8px', fontSize: '12px', color: '#68778d' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.1 (Web Prototip)</span>
+                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.3 (Web Prototip)</span>
                       <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>Karekod & Senkronizasyon · Güncel Sürüm</span>
                     </div>
                   </>

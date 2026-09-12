@@ -745,7 +745,7 @@ function MainApp() {
       setDiagnosticsLogs(logger.getLogs());
     });
     setDiagnosticsLogs(logger.getLogs());
-    logger.info('System', 'Uygulama açıldı (Reminder Health v0.2.1)');
+    logger.info('System', `Uygulama açıldı (Reminder Health v${CURRENT_APP_VERSION})`);
     return () => unsub();
   }, []);
 
