@@ -1,3 +1,7 @@
+import {Keyboard} from 'react-native';
+import {setNotificationIdMap} from './src/notifications';
+import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, type Session, type Snapshot} from './src/account';
+import {login, recover, registerAccount, updateUserEmail, getStoredSyncCode, getSession, logout, authRequest, localStore} from './src/authClient';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -14,7 +18,12 @@ import {
   Vibration,
   AppState,
   Share,
+  Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CAROUSEL_CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.80);
+const CAROUSEL_SPACING = 10;
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,8 +56,14 @@ import {
   ActiveNotificationPayload,
 } from './src/notifications';
 import { CameraScannerModal } from './src/components/CameraScannerModal';
+import { CalendarModal, formatLocalizedDate, formatTurkishDate } from './src/components/CalendarModal';
+import { TodayView } from './src/components/TodayView';
+import { MedicationList } from './src/components/MedicationList';
+import { HistoryView } from './src/components/HistoryView';
 import { CatalogMedicine } from './src/data/medCatalog';
 import {
+  DEFAULT_SYNC_SERVER_URL,
+  restoreServerUrl,
   checkServerHealth,
   syncWithServer,
   smartMergeDoses,
@@ -131,10 +146,12 @@ function TimeSlotPicker({
   slotTime,
   onChange,
   onStep,
+  lang = 'tr',
 }: {
   slotTime: string;
   onChange: (time: string) => void;
   onStep: (deltaMinutes: number) => void;
+  lang?: Language;
 }) {
   const [h = '09', m = '00'] = (slotTime || '09:00').split(':');
   const [hourText, setHourText] = useState(h);
@@ -227,7 +244,7 @@ function TimeSlotPicker({
         activeOpacity={0.7}
       >
         <Ionicons name="remove" size={16} color="#a9dfca" />
-        <Text style={styles.stepBtnText}>15 dk</Text>
+        <Text style={styles.stepBtnText}>{lang === 'en' ? '15 min' : '15 dk'}</Text>
       </TouchableOpacity>
 
       <View style={styles.dualClockContainer}>
@@ -238,7 +255,7 @@ function TimeSlotPicker({
           onPress={() => hourRef.current?.focus()}
         >
           <Text style={[styles.clockBoxLabel, isHourFocused && styles.clockBoxLabelFocused]}>
-            SAAT
+            {lang === 'en' ? 'HOUR' : 'SAAT'}
           </Text>
           <TextInput
             ref={hourRef}
@@ -264,7 +281,7 @@ function TimeSlotPicker({
           onPress={() => minuteRef.current?.focus()}
         >
           <Text style={[styles.clockBoxLabel, isMinuteFocused && styles.clockBoxLabelFocused]}>
-            DAKİKA
+            {lang === 'en' ? 'MIN' : 'DAKİKA'}
           </Text>
           <TextInput
             ref={minuteRef}
@@ -293,7 +310,7 @@ function TimeSlotPicker({
         activeOpacity={0.7}
       >
         <Ionicons name="add" size={16} color="#a9dfca" />
-        <Text style={styles.stepBtnText}>15 dk</Text>
+        <Text style={styles.stepBtnText}>{lang === 'en' ? '15 min' : '15 dk'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -303,6 +320,8 @@ function MainApp() {
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [today, setToday] = useState(localDateKey);
+  const [language, setLanguage] = useState<Language>('tr');
+  const t = getTranslations(language);
   const [hydrated, setHydrated] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [scheduleInfo, setScheduleInfo] = useState<string | null>(null);
@@ -310,12 +329,18 @@ function MainApp() {
   const pastWeekHistory = Array.from({ length: 7 }, (_, index) => {
     const date = dateFromKey(today);
     date.setDate(date.getDate() - 6 + index);
-    return { date: localDateKey(date), dayNum: date.getDate(), label: date.toLocaleDateString('tr-TR', { weekday: 'short' }), isToday: index === 6 };
+    return {
+      date: localDateKey(date),
+      dayNum: date.getDate(),
+      label: date.toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { weekday: 'short' }),
+      isToday: index === 6,
+    };
   });
   const [selectedHistoryDate, setSelectedHistoryDate] = useState(localDateKey);
   const [expandedTaken, setExpandedTaken] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [heroCarouselIndex, setHeroCarouselIndex] = useState(0);
 
   // Diagnostics & Logger State
   const [diagnosticsLogs, setDiagnosticsLogs] = useState<LogEntry[]>([]);
@@ -351,6 +376,25 @@ function MainApp() {
   const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
   const [currentBatchNo, setCurrentBatchNo] = useState<string | null>(null);
 
+  // Modern Calendar Modal State
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate'>('startDate');
+  const [calendarTitle, setCalendarTitle] = useState('Tarih Seçin');
+
+  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate', title: string) => {
+    setCalendarTarget(target);
+    setCalendarTitle(title);
+    setCalendarOpen(true);
+  };
+
+  const handleDateSelected = (selectedDateStr: string) => {
+    if (calendarTarget === 'startDate') {
+      setStartDate(selectedDateStr);
+    } else {
+      setCycleStartDate(selectedDateStr);
+    }
+  };
+
   const handleScanResult = (result: {
     gtin: string;
     name?: string;
@@ -368,9 +412,9 @@ function MainApp() {
 
     if (result.name) {
       setName(result.name);
-      showToast(`📦 ${result.name} karekoddan otomatik tanımlandı`);
+      showToast(language === 'en' ? `📦 ${result.name} auto-filled from barcode` : `📦 ${result.name} karekoddan otomatik tanımlandı`);
     } else {
-      showToast(`🏷️ Barkod okundu (${result.gtin}). Lütfen ilaç adını yazınız.`);
+      showToast(language === 'en' ? `🏷️ Barcode scanned (${result.gtin}). Please enter medication name.` : `🏷️ Barkod okundu (${result.gtin}). Lütfen ilaç adını yazınız.`);
     }
 
     if (result.amount) setAmount(result.amount);
@@ -408,9 +452,6 @@ function MainApp() {
   };
 
   // Language & i18n
-  const [language, setLanguage] = useState<Language>('tr');
-  const t = getTranslations(language);
-
   const updateLanguage = async (newLang: Language) => {
     setLanguage(newLang);
     try {
@@ -443,6 +484,74 @@ function MainApp() {
     }
   };
 
+  const getSoundProfileInfo = (id: string) => {
+    if (language === 'en') {
+      switch (id) {
+        case 'default':
+          return {
+            title: 'Default Sound',
+            badge: 'Standard',
+            description: 'Audible warning with standard notification chime',
+          };
+        case 'alarm':
+          return {
+            title: 'Alarm Tone (High Priority)',
+            badge: 'Strong',
+            description: 'Louder and more noticeable ringtone, ideal for heavy sleepers',
+          };
+        case 'gentle':
+          return {
+            title: 'Gentle Tone',
+            badge: 'Soft',
+            description: 'Mild and soothing chime, subtle alert',
+          };
+        case 'chime':
+          return {
+            title: 'Crystal Chime',
+            badge: 'Clear',
+            description: 'Vibrant, bright and modern crystal bell chime',
+          };
+        case 'system_custom':
+          return {
+            title: 'Device Sound (Custom)',
+            badge: 'Device',
+            description: 'Ringtone selected from your device audio library',
+          };
+        case 'silent':
+          return {
+            title: 'Silent (Vibration Only)',
+            badge: 'Silent',
+            description: 'Discrete alert with rhythmic vibration only',
+          };
+      }
+    }
+    const found = SOUND_PROFILE_OPTIONS.find(o => o.id === id);
+    return {
+      title: found?.title ?? id,
+      badge: found?.badge ?? '',
+      description: found?.description ?? '',
+    };
+  };
+
+  const getLeadTimeLabel = (val: number) => {
+    if (language === 'en') {
+      switch (val) {
+        case 0: return 'On time';
+        case 5: return '5 min early';
+        case 10: return '10 min early';
+        case 15: return '15 min early';
+        default: return `${val} min early`;
+      }
+    }
+    switch (val) {
+      case 0: return 'Vaktinde';
+      case 5: return '5 Dk Önce';
+      case 10: return '10 Dk Önce';
+      case 15: return '15 Dk Önce';
+      default: return `${val} Dk Önce`;
+    }
+  };
+
   // Settings
   const [privateMode, setPrivateMode] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -468,8 +577,17 @@ function MainApp() {
   const [wakeScreenOnAlarm, setWakeScreenOnAlarm] = useState(true);
 
   // Sync & Backup States
-  const [serverUrl, setServerUrl] = useState('http://192.168.1.50:3000');
-  const [apiToken, setApiToken] = useState('');
+  const [serverUrl, setServerUrl] = useState(DEFAULT_SYNC_SERVER_URL);
+  const [syncCode, setSyncCode] = useState('');
+  const [activeSyncCode, setActiveSyncCode] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState('');
+  const [recoveredCredentials, setRecoveredCredentials] = useState<{ syncCode: string; recoveryKey: string } | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const switchingAccount = useRef(false);
   const [autoSync, setAutoSync] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'testing' | 'syncing' | 'connected' | 'error'>('idle');
@@ -481,6 +599,32 @@ function MainApp() {
         Vibration.vibrate(30);
       } catch {}
     }
+  };
+
+  const mainScrollViewRef = useRef<ScrollView>(null);
+  const heroCarouselRef = useRef<ScrollView>(null);
+
+  const handleTabPress = (targetTab: Tab) => {
+    logger.breadcrumb(`Sekme değiştirildi: ${targetTab}`);
+    triggerHaptic();
+
+    // Sekmeye tıklandığında alt menülerde/sayfalarda takılı kalmasın, doğrudan ana menü açılsın
+    if (targetTab === 'Ayarlar') {
+      setSettingsSubPage('main');
+    } else if (targetTab === 'Geçmiş') {
+      setSelectedHistoryDate(today);
+    }
+
+    // Açık düzenleyici/modal ve geçici durumlar temizlensin
+    setEditorOpen(false);
+    setScannerOpen(false);
+    setCalendarOpen(false);
+
+    // Sekmeyi güncelle ve sayfanın en başına kaydır
+    setTab(targetTab);
+    setTimeout(() => {
+      mainScrollViewRef.current?.scrollTo({ y: 0, animated: tab === targetTab });
+    }, 10);
   };
 
   const dosesRef = useRef(doses);
@@ -505,7 +649,7 @@ function MainApp() {
 
   const snoozeDose = async (dose: Dose, time: string, date = localDateKey(), minutes = 3) => {
     if (!soundSettingsRef.current.enabled) {
-      showToast('Hatırlatmalar kapalı. Önce Ayarlar’dan açın.');
+      showToast(language === 'en' ? 'Reminders are turned off. Turn them on in Settings.' : 'Hatırlatmalar kapalı. Önce Ayarlar’dan açın.');
       return;
     }
     try {
@@ -513,11 +657,11 @@ function MainApp() {
       await cancelDoseRepeatNotifications(dose.id, time, date);
       await snoozeNotification({ ...dose, time, statusDate: date, amount: getCycleInfo(dose, date).todayAmount }, minutes, soundSettingsRef.current);
       setDoses(previous => previous.map(d => d.id === dose.id ? { ...d, snooze: minutes } : d));
-      showToast(`⏱️ Hatırlatıcı ${minutes} dakika ertelendi`);
+      showToast(language === 'en' ? `⏱️ Reminder snoozed for ${minutes} minutes` : `⏱️ Hatırlatıcı ${minutes} dakika ertelendi`);
     } catch (error) {
       logger.error('Notifications', `Doz erteleme hatası: ${dose.name}`, error);
       console.error('Snooze failed', error);
-      showToast('Erteleme kurulamadı. Lütfen tekrar deneyin.');
+      showToast(language === 'en' ? 'Failed to schedule snooze. Please try again.' : 'Erteleme kurulamadı. Lütfen tekrar deneyin.');
     }
   };
 
@@ -559,7 +703,9 @@ function MainApp() {
         cancelDoseRepeatNotifications(dose.id, time, doseDate).catch(console.error);
         setDoses(previous => previous.map(d => d.id === dose.id
           ? updateDoseSlot(d, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped') : d));
-        showToast(actionId === ACTION_TAKEN ? '✅ İlaç bildirimi onaylandı' : 'İlaç atlandı');
+        showToast(actionId === ACTION_TAKEN
+          ? (language === 'en' ? '✅ Dose confirmed as taken' : '✅ İlaç bildirimi onaylandı')
+          : (language === 'en' ? 'Dose skipped' : 'İlaç atlandı'));
       } else if (actionId === ACTION_SNOOZE) {
         void snoozeDose(dose, time, doseDate);
       }
@@ -582,13 +728,14 @@ function MainApp() {
   // Hydrate before writing defaults or rebuilding the device notification queue.
   useEffect(() => {
     let mounted = true;
-    Promise.all([
+    localStore.getItem('reminder_notification_map_v2').then(raw => {if(raw) setNotificationIdMap(JSON.parse(raw));}).catch(()=>{});
+    finishSwitch(localStore, {doses:STORAGE_KEY_DOSES, learned:STORAGE_KEY_LEARNED_MEDS, settings:STORAGE_KEY_SETTINGS}).then(() => Promise.all([
       AsyncStorage.getItem(STORAGE_KEY_DOSES),
       AsyncStorage.getItem(STORAGE_KEY_SETTINGS),
       AsyncStorage.getItem(STORAGE_KEY_LEARNED_MEDS),
       AsyncStorage.getItem(STORAGE_KEY_SYNC_CONFIG),
       AsyncStorage.getItem(STORAGE_KEY_LANGUAGE),
-    ])
+    ]))
       .then(([doseData, settingData, learnedData, syncData, langData]) => {
         if (!mounted) return;
         if (langData === 'tr' || langData === 'en') {
@@ -611,8 +758,7 @@ function MainApp() {
         if (syncData) {
           try {
             const parsed = JSON.parse(syncData);
-            if (parsed.serverUrl) setServerUrl(parsed.serverUrl);
-            if (parsed.apiToken !== undefined) setApiToken(parsed.apiToken);
+            setServerUrl(restoreServerUrl(parsed?.serverUrl));
             if (parsed.autoSync !== undefined) setAutoSync(parsed.autoSync);
             if (parsed.lastSyncAt) setLastSyncAt(parsed.lastSyncAt);
           } catch {}
@@ -623,7 +769,7 @@ function MainApp() {
           if (parsed.notifications !== undefined) setNotifications(parsed.notifications);
           if (parsed.soundEnabled !== undefined) setSoundEnabled(parsed.soundEnabled);
           if (parsed.soundType !== undefined) setSoundType(parsed.soundType);
-          if (parsed.userName !== undefined && parsed.userName !== 'Ahmet') setUserName(parsed.userName);
+          if (parsed.userName !== undefined) setUserName(parsed.userName);
           if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
           if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
           if (parsed.defaultStockThreshold !== undefined) setDefaultStockThreshold(parsed.defaultStockThreshold);
@@ -678,12 +824,11 @@ function MainApp() {
       STORAGE_KEY_SYNC_CONFIG,
       JSON.stringify({
         serverUrl,
-        apiToken,
         autoSync,
         lastSyncAt,
       })
     ).catch(() => {});
-  }, [hydrated, serverUrl, apiToken, autoSync, lastSyncAt]);
+  }, [hydrated, serverUrl, autoSync, lastSyncAt]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -817,6 +962,103 @@ function MainApp() {
 
   const pendingSlots = todaySlots.filter(s => s.status === 'pending');
   const nextSlot = pendingSlots[0];
+  const nextTime = nextSlot?.time;
+  // All pending slots for today go into the swipeable carousel deck
+  const carouselSlots = pendingSlots;
+  const restOfDaySlots = pendingSlots.slice(1);
+
+  const getSlotTimingText = (timeStr: string) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+    const diffMs = target.getTime() - now.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    if (diffMins > 0) {
+      if (diffMins < 60) return language === 'en' ? `${diffMins} min later` : `${diffMins} dk sonra`;
+      const hrs = Math.floor(diffMins / 60);
+      const rem = diffMins % 60;
+      return language === 'en' ? `${hrs}h ${rem > 0 ? `${rem}m ` : ''}later` : `${hrs} saat ${rem > 0 ? `${rem} dk ` : ''}sonra`;
+    } else if (diffMins < -1) {
+      const pastMins = Math.abs(diffMins);
+      return language === 'en' ? `${pastMins} min overdue` : `${pastMins} dk gecikti`;
+    } else {
+      return language === 'en' ? 'Due now' : 'Vakti geldi';
+    }
+  };
+
+  const getOverdueGuidance = (slot: ScheduledSlot) => {
+    const [h, m] = slot.time.split(':').map(Number);
+    const now = new Date();
+    const scheduledDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+    const diffMins = Math.round((now.getTime() - scheduledDate.getTime()) / 60000);
+
+    if (diffMins < 20) return null;
+
+    // Double-dose protection: is another dose of the same medication scheduled within 4 hours?
+    const sameMedUpcoming = pendingSlots.find(s => {
+      if (s.slotId === slot.slotId || String(s.doseId) !== String(slot.doseId)) return false;
+      const [uh, um] = s.time.split(':').map(Number);
+      const uDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), uh, um);
+      const diffToUpcoming = Math.round((uDate.getTime() - now.getTime()) / 60000);
+      return diffToUpcoming > 0 && diffToUpcoming <= 240;
+    });
+
+    if (sameMedUpcoming) {
+      return {
+        type: 'double_dose_warning',
+        icon: 'warning',
+        title: language === 'en' ? '⚠️ Double Dose Risk!' : '⚠️ Çift Doz Riski!',
+        message: language === 'en'
+          ? `Next dose is at ${sameMedUpcoming.time}. To prevent double-dosing, it is safer to skip this delayed dose.`
+          : `Sonraki dozunuz saat ${sameMedUpcoming.time}'de. Çift doz etkisini önlemek için bu geciken dozu atlamanız önerilir.`,
+      };
+    }
+
+    // Meal timing guidance:
+    const meal = slot.dose.mealCondition;
+    if (diffMins >= 45) {
+      if (meal === 'tok') {
+        return {
+          type: 'meal_guidance',
+          icon: 'restaurant',
+          title: language === 'en' ? '🍽️ Meal Time Passed' : '🍽️ Öğün Saati Geçti',
+          message: language === 'en'
+            ? 'This med is for after meals. Take with a light snack or with your next meal; avoid taking on an empty stomach.'
+            : 'Bu ilaç tok karnına alınmalıdır. Midenizi korumak için hafif bir atıştırmalıkla veya sonraki öğünle alınız.',
+        };
+      } else if (meal === 'ac') {
+        return {
+          type: 'meal_guidance',
+          icon: 'hourglass',
+          title: language === 'en' ? '⏳ Empty Stomach Needed' : '⏳ Aç Karnına Alınmalı',
+          message: language === 'en'
+            ? 'Must be taken on an empty stomach: at least 30-60 mins before eating or 2 hours after.'
+            : 'Aç karnına alınmalıdır: Yemekten en az 30-60 dk önce veya yemekten 2 saat sonra alınız.',
+        };
+      } else if (meal === 'yemekle') {
+        return {
+          type: 'meal_guidance',
+          icon: 'restaurant',
+          title: language === 'en' ? '🍲 Take With Meal' : '🍲 Yemekle Alınmalı',
+          message: language === 'en'
+            ? 'Take along with food to ensure proper absorption and stomach comfort.'
+            : 'İlacın emilimi ve mide konforu için yemeğin hemen yanında alınız.',
+        };
+      } else if (diffMins >= 90) {
+        return {
+          type: 'general_overdue',
+          icon: 'time',
+          title: language === 'en' ? '⏰ Missed / Overdue Dose' : '⏰ Unutulmuş / Gecikmiş Doz',
+          message: language === 'en'
+            ? 'If your next dose is far away, take it now. If your next dose is near, skip this one.'
+            : 'Sonraki doza daha çok vakit varsa şimdi alabilir, sonraki doza yakınsanız bu dozu atlayabilirsiniz.',
+        };
+      }
+    }
+
+    return null;
+  };
+
   const takenSlots = todaySlots.filter(s => s.status === 'taken');
   const recordedSlots = todaySlots.filter(s => s.status !== 'pending');
   const historySlots = doses.flatMap(dose => {
@@ -832,9 +1074,9 @@ function MainApp() {
     setTimeout(() => setToastText(null), 4000);
   };
 
-  const changeDose = (id: number, patch: Partial<Dose>, msg: string) => {
+  const changeDose = (id: string | number, patch: Partial<Dose>, msg: string) => {
     const prev = doses;
-    setDoses(ds => ds.map(d => d.id === id ? { ...d, ...patch } : d));
+    setDoses(ds => ds.map(d => d.id === id ? { ...d, ...patch, updatedAt: Date.now() } : d));
     showToast(msg, prev);
   };
 
@@ -847,7 +1089,7 @@ function MainApp() {
     if (status !== 'pending') cancelDoseRepeatNotifications(slot.doseId, slot.time).catch(err => {
       logger.warn('Notifications', `Tekrar bildirimi iptal edilemedi: ${slot.dose.name}`, { error: String(err) });
     });
-    showToast(`${slot.dose.name} (${slot.time}) ${status === 'taken' ? 'alındı' : status === 'skipped' ? 'atlandı' : 'kaydı geri alındı'}`, previous);
+    showToast(`${slot.dose.name} (${slot.time}) ${status === 'taken' ? (language === 'en' ? 'taken' : 'alındı') : status === 'skipped' ? (language === 'en' ? 'skipped' : 'atlandı') : (language === 'en' ? 'record reverted' : 'kaydı geri alındı')}`, previous);
   };
   const takeSlot = (slot: ScheduledSlot) => applySlot(slot, 'taken');
   const skipSlot = (slot: ScheduledSlot) => applySlot(slot, 'skipped');
@@ -926,7 +1168,10 @@ function MainApp() {
 
   const saveDose = () => {
     if (!name.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen ilaç adını giriniz.');
+      Alert.alert(
+        language === 'en' ? 'Missing Information' : 'Eksik Bilgi',
+        language === 'en' ? 'Please enter medication name.' : 'Lütfen ilaç adını giriniz.'
+      );
       return;
     }
     const effectiveTimes = times.length > 0 ? times : ['09:00'];
@@ -945,10 +1190,10 @@ function MainApp() {
       cyclePhase1Amount: cyclePhase1Amount.trim() || amount.trim(),
       cyclePhase2Days: Math.max(1, Number(cyclePhase2Days) || 1),
       cyclePhase2Amount: cyclePhase2Amount.trim() || (frequencyType === 'cycle' ? '0 (Ara)' : '1 tablet'),
-      cycleStartDate,
+      cycleStartDate: frequencyType !== 'everyday' ? (cycleStartDate || today) : undefined,
       durationMode,
       durationDays: durationMode === 'days' ? Math.max(1, Number(durationDays) || 7) : undefined,
-      startDate: durationMode === 'days' ? startDate : undefined,
+      startDate: startDate || today,
       endDate: durationMode === 'days' ? calculateEndDate(startDate, Number(durationDays) || 7) : undefined,
       gtin: currentGTIN || undefined,
       expiryDate: currentExpiryDate || undefined,
@@ -975,58 +1220,125 @@ function MainApp() {
 
     if (editingId) {
       logger.breadcrumb(`İlaç güncellendi: ${name.trim()} (${amount.trim()})`);
-      setDoses(ds => ds.map(d => d.id === editingId ? { ...d, ...patch } : d));
-      showToast('İlaç güncellendi');
+      setDoses(ds => ds.map(d => d.id === editingId ? { ...d, ...patch, updatedAt: Date.now() } : d));
+      showToast(language === 'en' ? 'Medication updated' : 'İlaç güncellendi');
     } else {
       logger.breadcrumb(`Yeni ilaç eklendi: ${name.trim()} (${amount.trim()})`);
-      setDoses(ds => [...ds, { id: Date.now(), ...patch, status: 'pending', statusDate: today, slotStatuses: {} }]);
-      showToast('Yeni ilaç eklendi');
+      setDoses(ds => [...ds, { id: newId(), ...patch, status: 'pending', statusDate: today, slotStatuses: {} }]);
+      showToast(language === 'en' ? 'New medication added' : 'Yeni ilaç eklendi');
     }
     setEditorOpen(false);
   };
 
-  const deleteDose = (id: number) => {
-    logger.breadcrumb(`İlaç silindi: id=${id}`);
-    const prev = doses;
-    setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt: Date.now(), updatedAt: Date.now() } : d));
-    setEditorOpen(false);
-    showToast('İlaç silindi', prev);
+  const deleteDose = (id: string | number) => {
+    Alert.alert(
+      t.confirmDeleteTitle,
+      t.confirmDeleteDesc,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.delete,
+          style: 'destructive',
+          onPress: () => {
+            logger.breadcrumb(`İlaç silindi: id=${id}`);
+            const prev = doses;
+            setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt: Date.now(), updatedAt: Date.now() } : d));
+            setEditorOpen(false);
+            showToast(t.toastMedDeleted, prev);
+          },
+        },
+      ]
+    );
   };
 
   // Sync Action Handlers
-  const handleTestConnection = async () => {
-    triggerHaptic();
-    setSyncStatus('testing');
-    setSyncStatusMsg('Sunucuya bağlanılıyor...');
-    const result = await checkServerHealth(serverUrl, apiToken);
-    if (result.ok) {
-      setSyncStatus('connected');
-      setSyncStatusMsg(`Sunucu Çevrimiçi (v${result.version} · ${result.latencyMs}ms)`);
-      showToast('Sunucu bağlantısı başarılı');
-    } else {
-      setSyncStatus('error');
-      setSyncStatusMsg(`Bağlanılamadı: ${result.error}`);
-      showToast('Bağlantı başarısız');
+
+  const accountSnapshot = (): Snapshot => ({
+    doses,
+    learnedMeds,
+    settings: {
+      userName,
+      notifications,
+      soundEnabled,
+      soundType,
+      snoozeMinutes,
+      leadTimeMinutes,
+      defaultStockThreshold,
+      stockAlertsEnabled,
+      hideDoseAmount,
+      autoCollapseTaken,
+      hapticsEnabled,
     }
+  });
+
+  const bindAccount = async (next: Session) => {
+    switchingAccount.current = true;
+    try {
+      const before = doses;
+      const snapshot = await switchAccount(localStore, serverUrl, next.user, accountSnapshot());
+      await finishSwitch(localStore, {doses:STORAGE_KEY_DOSES, learned:STORAGE_KEY_LEARNED_MEDS, settings:STORAGE_KEY_SETTINGS});
+      const oldMap = await localStore.getItem('reminder_notification_map_v2');
+      const map = Object.fromEntries(before.filter(d => typeof d.id === 'number').map(d => [String(d.id), String(migrateDoseIds([d], next.user.id)[0].id)]));
+      const oldAccount = await localStore.getItem('reminder_notification_account_v2');
+      const ids = {...(oldAccount === next.user.id && oldMap ? JSON.parse(oldMap) : {}), ...map};
+      setNotificationIdMap(ids);
+      await localStore.setItem('reminder_notification_map_v2', JSON.stringify(ids));
+      await localStore.setItem('reminder_notification_account_v2', next.user.id);
+      setDoses(snapshot.doses);
+      setLearnedMeds(snapshot.learnedMeds);
+      const effectiveUserName = snapshot.settings.userName || (next.user?.name && next.user.name !== 'Kullanıcı' ? next.user.name : '');
+      setUserName(effectiveUserName);
+      if (snapshot.settings.notifications !== undefined) setNotifications(snapshot.settings.notifications);
+      if (snapshot.settings.soundEnabled !== undefined) setSoundEnabled(snapshot.settings.soundEnabled);
+      if (snapshot.settings.soundType !== undefined) setSoundType(snapshot.settings.soundType);
+      if (snapshot.settings.snoozeMinutes !== undefined) setSnoozeMinutes(snapshot.settings.snoozeMinutes);
+      if (snapshot.settings.leadTimeMinutes !== undefined) setLeadTimeMinutes(snapshot.settings.leadTimeMinutes);
+      if (snapshot.settings.defaultStockThreshold !== undefined) setDefaultStockThreshold(snapshot.settings.defaultStockThreshold);
+      if (snapshot.settings.stockAlertsEnabled !== undefined) setStockAlertsEnabled(snapshot.settings.stockAlertsEnabled);
+      if (snapshot.settings.hideDoseAmount !== undefined) setHideDoseAmount(snapshot.settings.hideDoseAmount);
+      if (snapshot.settings.autoCollapseTaken !== undefined) setAutoCollapseTaken(snapshot.settings.autoCollapseTaken);
+      if (snapshot.settings.hapticsEnabled !== undefined) setHapticsEnabled(snapshot.settings.hapticsEnabled);
+      setPreviousState(null);
+      setActiveBannerNotification(null);
+      setLastSyncAt(null);
+      setSession(next);
+    } finally { switchingAccount.current = false; }
   };
 
-  const handleSyncNow = async () => {
-    triggerHaptic();
-    logger.breadcrumb(`Sunucu eşitlemesi başlatıldı: ${serverUrl}`);
+  const syncWithServer = async (activeSession?: Session | null, showToastNotification = true) => {
+    const s = activeSession || session;
+    if (!s) {
+      if (showToastNotification) throw new Error(language === 'en' ? 'Connect with your personal sync code first.' : 'Önce kişisel eşitleme kodunuzla bağlanın.');
+      return;
+    }
     setSyncStatus('syncing');
-    setSyncStatusMsg('Eşitleniyor...');
+    setSyncStatusMsg(language === 'en' ? 'Syncing...' : 'Eşitleniyor...');
     try {
-      const response = await syncWithServer(serverUrl, apiToken, {
+      await assertAccount(localStore, serverUrl, s.user);
+      const currentSession = await getSession(serverUrl);
+      if (currentSession.user.id !== s.user.id) throw new Error(language === 'en' ? 'Account changed; please reconnect.' : 'Hesap değişti; yeniden bağlanın.');
+
+      const payloadSettings: Record<string, any> = {
+        notifications,
+        soundEnabled,
+        soundType,
+        snoozeMinutes,
+        leadTimeMinutes,
+        defaultStockThreshold,
+        stockAlertsEnabled,
+        hideDoseAmount,
+        autoCollapseTaken,
+        hapticsEnabled,
+      };
+      if (userName && userName.trim()) {
+        payloadSettings.userName = userName.trim();
+      }
+
+      const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
         learnedMeds,
-        settings: {
-          userName,
-          notifications,
-          soundEnabled,
-          soundType,
-          snoozeMinutes,
-        },
-      });
+        settings: payloadSettings,
+      }, currentSession);
 
       if (response.success) {
         const merged = smartMergeDoses(doses as SyncDose[], response.doses);
@@ -1034,29 +1346,181 @@ function MainApp() {
         if (response.learnedMeds) {
           setLearnedMeds(prev => ({ ...prev, ...response.learnedMeds }));
         }
-        const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        if (response.settings) {
+          if (response.settings.userName && typeof response.settings.userName === 'string') {
+            setUserName(response.settings.userName);
+          } else if (currentSession.user?.name && (!userName || !userName.trim())) {
+            setUserName(currentSession.user.name);
+          }
+          if (response.settings.notifications !== undefined) setNotifications(response.settings.notifications);
+          if (response.settings.soundEnabled !== undefined) setSoundEnabled(response.settings.soundEnabled);
+          if (response.settings.soundType !== undefined) setSoundType(response.settings.soundType);
+          if (response.settings.snoozeMinutes !== undefined) setSnoozeMinutes(response.settings.snoozeMinutes);
+          if (response.settings.leadTimeMinutes !== undefined) setLeadTimeMinutes(response.settings.leadTimeMinutes);
+          if (response.settings.defaultStockThreshold !== undefined) setDefaultStockThreshold(response.settings.defaultStockThreshold);
+          if (response.settings.stockAlertsEnabled !== undefined) setStockAlertsEnabled(response.settings.stockAlertsEnabled);
+          if (response.settings.hideDoseAmount !== undefined) setHideDoseAmount(response.settings.hideDoseAmount);
+          if (response.settings.autoCollapseTaken !== undefined) setAutoCollapseTaken(response.settings.autoCollapseTaken);
+          if (response.settings.hapticsEnabled !== undefined) setHapticsEnabled(response.settings.hapticsEnabled);
+        } else if (currentSession.user?.name && (!userName || !userName.trim())) {
+          setUserName(currentSession.user.name);
+        }
+
+        const nowStr = new Date().toLocaleTimeString(language === 'en' ? 'en-US' : 'tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncAt(nowStr);
         setSyncStatus('connected');
-        const activeCount = response.doses.filter(d => !d.deletedAt).length;
-        setSyncStatusMsg(`Eşitlendi (${activeCount} aktif ilaç)`);
-        showToast('Eşitleme tamamlandı');
+        const activeCount = response.doses.filter((d: SyncDose) => !d.deletedAt).length;
+        setSyncStatusMsg(language === 'en' ? `Synced (${activeCount} active medications)` : `Eşitlendi (${activeCount} aktif ilaç)`);
+        if (showToastNotification) showToast(t.toastSyncSuccess);
         logger.info('Sync', `Sunucu ile başarıyla eşitlendi (${activeCount} aktif ilaç)`);
       } else {
         setSyncStatus('error');
-        setSyncStatusMsg(response.message || 'Eşitleme başarısız');
+        setSyncStatusMsg(response.message || (language === 'en' ? 'Sync failed' : 'Eşitleme başarısız'));
         logger.warn('Sync', `Sunucu eşitleme başarısız yanıt döndü: ${response.message}`, { serverUrl });
       }
     } catch (err: any) {
       setSyncStatus('error');
-      setSyncStatusMsg(err.message || 'Bağlantı hatası');
-      showToast('Eşitleme başarısız oldu');
+      setSyncStatusMsg(err.message || (language === 'en' ? 'Connection error' : 'Bağlantı hatası'));
+      if (showToastNotification) showToast(t.toastSyncFailed);
       logger.error('Sync', 'Sunucu eşitleme hatası', err, { serverUrl });
     }
+  };
+
+  const handleRegister = async () => {
+    Keyboard.dismiss();
+    setAuthBusy(true);
+    try {
+      const res = await registerAccount(serverUrl, userName || 'Aykut', authEmail.trim() || undefined);
+      await bindAccount(res.session);
+      setActiveSyncCode(res.syncCode);
+      setRecoveredCredentials({ syncCode: res.syncCode, recoveryKey: res.recoveryKey });
+      setSyncStatusMsg(language === 'en' ? `New sync code created for ${res.session.user.name}` : `${res.session.user.name} için yeni eşitleme kodu oluşturuldu`);
+      setSyncStatus('connected');
+      try {
+        await syncWithServer(res.session, false);
+      } catch {}
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || (language === 'en' ? 'Account could not be created.' : 'Hesap oluşturulamadı.'));
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleUpdateEmail = async () => {
+    if (!authEmail.trim()) return;
+    Keyboard.dismiss();
+    setAuthBusy(true);
+    try {
+      const res = await updateUserEmail(serverUrl, authEmail.trim(), session || undefined);
+      if (session) {
+        setSession({ ...session, user: { ...session.user, email: res.email } });
+      }
+      setEditingEmail(false);
+      showToast(t.syncEmailSaved);
+      setSyncStatusMsg(t.syncEmailSaved);
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || (language === 'en' ? 'Failed to save email' : 'E-posta kaydedilemedi'));
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleLogin = async () => {
+    Keyboard.dismiss();
+    setAuthBusy(true);
+    try {
+      const next = await login(serverUrl, syncCode);
+      const code = syncCode;
+      setSyncCode('');
+      await bindAccount(next);
+      setActiveSyncCode(code);
+      setSyncStatusMsg(language === 'en' ? `Connected to ${next.user.name}'s account` : `${next.user.name} hesabına bağlandı`);
+      setSyncStatus('connected');
+      try {
+        await syncWithServer(next, false);
+      } catch (syncErr) {
+        console.warn('Initial sync error after login', syncErr);
+      }
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || (language === 'en' ? 'Connection failed.' : 'Bağlantı başarısız.'));
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleRecover = async () => {
+    Keyboard.dismiss();
+    setAuthBusy(true);
+    try {
+      const res = await recover(serverUrl, recoveryKey);
+      setRecoveryKey('');
+      setRecoveryMode(false);
+      await bindAccount(res.session);
+      setActiveSyncCode(res.newSyncCode);
+      setRecoveredCredentials({ syncCode: res.newSyncCode, recoveryKey: res.newRecoveryKey });
+      setSyncStatusMsg(language === 'en' ? `Account recovered for ${res.session.user.name}` : `${res.session.user.name} hesabı kurtarıldı`);
+      setSyncStatus('connected');
+      try {
+        await syncWithServer(res.session, false);
+      } catch {}
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || (language === 'en' ? 'Recovery failed.' : 'Kurtarma başarısız.'));
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleLogout = async () => {
+    Keyboard.dismiss();
+    setAuthBusy(true);
+    try { if(session) await logout(serverUrl, session); }
+    catch { setSyncStatusMsg(language === 'en' ? 'Server unreachable. Check connection to disconnect.' : 'Sunucuya ulaşılamadı. Oturumu kapatmak için bağlantıyı kontrol edin.'); return; }
+    finally { setAuthBusy(false); }
+    setSession(null); setActiveSyncCode(null); setSyncCode(''); setSyncStatusMsg(language === 'en' ? 'Connection closed. Local records are kept on this device.' : 'Bağlantı kapatıldı. Yerel kayıtlar bu cihazda korunuyor.');
+  };
+  useEffect(() => {
+    if (!hydrated) return;
+    let active = true;
+    setSession(null);
+    getSession(serverUrl).then(async next => {
+      if(active) {
+        setAuthBusy(true);
+        try {
+          await bindAccount(next);
+          const savedCode = await getStoredSyncCode();
+          if (active) setActiveSyncCode(savedCode);
+        } finally {setAuthBusy(false);}
+      }
+    }).catch(() => {});
+    return () => {active=false;};
+  }, [serverUrl, hydrated]);
+
+  const handleTestConnection = async () => {
+    triggerHaptic();
+    setSyncStatus('testing');
+    setSyncStatusMsg(language === 'en' ? 'Connecting to server...' : 'Sunucuya bağlanılıyor...');
+    const result = await checkServerHealth(serverUrl);
+    if (result.ok) {
+      setSyncStatus('connected');
+      setSyncStatusMsg(language === 'en' ? `Server Online (v${result.version} · ${result.latencyMs}ms)` : `Sunucu Çevrimiçi (v${result.version} · ${result.latencyMs}ms)`);
+      showToast(language === 'en' ? 'Server connection successful' : 'Sunucu bağlantısı başarılı');
+    } else {
+      setSyncStatus('error');
+      setSyncStatusMsg(language === 'en' ? `Failed to connect: ${result.error}` : `Bağlanılamadı: ${result.error}`);
+      showToast(language === 'en' ? 'Connection failed' : 'Bağlantı başarısız');
+    }
+  };
+
+  const handleSyncNow = async () => {
+    triggerHaptic();
+    logger.breadcrumb(`Sunucu eşitlemesi başlatıldı: ${serverUrl}`);
+    await syncWithServer(session, true);
   };
 
   const handleExportBackup = async () => {
     triggerHaptic();
     const backup = createBackupPayload({
+      ownerId: session?.user.id,
       doses,
       settings: {
         userName,
@@ -1076,22 +1540,22 @@ function MainApp() {
     const jsonStr = JSON.stringify(backup, null, 2);
     try {
       await Share.share({
-        title: 'Reminder Health İlaç Yedeklemesi',
+        title: language === 'en' ? 'Reminder Health Backup' : 'Reminder Health İlaç Yedeklemesi',
         message: jsonStr,
       });
     } catch {
-      Alert.alert('Hata', 'Yedek dosyası paylaşılamadı.');
+      Alert.alert(language === 'en' ? 'Error' : 'Hata', language === 'en' ? 'Backup file could not be shared.' : 'Yedek dosyası paylaşılamadı.');
     }
   };
 
   const resetAllData = () => {
     Alert.alert(
-      'Sıfırla',
-      'Tüm kayıtları ve ayarları başlangıç durumuna döndürmek istiyor musunuz?',
+      t.confirmResetTitle,
+      t.confirmResetDesc,
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         {
-          text: 'Sıfırla',
+          text: language === 'en' ? 'Reset' : 'Sıfırla',
           style: 'destructive',
           onPress: () => {
             AsyncStorage.clear().catch(() => {});
@@ -1108,7 +1572,7 @@ function MainApp() {
             setHideDoseAmount(false);
             setAutoCollapseTaken(false);
             setHapticsEnabled(true);
-            showToast('Tüm veriler ve ayarlar sıfırlandı');
+            showToast(t.toastResetSuccess);
           },
         },
       ]
@@ -1127,7 +1591,9 @@ function MainApp() {
               <View style={styles.pushBannerAppRow}>
                 <Ionicons name="medical" size={13} color="#a9dfca" />
                 <Text style={styles.pushBannerAppName}>
-                  {activeBannerNotification.isRepeat ? '⚠️ RUTİN · TEKRAR UYARISI (+3 DK)' : 'RUTİN · BİLDİRİM'}
+                  {activeBannerNotification.isRepeat
+                    ? (language === 'en' ? '⚠️ ROUTINE · REPEAT ALERT (+3 MIN)' : '⚠️ RUTİN · TEKRAR UYARISI (+3 DK)')
+                    : (language === 'en' ? 'ROUTINE · NOTIFICATION' : 'RUTİN · BİLDİRİM')}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setActiveBannerNotification(null)}>
@@ -1149,7 +1615,7 @@ function MainApp() {
                       ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'taken') : d));
                   }
                   setActiveBannerNotification(null);
-                  showToast('✅ İlaç alındı olarak onaylandı');
+                  showToast(language === 'en' ? '✅ Dose confirmed as taken' : '✅ İlaç alındı olarak onaylandı');
                 }}
               >
                 <Ionicons name="checkmark-circle" size={15} color="#081624" />
@@ -1230,331 +1696,73 @@ function MainApp() {
         </View>
 
         {/* Content Tabs */}
-        <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={mainScrollViewRef}
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+        >
           {tab === 'Bugün' && (
-            <>
-              {/* Cihaz Güvenilirliği & Alarm Koruma Durumu */}
-              <TouchableOpacity
-                style={styles.reliabilityStatusBanner}
-                onPress={() => {
-                  triggerHaptic();
-                  setTab('Ayarlar');
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={styles.reliabilityStatusLeft}>
-                  <View style={styles.reliabilityStatusDot} />
-                  <Ionicons name="shield-checkmark" size={14} color="#a9dfca" />
-                  <Text style={styles.reliabilityStatusText}>
-                    Alarmlar & 3 Dk Tekrarlar Tam Korumalı
-                  </Text>
-                </View>
-                <View style={styles.reliabilityStatusAction}>
-                  <Text style={styles.reliabilityStatusActionText}>Pil / İzinler</Text>
-                  <Ionicons name="chevron-forward" size={12} color="#a9dfca" />
-                </View>
-              </TouchableOpacity>
-
-              {/* Next Dose Hero */}
-              {nextSlot ? (
-                <View style={styles.heroCard}>
-                  <Text style={styles.heroEyebrow}>{t.nextDose.toUpperCase()}</Text>
-                  <Text style={styles.heroTime}>{nextSlot.time}</Text>
-                  <Text style={styles.heroName}>{nextSlot.dose.name}</Text>
-
-                  <View style={styles.chipsRow}>
-                    <View style={styles.chipMeal}>
-                      <MaterialCommunityIcons name="silverware-fork-knife" size={13} color="#a9dfca" />
-                      <Text style={styles.chipMealText}>{getMealLabel(nextSlot.dose.mealCondition)}</Text>
-                    </View>
-                    <View style={styles.chipForm}>
-                      <MaterialCommunityIcons name="pill" size={13} color="#f5f3f0" />
-                      <Text style={styles.chipFormText}>{getFormLabel(nextSlot.dose.form)}</Text>
-                    </View>
-                    {nextSlot.dose.frequencyType && nextSlot.dose.frequencyType !== 'everyday' && (
-                      <View style={styles.chipCycle}>
-                        <Ionicons name="sync" size={13} color="#a9dfca" />
-                        <Text style={styles.chipCycleText}>{nextSlot.cycleInfo.phaseLabel}</Text>
-                      </View>
-                    )}
-                    {!nextSlot.durationInfo.isContinuous && (
-                      <View style={[styles.chipDuration, nextSlot.durationInfo.isExpired && styles.chipDurationExpired]}>
-                        <Ionicons name="hourglass-outline" size={12} color="#a9dfca" />
-                        <Text style={styles.chipDurationText}>{nextSlot.durationInfo.badgeText}</Text>
-                      </View>
-                    )}
-                    {nextSlot.dose.stock !== undefined && (
-                      <View style={[styles.chipStock, nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) && styles.chipStockLow]}>
-                        <MaterialCommunityIcons name="package-variant" size={13} color={nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) ? '#f0b484' : '#adb3bf'} />
-                        <Text style={[styles.chipStockText, nextSlot.dose.stock <= (nextSlot.dose.stockThreshold ?? 5) && styles.chipStockLowText]}>
-                          {formatStock(nextSlot.dose.stock)} {language === 'en' ? (nextSlot.dose.stock === 1 ? 'unit' : 'units') : 'adet'}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <Text style={styles.heroAmount}>
-                    {nextSlot.todayAmount} {nextSlot.dose.instructions ? `· ${nextSlot.dose.instructions}` : (language === 'en' ? '· As scheduled' : '· Planına göre')}
-                  </Text>
-
-                  <TouchableOpacity style={styles.takeBtn} onPress={() => takeSlot(nextSlot)}>
-                    <Ionicons name="checkmark" size={28} color="#092326" />
-                    <Text style={styles.takeBtnText}>{t.take}</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.heroSecondaryActions}>
-                    <TouchableOpacity style={styles.heroSecBtn} onPress={() => void snoozeDose(nextSlot.dose, nextSlot.time, today, snoozeMinutes)}>
-                      <Ionicons name="alarm-outline" size={18} color="#adb3bf" />
-                      <Text style={styles.heroSecBtnText}>{t.snooze}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.heroSecBtn} onPress={() => skipSlot(nextSlot)}>
-                      <Ionicons name="close-circle-outline" size={18} color="#adb3bf" />
-                      <Text style={styles.heroSecBtnText}>{t.skip}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : todaySlots.length > 0 ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="checkmark-circle" size={54} color="#a9dfca" />
-                  <Text style={styles.emptyCardTitle}>{t.allDone}</Text>
-                  <Text style={styles.emptyCardSub}>{language === 'en' ? `${takenSlots.length} doses taken, no pending doses.` : `${takenSlots.length} doz alındı, bekleyen doz yok.`}</Text>
-                </View>
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="medical-outline" size={54} color="#a9dfca" />
-                  <Text style={styles.emptyCardTitle}>{t.noMedsTodayTitle}</Text>
-                  <Text style={styles.emptyCardSub}>{t.noMedsTodayDesc}</Text>
-                  <TouchableOpacity style={[styles.takeBtn, { marginTop: 18 }]} onPress={() => openEditor()}>
-                    <Ionicons name="add" size={24} color="#092326" />
-                    <Text style={styles.takeBtnText}>{t.addFirstMedicine}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Off-cycle section */}
-              {offCycleDoses.length > 0 && (
-                <View style={styles.offCycleBox}>
-                  <View style={styles.offCycleHeader}>
-                    <Ionicons name="sync" size={16} color="#a9dfca" />
-                    <Text style={styles.offCycleHeaderText}>
-                      {language === 'en' ? `Not Scheduled Today (${offCycleDoses.length} Meds)` : `Bugün Planlanmayanlar (${offCycleDoses.length} İlaç)`}
-                    </Text>
-                  </View>
-                  {offCycleDoses.map(d => {
-                    const info = getCycleInfo(d, today, language);
-                    return (
-                      <View key={d.id} style={styles.offCycleItem}>
-                        <View>
-                          <Text style={styles.offCycleItemName}>{d.name}</Text>
-                          <Text style={styles.offCycleItemSub}>
-                            {getDurationInfo(d, today, language).hasStarted ? info.phaseLabel : (language === 'en' ? 'Not Started Yet' : 'Henüz Başlamadı')} · {language === 'en' ? 'No dose today' : 'Bugün doz yok'}
-                          </Text>
-                        </View>
-                        <View style={styles.offBadge}>
-                          <Text style={styles.offBadgeText}>{language === 'en' ? 'Off Day' : 'Beklemede'}</Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-
-              {/* Completed treatment section */}
-              {completedDoses.length > 0 && (
-                <View style={styles.completedBox}>
-                  <View style={styles.completedHeader}>
-                    <Ionicons name="checkmark-done-circle" size={16} color="#34d399" />
-                    <Text style={styles.completedHeaderText}>
-                      {language === 'en' ? `Completed Treatments (${completedDoses.length} Meds)` : `Tedavisi Tamamlananlar (${completedDoses.length} İlaç)`}
-                    </Text>
-                  </View>
-                  {completedDoses.map(d => (
-                    <View key={d.id} style={styles.completedItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.completedItemName}>{d.name}</Text>
-                        <Text style={styles.completedItemSub}>
-                          {language === 'en' ? `${d.durationDays}-Day Treatment Completed` : `${d.durationDays} Günlük Tedavi Tamamlandı`} · {d.startDate} - {d.endDate}
-                        </Text>
-                      </View>
-                      <View style={styles.completedBadge}>
-                        <Text style={styles.completedBadgeText}>{language === 'en' ? 'Completed' : 'Tamamlandı'}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Remaining doses */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{t.restOfDay}</Text>
-              </View>
-              {pendingSlots.slice(1).length > 0 ? (
-                pendingSlots.slice(1).map(slot => (
-                  <View key={slot.slotId} style={styles.doseRow}>
-                    <Text style={styles.doseRowTime}>{slot.time}</Text>
-                    <View style={styles.doseRowMain}>
-                      <Text style={styles.doseRowName}>{slot.dose.name}</Text>
-                      <Text style={styles.doseRowSub}>
-                        {slot.todayAmount} · {getMealLabel(slot.dose.mealCondition)}
-                        {slot.dose.frequencyType && slot.dose.frequencyType !== 'everyday' ? ` · ${slot.cycleInfo.phaseLabel}` : ''}
-                        {!slot.durationInfo.isContinuous ? ` · ${slot.durationInfo.badgeText}` : ''}
-                      </Text>
-                    </View>
-                    <TouchableOpacity style={styles.quickTakeBtn} onPress={() => takeSlot(slot)}>
-                      <Ionicons name="checkmark" size={18} color="#a9dfca" />
-                    </TouchableOpacity>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.quietEmpty}>{language === 'en' ? 'No other scheduled doses.' : 'Başka planlı doz bulunmuyor.'}</Text>
-              )}
-
-              {/* Taken doses toggle */}
-              <TouchableOpacity style={styles.takenToggle} onPress={() => setExpandedTaken(!expandedTaken)}>
-                <Ionicons name="clipboard-outline" size={20} color="#adb3bf" />
-                <Text style={styles.takenToggleText}>
-                  {language === 'en' ? `Taken (${takenSlots.length} records)` : `Alınanlar (${takenSlots.length} kayıt)`}
-                </Text>
-                <Ionicons name={expandedTaken ? 'chevron-up' : 'chevron-down'} size={18} color="#adb3bf" />
-              </TouchableOpacity>
-
-              {expandedTaken && (
-                <View style={styles.takenList}>
-                  {takenSlots.map(slot => (
-                    <TouchableOpacity key={slot.slotId} style={styles.doseRow} onPress={() => revertSlot(slot)}>
-                      <Text style={styles.doseRowTime}>{slot.time}</Text>
-                      <View style={styles.doseRowMain}>
-                        <Text style={styles.doseRowName}>{slot.dose.name}</Text>
-                        <Text style={styles.doseRowSub}>
-                          {slot.todayAmount} · {language === 'en' ? 'Taken (Tap to revert)' : 'Alındı (Geri almak için dokun)'}
-                        </Text>
-                      </View>
-                      <Ionicons name="checkmark-circle" size={20} color="#a9dfca" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </>
+            <TodayView
+              carouselSlots={carouselSlots}
+              todaySlots={todaySlots}
+              takenSlots={takenSlots}
+              offCycleDoses={offCycleDoses}
+              completedDoses={completedDoses}
+              restOfDaySlots={restOfDaySlots}
+              heroCarouselIndex={heroCarouselIndex}
+              setHeroCarouselIndex={setHeroCarouselIndex}
+              heroCarouselRef={heroCarouselRef}
+              takeSlot={takeSlot}
+              snoozeDose={snoozeDose}
+              skipSlot={skipSlot}
+              triggerHaptic={triggerHaptic}
+              openEditor={openEditor}
+              onNavigateSettings={() => setTab('Ayarlar')}
+              today={today}
+              snoozeMinutes={snoozeMinutes}
+              language={language}
+              t={t}
+              expandedTaken={expandedTaken}
+              setExpandedTaken={setExpandedTaken}
+              getSlotTimingText={getSlotTimingText}
+              getMealLabel={getMealLabel}
+              getFormLabel={getFormLabel}
+              getOverdueGuidance={getOverdueGuidance}
+              formatStock={formatStock}
+              getCycleInfo={getCycleInfo}
+              getDurationInfo={getDurationInfo}
+              CAROUSEL_CARD_WIDTH={CAROUSEL_CARD_WIDTH}
+              CAROUSEL_SPACING={CAROUSEL_SPACING}
+            />
           )}
 
           {tab === 'İlaçlarım' && (
-            <View>
-              <View style={styles.medsHeader}>
-                <Text style={styles.sectionTitle}>
-                  {language === 'en' ? `DAILY PLAN (${doses.filter(d => !d.deletedAt).length} Meds)` : `GÜNLÜK PLAN (${doses.filter(d => !d.deletedAt).length} İlaç)`}
-                </Text>
-              </View>
-              {doses.filter(d => !d.deletedAt).length === 0 ? (
-                <View style={[styles.emptyCard, { marginHorizontal: 0, marginBottom: 16 }]}>
-                  <Ionicons name="medkit-outline" size={48} color="#a9dfca" />
-                  <Text style={styles.emptyCardTitle}>{t.noMedsRecordedTitle}</Text>
-                  <Text style={styles.emptyCardSub}>{t.noMedsRecordedDesc}</Text>
-                </View>
-              ) : (
-                doses.filter(d => !d.deletedAt).map(dose => {
-                  const cycleInfo = getCycleInfo(dose, today, language);
-                  const durationInfo = getDurationInfo(dose, today, language);
-                  const medTimes = dose.times && dose.times.length > 0 ? dose.times : [dose.time];
-                  const isLow = (dose.stock ?? 10) <= (dose.stockThreshold ?? 5);
-                  let regimenText = language === 'en' ? 'Every day' : 'Her gün';
-                  if (dose.frequencyType === 'alternate') regimenText = language === 'en' ? 'Alternate days' : 'Gün aşırı';
-                  else if (dose.frequencyType === 'cycle') regimenText = language === 'en' ? `${dose.cyclePhase1Days || 3}d on / ${dose.cyclePhase2Days || 4}d off` : `${dose.cyclePhase1Days || 3} gün al / ${dose.cyclePhase2Days || 4} gün ara`;
-                  else if (dose.frequencyType === 'variable') regimenText = language === 'en' ? `${dose.cyclePhase1Days || 4}d ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3}d ${dose.cyclePhase2Amount || '1 tab'}` : `${dose.cyclePhase1Days || 4} gün ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3} gün ${dose.cyclePhase2Amount || '1 tab'}`;
-
-                  return (
-                    <TouchableOpacity key={dose.id} style={styles.medCard} onPress={() => openEditor(dose)}>
-                      <View style={styles.medCardHeader}>
-                        <Text style={styles.medCardTime}>{medTimes.join(', ')}</Text>
-                        <View style={styles.medCardBadges}>
-                          {!durationInfo.isContinuous && (
-                            <View style={[styles.durationTag, durationInfo.isExpired && styles.durationTagExpired]}>
-                              <Ionicons name={durationInfo.isExpired ? "checkmark-circle" : "hourglass-outline"} size={10} color={durationInfo.isExpired ? "#94a3b8" : "#a9dfca"} />
-                              <Text style={[styles.durationTagText, durationInfo.isExpired && styles.durationTagTextExpired]}>
-                                {durationInfo.badgeText}
-                              </Text>
-                            </View>
-                          )}
-                          <View style={[styles.cycleTag, cycleInfo.phaseType === 'off' && styles.cycleTagOff]}>
-                            <Text style={[styles.cycleTagText, cycleInfo.phaseType === 'off' && styles.cycleTagOffText]}>
-                              {cycleInfo.phaseType === 'off' ? (language === 'en' ? 'Rest day' : 'Ara gününde') : cycleInfo.phaseLabel}
-                            </Text>
-                          </View>
-                          <View style={[styles.stockPill, isLow && styles.stockPillLow]}>
-                            <Text style={[styles.stockPillText, isLow && styles.stockPillLowText]}>{formatStock(dose.stock)}</Text>
-                          </View>
-                        </View>
-                      </View>
-                      <Text style={styles.medCardName}>{dose.name}</Text>
-                      <Text style={styles.medCardSub}>
-                        {dose.amount} · {getMealLabel(dose.mealCondition)} · {regimenText}
-                        {dose.instructions ? ` · ${dose.instructions}` : ''}
-                      </Text>
-                      {!durationInfo.isContinuous && (
-                        <View style={styles.medCardDurationRow}>
-                          <Ionicons name="calendar-outline" size={11} color="#a9dfca" />
-                          <Text style={styles.medCardDurationText}>
-                            {dose.startDate} - {dose.endDate || calculateEndDate(dose.startDate || today, dose.durationDays || 7)} ({dose.durationDays} Günlük Tedavi)
-                          </Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-              <TouchableOpacity style={styles.fullAddBtn} onPress={() => openEditor()}>
-                <Ionicons name="add" size={20} color="#f5f3f0" />
-                <Text style={styles.fullAddBtnText}>Yeni İlaç Ekle</Text>
-              </TouchableOpacity>
-            </View>
+            <MedicationList
+              doses={doses}
+              today={today}
+              language={language}
+              t={t}
+              openEditor={openEditor}
+              getMealLabel={getMealLabel}
+              formatStock={formatStock}
+              getCycleInfo={getCycleInfo}
+              getDurationInfo={getDurationInfo}
+              calculateEndDate={calculateEndDate}
+            />
           )}
 
           {tab === 'Geçmiş' && (
-            <View>
-              <View style={styles.adherenceCard}>
-                <View style={styles.adherencePill}>
-                  <Ionicons name="trending-up" size={16} color="#a9dfca" />
-                  <Text style={styles.adherencePillText}>Son 7 Gün</Text>
-                </View>
-                <Text style={styles.adherenceSub}>{takenSlots.length} / {todaySlots.length} doz bugün alındı</Text>
-                <View style={styles.weekStrip}>
-                  {pastWeekHistory.map(day => (
-                    <TouchableOpacity
-                      key={day.date}
-                      style={[styles.weekPill, selectedHistoryDate === day.date && styles.weekPillActive]}
-                      onPress={() => setSelectedHistoryDate(day.date)}
-                    >
-                      <Text style={styles.weekPillLabel}>{day.label}</Text>
-                      <Text style={styles.weekPillNum}>{day.dayNum}</Text>
-                      <View style={[styles.weekDot, day.isToday ? styles.dotToday : styles.dotComplete]} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <Text style={styles.sectionTitle}>
-                {selectedHistoryDate === today ? "Bugünün Kayıtları" : dateFromKey(selectedHistoryDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </Text>
-              {
-                historySlots.length > 0 ? (
-                  historySlots.map(slot => (
-                    <View key={slot.slotId} style={styles.doseRow}>
-                      <Text style={styles.doseRowTime}>{slot.time}</Text>
-                      <View style={styles.doseRowMain}>
-                        <Text style={styles.doseRowName}>{slot.dose.name}</Text>
-                        <Text style={styles.doseRowSub}>{slot.todayAmount} · {slot.status === 'taken' ? 'Alındı' : 'Atlandı'}</Text>
-                      </View>
-                      <Ionicons
-                        name={slot.status === 'taken' ? 'checkmark-circle' : 'close-circle'}
-                        size={20}
-                        color={slot.status === 'taken' ? '#a9dfca' : '#e6ba93'}
-                      />
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.quietEmpty}>Henüz kayıt bulunmuyor.</Text>
-                )
-              }
-            </View>
+            <HistoryView
+              pastWeekHistory={pastWeekHistory}
+              selectedHistoryDate={selectedHistoryDate}
+              setSelectedHistoryDate={setSelectedHistoryDate}
+              historySlots={historySlots}
+              takenSlots={takenSlots}
+              todaySlots={todaySlots}
+              today={today}
+              language={language}
+              dateFromKey={dateFromKey}
+            />
           )}
 
           {tab === 'Ayarlar' && (
@@ -1597,21 +1805,26 @@ function MainApp() {
                       onPress={async () => {
                         const granted = await requestNotificationPermissions();
                         setHasNotificationPermission(granted);
-                        if (granted) showToast('Bildirim izni verildi!');
-                        else Alert.alert('İzin Reddedildi', 'Telefonunuzun Ayarlar > Bildirimler menüsünden Expo Go için bildirim izni vermeniz gerekebilir.');
+                        if (granted) showToast(language === 'en' ? 'Notification permission granted!' : 'Bildirim izni verildi!');
+                        else Alert.alert(
+                          language === 'en' ? 'Permission Denied' : 'İzin Reddedildi',
+                          language === 'en' ? 'Please grant notification permissions in phone Settings.' : 'Telefonunuzun Ayarlar > Bildirimler menüsünden bildirim izni vermeniz gerekebilir.'
+                        );
                       }}
                     >
                       <Ionicons name="warning-outline" size={20} color="#f0b484" />
-                      <Text style={styles.permBannerText}>Bildirim izni kapalı. Doz hatırlatıcıları için dokunun.</Text>
+                      <Text style={styles.permBannerText}>
+                        {language === 'en' ? 'Notifications are disabled. Tap to enable dose reminders.' : 'Bildirim izni kapalı. Doz hatırlatıcıları için dokunun.'}
+                      </Text>
                       <View style={styles.permBannerBtn}>
-                        <Text style={styles.permBannerBtnText}>İzin Ver</Text>
+                        <Text style={styles.permBannerBtnText}>{language === 'en' ? 'Enable' : 'İzin Ver'}</Text>
                       </View>
                     </TouchableOpacity>
                   )}
 
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="options-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>AYAR KATEGORİLERİ</Text>
+                    <Text style={styles.settingGroupTitle}>{language === 'en' ? 'SETTINGS CATEGORIES' : 'AYAR KATEGORİLERİ'}</Text>
                   </View>
 
                   <View style={styles.menuListCard}>
@@ -1625,8 +1838,8 @@ function MainApp() {
                         <Ionicons name="person-circle-outline" size={22} color="#a9dfca" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Kullanıcı Profili</Text>
-                        <Text style={styles.menuItemSub}>{userName ? `Hitap: ${userName}` : 'İsim ve hitap tercihlerini belirleyin'}</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsProfile}</Text>
+                        <Text style={styles.menuItemSub}>{userName ? (language === 'en' ? `Name: ${userName}` : `Hitap: ${userName}`) : t.settingsProfileDesc}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1661,9 +1874,9 @@ function MainApp() {
                         <Ionicons name="notifications-outline" size={22} color="#a9dfca" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Bildirim ve Ses Ayarları</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsNotifications}</Text>
                         <Text style={styles.menuItemSub}>
-                          {notifications ? (soundEnabled ? 'Sesli bildirimler açık' : 'Sessiz bildirim') : 'Bildirimler kapalı'}
+                          {notifications ? (soundEnabled ? (language === 'en' ? 'Sound notifications on' : 'Sesli bildirimler açık') : (language === 'en' ? 'Silent notifications' : 'Sessiz bildirim')) : (language === 'en' ? 'Notifications off' : 'Bildirimler kapalı')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
@@ -1681,9 +1894,9 @@ function MainApp() {
                         <Ionicons name="time-outline" size={22} color="#a9dfca" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Hatırlatıcı & Erteleme</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsReminders}</Text>
                         <Text style={styles.menuItemSub}>
-                          {`${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
+                          {language === 'en' ? `${snoozeMinutes} min snooze · ${repeatNagEnabled ? `${repeatNagCount} repeats` : 'No repeats'}` : `${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
@@ -1701,8 +1914,8 @@ function MainApp() {
                         <Ionicons name="shield-checkmark-outline" size={22} color="#34d399" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Cihaz Güvenilirliği & Alarm</Text>
-                        <Text style={styles.menuItemSub}>Pil optimizasyonu, hassas alarm & arka plan</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsReliability}</Text>
+                        <Text style={styles.menuItemSub}>{t.settingsReliabilityDesc}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1719,8 +1932,8 @@ function MainApp() {
                         <Ionicons name="cube-outline" size={22} color="#c4b5fd" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Stok ve Envanter</Text>
-                        <Text style={styles.menuItemSub}>{`Kritik eşik: ${defaultStockThreshold} doz · ${stockAlertsEnabled ? 'Uyarılar aktif' : 'Kapalı'}`}</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsStock}</Text>
+                        <Text style={styles.menuItemSub}>{language === 'en' ? `Threshold: ${defaultStockThreshold} doses · ${stockAlertsEnabled ? 'Alerts on' : 'Off'}` : `Kritik eşik: ${defaultStockThreshold} doz · ${stockAlertsEnabled ? 'Uyarılar aktif' : 'Kapalı'}`}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1737,8 +1950,8 @@ function MainApp() {
                         <Ionicons name="lock-closed-outline" size={22} color="#7dd3fc" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Gizlilik ve Kilit Ekranı</Text>
-                        <Text style={styles.menuItemSub}>{privateMode ? 'Gizlilik modu aktif (İlaç gizli)' : 'Detaylı bildirimler'}</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsPrivacy}</Text>
+                        <Text style={styles.menuItemSub}>{privateMode ? (language === 'en' ? 'Privacy mode on (Med hidden)' : 'Gizlilik modu aktif (İlaç gizli)') : (language === 'en' ? 'Detailed notifications' : 'Detaylı bildirimler')}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1755,8 +1968,8 @@ function MainApp() {
                         <Ionicons name="sparkles-outline" size={22} color="#f472b6" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Uygulama Deneyimi</Text>
-                        <Text style={styles.menuItemSub}>Dozları daraltma, titreşim (haptics)</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsExperience}</Text>
+                        <Text style={styles.menuItemSub}>{t.settingsExperienceDesc}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1771,9 +1984,9 @@ function MainApp() {
                         <Ionicons name="cloud-upload-outline" size={22} color="#38bdf8" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>Senkronizasyon & Yedekleme</Text>
+                        <Text style={styles.menuItemTitle}>{t.settingsSync}</Text>
                         <Text style={styles.menuItemSub}>
-                          {lastSyncAt ? `Son eşitleme: ${lastSyncAt}` : 'Ubuntu sunucu eşitleme & JSON yedek'}
+                          {lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
@@ -1790,16 +2003,16 @@ function MainApp() {
                       </View>
                       <View style={styles.menuTextContainer}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.menuItemTitle}>Hata & Tanılama Günlüğü</Text>
+                          <Text style={styles.menuItemTitle}>{t.settingsDiagnostics}</Text>
                           {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
                             <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
                               <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
-                                {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} Hata
+                                {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} {language === 'en' ? 'Errors' : 'Hata'}
                               </Text>
                             </View>
                           )}
                         </View>
-                        <Text style={styles.menuItemSub}>Sistem logları, yakalanan hatalar ve kaza raporları</Text>
+                        <Text style={styles.menuItemSub}>{t.settingsDiagnosticsDesc}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -1816,8 +2029,8 @@ function MainApp() {
                         <Ionicons name="refresh-outline" size={22} color="#ff9696" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={[styles.menuItemTitle, { color: '#ff9696' }]}>Veri & Sıfırlama</Text>
-                        <Text style={styles.menuItemSub}>Tüm kayıtları ve ayarları fabrika haline döndür</Text>
+                        <Text style={[styles.menuItemTitle, { color: '#ff9696' }]}>{t.settingsReset}</Text>
+                        <Text style={styles.menuItemSub}>{t.settingsResetDesc}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#ff9696" />
                     </TouchableOpacity>
@@ -1826,7 +2039,9 @@ function MainApp() {
                   {/* SÜRÜM BİLGİSİ */}
                   <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 16 }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#a9dfca' }}>Reminder Health v0.2.1 (Release)</Text>
-                    <Text style={{ fontSize: 11, color: '#68778d', marginTop: 2 }}>Karekod & Senkronizasyon · Güncel Sürüm</Text>
+                    <Text style={{ fontSize: 11, color: '#68778d', marginTop: 2 }}>
+                      {language === 'en' ? 'Barcode & Cloud Sync · Up to Date' : 'Karekod & Senkronizasyon · Güncel Sürüm'}
+                    </Text>
                   </View>
                 </>
               )}
@@ -1836,24 +2051,42 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="person-circle-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>KULLANICI PROFİLİ</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsProfile.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View>
-                      <Text style={styles.settingTitle}>Kullanıcı İsmi / Hitap</Text>
-                      <Text style={styles.settingSub}>Ana ekranda ve bildirimlerde size nasıl hitap edileceğini belirleyin</Text>
+                      <Text style={styles.settingTitle}>{language === 'en' ? 'User Name / Greeting' : 'Kullanıcı İsmi / Hitap'}</Text>
+                      <Text style={styles.settingSub}>
+                        {language === 'en'
+                          ? 'Set how you are greeted on the home screen and in notifications'
+                          : 'Ana ekranda ve bildirimlerde size nasıl hitap edileceğini belirleyin'}
+                      </Text>
                       <View style={styles.profileInputRow}>
                         <Ionicons name="person-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
                         <TextInput
                           style={styles.profileInput}
                           value={userName}
                           onChangeText={setUserName}
-                          placeholder="Adınızı giriniz..."
+                          placeholder={language === 'en' ? 'Enter your name...' : 'Adınızı giriniz...'}
                           placeholderTextColor="#5c6e80"
                           maxLength={24}
+                          onBlur={() => {
+                            if (session && userName.trim()) {
+                              authRequest(serverUrl, '/api/sync', {
+                                settings: { userName: userName.trim() }
+                              }, session).catch(() => {});
+                            }
+                          }}
                         />
                         {userName.trim().length > 0 && (
-                          <TouchableOpacity onPress={() => showToast(`İsim "${userName}" olarak güncellendi`)}>
+                          <TouchableOpacity onPress={() => {
+                            showToast(language === 'en' ? `Name updated to "${userName}"` : `İsim "${userName}" olarak güncellendi`);
+                            if (session && userName.trim()) {
+                              authRequest(serverUrl, '/api/sync', {
+                                settings: { userName: userName.trim() }
+                              }, session).catch(() => {});
+                            }
+                          }}>
                             <Ionicons name="checkmark-circle" size={18} color="#a9dfca" />
                           </TouchableOpacity>
                         )}
@@ -1888,10 +2121,14 @@ function MainApp() {
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Text style={styles.languageOptionTitle}>Türkçe</Text>
                           <View style={styles.languageDefaultBadge}>
-                            <Text style={styles.languageDefaultBadgeText}>Varsayılan</Text>
+                            <Text style={styles.languageDefaultBadgeText}>
+                              {language === 'en' ? 'Default' : 'Varsayılan'}
+                            </Text>
                           </View>
                         </View>
-                        <Text style={styles.languageOptionSub}>Uygulama arayüzü ve bildirimler Türkçe görüntülenir</Text>
+                        <Text style={styles.languageOptionSub}>
+                          {language === 'en' ? 'App interface and notifications displayed in Turkish' : 'Uygulama arayüzü ve bildirimler Türkçe görüntülenir'}
+                        </Text>
                       </View>
                       <Ionicons
                         name={language === 'tr' ? 'radio-button-on' : 'radio-button-off'}
@@ -1934,13 +2171,13 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="notifications-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>BİLDİRİM VE SES AYARLARI</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsNotifications.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
                       <View>
-                        <Text style={styles.settingTitle}>Bildirimler</Text>
-                        <Text style={styles.settingSub}>Doz zamanında sistem hatırlatıcıları</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Notifications' : 'Bildirimler'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'System reminders at dose times' : 'Doz zamanında sistem hatırlatıcıları'}</Text>
                       </View>
                       <Switch
                         value={notifications}
@@ -1956,15 +2193,15 @@ function MainApp() {
 
                     <View style={styles.settingRow}>
                       <View>
-                        <Text style={styles.settingTitle}>Bildirim Sesi</Text>
-                        <Text style={styles.settingSub}>Doz hatırlatıcılarında sesli uyarı çal</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Notification Sound' : 'Bildirim Sesi'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'Play audible alert for dose reminders' : 'Doz hatırlatıcılarında sesli uyarı çal'}</Text>
                       </View>
                       <Switch
                         value={soundEnabled}
                         onValueChange={val => {
                           triggerHaptic();
                           setSoundEnabled(val);
-                          showToast(val ? '🔊 Bildirim sesi açıldı' : '🔕 Bildirim sesi kapatıldı (Sessiz mod)');
+                          showToast(val ? (language === 'en' ? '🔊 Notification sound turned on' : '🔊 Bildirim sesi açıldı') : (language === 'en' ? '🔕 Notification sound turned off (Silent mode)' : '🔕 Bildirim sesi kapatıldı (Sessiz mod)'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
@@ -1974,23 +2211,24 @@ function MainApp() {
                     {soundEnabled && (
                       <View style={styles.soundSection}>
                         <View style={styles.soundSectionHeader}>
-                          <Text style={styles.soundSectionTitle}>SES VE MELODİ TÜRÜ</Text>
+                          <Text style={styles.soundSectionTitle}>{language === 'en' ? 'SOUND & MELODY TYPE' : 'SES VE MELODİ TÜRÜ'}</Text>
                           <TouchableOpacity
                             style={styles.testSoundHeaderBtn}
                             onPress={() => {
                               triggerHaptic();
                               playTestSound(soundType, soundEnabled);
-                              showToast('🔊 Bildirim sesi önizlemesi çalınıyor...');
+                              showToast(language === 'en' ? '🔊 Playing sound preview...' : '🔊 Bildirim sesi önizlemesi çalınıyor...');
                             }}
                           >
                             <Ionicons name="volume-high-outline" size={13} color="#a9dfca" />
-                            <Text style={styles.testSoundHeaderBtnText}>Sesi Dinle</Text>
+                            <Text style={styles.testSoundHeaderBtnText}>{language === 'en' ? 'Play Sound' : 'Sesi Dinle'}</Text>
                           </TouchableOpacity>
                         </View>
 
                         <View style={styles.soundOptionsList}>
                           {SOUND_PROFILE_OPTIONS.map(opt => {
                             const isSelected = soundType === opt.id;
+                            const soundInfo = getSoundProfileInfo(opt.id);
                             return (
                               <TouchableOpacity
                                 key={opt.id}
@@ -1999,7 +2237,7 @@ function MainApp() {
                                   triggerHaptic();
                                   setSoundType(opt.id);
                                   playTestSound(opt.id, true);
-                                  showToast(`🎵 ${opt.title} seçildi`);
+                                  showToast(`🎵 ${soundInfo.title} ${language === 'en' ? 'selected' : 'seçildi'}`);
                                 }}
                               >
                                 <View style={[styles.soundOptionIconCircle, isSelected && styles.soundOptionIconCircleActive]}>
@@ -2012,15 +2250,15 @@ function MainApp() {
                                 <View style={{ flex: 1, marginLeft: 10 }}>
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                     <Text style={[styles.soundOptionTitle, isSelected && styles.soundOptionTitleActive]}>
-                                      {opt.title}
+                                      {soundInfo.title}
                                     </Text>
                                     <View style={[styles.soundOptionBadge, isSelected && styles.soundOptionBadgeActive]}>
                                       <Text style={[styles.soundOptionBadgeText, isSelected && styles.soundOptionBadgeTextActive]}>
-                                        {opt.badge}
+                                        {soundInfo.badge}
                                       </Text>
                                     </View>
                                   </View>
-                                  <Text style={styles.soundOptionSub}>{opt.description}</Text>
+                                  <Text style={styles.soundOptionSub}>{soundInfo.description}</Text>
                                 </View>
                                 <Ionicons
                                   name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
@@ -2039,7 +2277,7 @@ function MainApp() {
                           onPress={async () => {
                             triggerHaptic();
                             const targetChannel = SOUND_CHANNELS[soundType]?.id || 'medication-channel-custom-v2';
-                            showToast('📱 Cihaz ses ayarları açılıyor...');
+                            showToast(language === 'en' ? '📱 Opening device sound settings...' : '📱 Cihaz ses ayarları açılıyor...');
                             await openChannelNotificationSettings(targetChannel);
                           }}
                         >
@@ -2047,9 +2285,13 @@ function MainApp() {
                             <Ionicons name="phone-portrait-outline" size={20} color="#081624" />
                           </View>
                           <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={styles.deviceSoundActionTitle}>Cihazdan Özel Bildirim Sesi Seç</Text>
+                            <Text style={styles.deviceSoundActionTitle}>
+                              {language === 'en' ? 'Select Custom Device Sound' : 'Cihazdan Özel Bildirim Sesi Seç'}
+                            </Text>
                             <Text style={styles.deviceSoundActionSub}>
-                              Android sistem ekranını açarak telefonunuzdaki dahili bildirim seslerinden birini seçin
+                              {language === 'en'
+                                ? 'Open Android system screen to select one of your device ringtones'
+                                : 'Android sistem ekranını açarak telefonunuzdaki dahili bildirim seslerinden birini seçin'}
                             </Text>
                           </View>
                           <Ionicons name="open-outline" size={18} color="#a9dfca" />
@@ -2058,7 +2300,9 @@ function MainApp() {
                         <View style={styles.deviceSoundTipCard}>
                           <Ionicons name="information-circle-outline" size={16} color="#a9dfca" style={{ marginTop: 1 }} />
                           <Text style={styles.deviceSoundTipText}>
-                            İpucu: Yukarıdaki butona dokunduğunuzda açılan Android ekranında <Text style={{ color: '#a9dfca', fontWeight: 'bold' }}>"Ses"</Text> (Sound) seçeneğine tıklayarak telefonunuzdaki Samsung, Xiaomi, Pixel veya kendi yüklediğiniz zil seslerinden birini doğrudan bu kanala atayabilirsiniz.
+                            {language === 'en'
+                              ? 'Tip: Tap the button above and select "Sound" on the Android screen to assign Samsung, Xiaomi, Pixel, or your own custom ringtone to this channel.'
+                              : 'İpucu: Yukarıdaki butona dokunduğunuzda açılan Android ekranında "Ses" (Sound) seçeneğine tıklayarak telefonunuzdaki Samsung, Xiaomi, Pixel veya kendi yüklediğiniz zil seslerinden birini doğrudan bu kanala atayabilirsiniz.'}
                           </Text>
                         </View>
                       </View>
@@ -2072,17 +2316,17 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="time-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>HATIRLATICI & ERTELEME</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsReminders.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={styles.settingTitle}>Varsayılan Erteleme Süresi</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Default Snooze Duration' : 'Varsayılan Erteleme Süresi'}</Text>
                         <View style={styles.selectedPillBadge}>
-                          <Text style={styles.selectedPillBadgeText}>{snoozeMinutes} Dakika</Text>
+                          <Text style={styles.selectedPillBadgeText}>{snoozeMinutes} {language === 'en' ? 'Minutes' : 'Dakika'}</Text>
                         </View>
                       </View>
-                      <Text style={styles.settingSub}>Bildirimlerdeki erteleme butonunun süresi</Text>
+                      <Text style={styles.settingSub}>{language === 'en' ? 'Duration of snooze button in notifications' : 'Bildirimlerdeki erteleme butonunun süresi'}</Text>
                       <View style={styles.chipSelector}>
                         {SNOOZE_OPTIONS.map(mins => (
                           <TouchableOpacity
@@ -2091,11 +2335,11 @@ function MainApp() {
                             onPress={() => {
                               triggerHaptic();
                               setSnoozeMinutes(mins);
-                              showToast(`Erteleme süresi ${mins} dakika yapıldı`);
+                              showToast(language === 'en' ? `Snooze duration set to ${mins} minutes` : `Erteleme süresi ${mins} dakika yapıldı`);
                             }}
                           >
                             <Text style={[styles.choiceChipText, snoozeMinutes === mins && styles.choiceChipTextActive]}>
-                              {mins} dk
+                              {mins} {language === 'en' ? 'min' : 'dk'}
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -2106,14 +2350,14 @@ function MainApp() {
 
                     <View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={styles.settingTitle}>Ön Bildirim (Erken Uyarı)</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Pre-Reminder (Early Alert)' : 'Ön Bildirim (Erken Uyarı)'}</Text>
                         <View style={styles.selectedPillBadge}>
                           <Text style={styles.selectedPillBadgeText}>
-                            {LEAD_TIME_OPTIONS.find(o => o.value === leadTimeMinutes)?.label ?? 'Vaktinde'}
+                            {getLeadTimeLabel(leadTimeMinutes)}
                           </Text>
                         </View>
                       </View>
-                      <Text style={styles.settingSub}>Doz vaktinden kaç dakika önce hazırlık uyarısı verilsin?</Text>
+                      <Text style={styles.settingSub}>{language === 'en' ? 'Minutes before dose time to send a preparation alert' : 'Doz vaktinden kaç dakika önce hazırlık uyarısı verilsin?'}</Text>
                       <View style={styles.chipSelector}>
                         {LEAD_TIME_OPTIONS.map(opt => (
                           <TouchableOpacity
@@ -2122,11 +2366,11 @@ function MainApp() {
                             onPress={() => {
                               triggerHaptic();
                               setLeadTimeMinutes(opt.value);
-                              showToast(`Ön bildirim: ${opt.label}`);
+                              showToast(language === 'en' ? `Pre-reminder: ${getLeadTimeLabel(opt.value)}` : `Ön bildirim: ${opt.label}`);
                             }}
                           >
                             <Text style={[styles.choiceChipText, leadTimeMinutes === opt.value && styles.choiceChipTextActive]}>
-                              {opt.label}
+                              {getLeadTimeLabel(opt.value)}
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -2139,9 +2383,11 @@ function MainApp() {
                     <View>
                       <View style={styles.settingRow}>
                         <View style={{ flex: 1, paddingRight: 12 }}>
-                          <Text style={styles.settingTitle}>3 Dakikada Bir Tekrar Uyarısı</Text>
+                          <Text style={styles.settingTitle}>{language === 'en' ? 'Persistent 3-Min Repeat Alert' : '3 Dakikada Bir Tekrar Uyarısı'}</Text>
                           <Text style={styles.settingSub}>
-                            İlaç onaylanana (içilene) kadar her 3 dakikada bir ısrarcı bildirim gönderir
+                            {language === 'en'
+                              ? 'Sends persistent reminders every 3 minutes until dose is confirmed'
+                              : 'İlaç onaylanana (içilene) kadar her 3 dakikada bir ısrarcı bildirim gönderir'}
                           </Text>
                         </View>
                         <Switch
@@ -2149,7 +2395,7 @@ function MainApp() {
                           onValueChange={val => {
                             triggerHaptic();
                             setRepeatNagEnabled(val);
-                            showToast(val ? '3 dakikada bir ısrarcı bildirim açıldı' : 'Tekrar bildirimleri kapatıldı');
+                            showToast(val ? (language === 'en' ? '3-minute persistent repeat enabled' : '3 dakikada bir ısrarcı bildirim açıldı') : (language === 'en' ? 'Repeat reminders disabled' : 'Tekrar bildirimleri kapatıldı'));
                           }}
                           trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                         />
@@ -2157,12 +2403,12 @@ function MainApp() {
 
                       {repeatNagEnabled && (
                         <View style={{ marginTop: 10 }}>
-                          <Text style={[styles.settingSub, { marginBottom: 6 }]}>Maksimum Tekrar Sayısı:</Text>
+                          <Text style={[styles.settingSub, { marginBottom: 6 }]}>{language === 'en' ? 'Maximum Repeat Count:' : 'Maksimum Tekrar Sayısı:'}</Text>
                           <View style={styles.chipSelector}>
                             {[
-                              { count: 3, label: '3 Tekrar (9 dk)' },
-                              { count: 5, label: '5 Tekrar (15 dk)' },
-                              { count: 10, label: '10 Tekrar (30 dk)' },
+                              { count: 3, label: language === 'en' ? '3 Repeats (9 min)' : '3 Tekrar (9 dk)' },
+                              { count: 5, label: language === 'en' ? '5 Repeats (15 min)' : '5 Tekrar (15 dk)' },
+                              { count: 10, label: language === 'en' ? '10 Repeats (30 min)' : '10 Tekrar (30 dk)' },
                             ].map(opt => (
                               <TouchableOpacity
                                 key={opt.count}
@@ -2170,7 +2416,7 @@ function MainApp() {
                                 onPress={() => {
                                   triggerHaptic();
                                   setRepeatNagCount(opt.count);
-                                  showToast(`Tekrar uyarısı: ${opt.label}`);
+                                  showToast(language === 'en' ? `Repeat alert: ${opt.label}` : `Tekrar uyarısı: ${opt.label}`);
                                 }}
                               >
                                 <Text style={[styles.choiceChipText, repeatNagCount === opt.count && styles.choiceChipTextActive]}>
@@ -2191,17 +2437,19 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="shield-checkmark-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>CİHAZ GÜVENİLİRLİĞİ & ALARM KORUMASI</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsReliability.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.reliabilityHeaderRow}>
                       <View style={batteryExemptionEnabled && exactAlarmEnabled ? styles.reliabilityBadgeActive : [styles.reliabilityBadgeActive, { backgroundColor: '#2d2516', borderColor: '#59441f' }]}>
                         <View style={[styles.reliabilityBadgeDot, (!batteryExemptionEnabled || !exactAlarmEnabled) && { backgroundColor: '#f0b484' }]} />
                         <Text style={[styles.reliabilityBadgeActiveText, (!batteryExemptionEnabled || !exactAlarmEnabled) && { color: '#f0b484' }]}>
-                          {batteryExemptionEnabled && exactAlarmEnabled ? 'Arka Plan Koruması Tam' : 'Kısmi Koruma'}
+                          {language === 'en'
+                            ? (batteryExemptionEnabled && exactAlarmEnabled ? 'Full Background Protection' : 'Partial Protection')
+                            : (batteryExemptionEnabled && exactAlarmEnabled ? 'Arka Plan Koruması Tam' : 'Kısmi Koruma')}
                         </Text>
                       </View>
-                      <Text style={styles.reliabilityVersionText}>Android 14+ / iOS Uyumlu</Text>
+                      <Text style={styles.reliabilityVersionText}>{language === 'en' ? 'Android 14+ / iOS Compatible' : 'Android 14+ / iOS Uyumlu'}</Text>
                     </View>
 
                     {/* 1. Pil Optimizasyonu Muafiyeti (Doze Mode) */}
@@ -2210,9 +2458,11 @@ function MainApp() {
                         <Ionicons name="battery-charging" size={18} color="#a9dfca" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>Pil Optimizasyonu Muafiyeti</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Battery Optimization Exemption' : 'Pil Optimizasyonu Muafiyeti'}</Text>
                         <Text style={styles.settingSub}>
-                          Telefon Doze (derin uyku) modundayken alarmların gecikmesini veya atlanmasını engeller
+                          {language === 'en'
+                            ? 'Prevents alarms from being delayed or missed when phone is in deep sleep (Doze)'
+                            : 'Telefon Doze (derin uyku) modundayken alarmların gecikmesini veya atlanmasını engeller'}
                         </Text>
                       </View>
                       <Switch
@@ -2222,9 +2472,9 @@ function MainApp() {
                           setBatteryExemptionEnabled(val);
                           if (val) {
                             const ok = await openBatteryOptimizationSettings();
-                            if (ok) showToast('⚡ Pil ayarları açıldı. "Kısıtlama Yok" seçiniz.');
+                            if (ok) showToast(language === 'en' ? '⚡ Battery settings opened. Select "No restrictions".' : '⚡ Pil ayarları açıldı. "Kısıtlama Yok" seçiniz.');
                           } else {
-                            showToast('Pil muafiyeti kapatıldı (Standart mod)');
+                            showToast(language === 'en' ? 'Battery exemption disabled (Standard mode)' : 'Pil muafiyeti kapatıldı (Standart mod)');
                           }
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
@@ -2239,9 +2489,11 @@ function MainApp() {
                         <Ionicons name="alarm" size={18} color="#a9dfca" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>Hassas Alarm İzni (Exact Alarm)</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Exact Alarm Permission' : 'Hassas Alarm İzni (Exact Alarm)'}</Text>
                         <Text style={styles.settingSub}>
-                          İlaç zamanlayıcılarının saniyesi saniyesine ve yüksek öncelikli çalması için sistem alarm izni
+                          {language === 'en'
+                            ? 'System permission for timers to fire precisely on the second with high priority'
+                            : 'İlaç zamanlayıcılarının saniyesi saniyesine ve yüksek öncelikli çalması için sistem alarm izni'}
                         </Text>
                       </View>
                       <Switch
@@ -2251,9 +2503,9 @@ function MainApp() {
                           setExactAlarmEnabled(val);
                           if (val) {
                             const ok = await openExactAlarmSettings();
-                            if (ok) showToast('⏰ Alarm izinleri açıldı.');
+                            if (ok) showToast(language === 'en' ? '⏰ Alarm permissions opened.' : '⏰ Alarm izinleri açıldı.');
                           } else {
-                            showToast('Hassas alarm kapatıldı');
+                            showToast(language === 'en' ? 'Exact alarm disabled' : 'Hassas alarm kapatıldı');
                           }
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
@@ -2268,9 +2520,11 @@ function MainApp() {
                         <Ionicons name="sync-circle" size={18} color="#a9dfca" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>Yeniden Başlatma Koruması (Boot)</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Auto Reschedule on Reboot (Boot)' : 'Yeniden Başlatma Koruması (Boot)'}</Text>
                         <Text style={styles.settingSub}>
-                          Telefon kapatılıp açıldığında aktif tüm günlük ilaç alarmları işletim sistemince otomatik baştan kurulur
+                          {language === 'en'
+                            ? 'When the phone restarts, all active daily medication alarms are automatically restored'
+                            : 'Telefon kapatılıp açıldığında aktif tüm günlük ilaç alarmları işletim sistemince otomatik baştan kurulur'}
                         </Text>
                       </View>
                       <Switch
@@ -2278,7 +2532,7 @@ function MainApp() {
                         onValueChange={(val) => {
                           triggerHaptic();
                           setAutoRescheduleOnBoot(val);
-                          showToast(val ? '🔄 Yeniden başlatma koruması devrede' : 'Yeniden başlatma koruması kapatıldı');
+                          showToast(val ? (language === 'en' ? '🔄 Reboot protection active' : '🔄 Yeniden başlatma koruması devrede') : (language === 'en' ? 'Reboot protection disabled' : 'Yeniden başlatma koruması kapatıldı'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
@@ -2292,9 +2546,11 @@ function MainApp() {
                         <Ionicons name="phone-portrait-outline" size={18} color="#a9dfca" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>Ekran Kapalıyken Uyandır</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Wake Screen on Alarm' : 'Ekran Kapalıyken Uyandır'}</Text>
                         <Text style={styles.settingSub}>
-                          Alarm saatinde telefon kilitliyse ekranı aydınlatıp tam ekran ilaç uyarısını gösterir
+                          {language === 'en'
+                            ? 'If phone is locked at alarm time, lights up screen and displays full-screen alert'
+                            : 'Alarm saatinde telefon kilitliyse ekranı aydınlatıp tam ekran ilaç uyarısını gösterir'}
                         </Text>
                       </View>
                       <Switch
@@ -2302,7 +2558,7 @@ function MainApp() {
                         onValueChange={(val) => {
                           triggerHaptic();
                           setWakeScreenOnAlarm(val);
-                          showToast(val ? '💡 Ekran uyandırma aktif' : 'Ekran uyandırma kapatıldı');
+                          showToast(val ? (language === 'en' ? '💡 Screen wake active' : '💡 Ekran uyandırma aktif') : (language === 'en' ? 'Screen wake disabled' : 'Ekran uyandırma kapatıldı'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
@@ -2316,9 +2572,11 @@ function MainApp() {
                         <Ionicons name="hardware-chip-outline" size={18} color="#a9dfca" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>Üretici Arka Plan Ayarları</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Manufacturer Background Settings' : 'Üretici Arka Plan Ayarları'}</Text>
                         <Text style={styles.settingSub}>
-                          Xiaomi (MIUI/HyperOS), Samsung (OneUI) veya Huawei cihazlarda "Otomatik Başlatma" ve kısıtlamasız arka plan izni verin
+                          {language === 'en'
+                            ? 'On Xiaomi (MIUI/HyperOS), Samsung (OneUI), or Huawei devices, grant "Auto-start" and unrestricted background'
+                            : 'Xiaomi (MIUI/HyperOS), Samsung (OneUI) veya Huawei cihazlarda "Otomatik Başlatma" ve kısıtlamasız arka plan izni verin'}
                         </Text>
                       </View>
                       <TouchableOpacity
@@ -2326,10 +2584,10 @@ function MainApp() {
                         onPress={async () => {
                           triggerHaptic();
                           const ok = await openChannelNotificationSettings();
-                          if (ok) showToast('⚙️ Cihaz ve bildirim izinleri açıldı.');
+                          if (ok) showToast(language === 'en' ? '⚙️ Device and notification permissions opened.' : '⚙️ Cihaz ve bildirim izinleri açıldı.');
                         }}
                       >
-                        <Text style={styles.reliabilityActionBtnText}>İzinleri Aç</Text>
+                        <Text style={styles.reliabilityActionBtnText}>{language === 'en' ? 'Open Settings' : 'İzinleri Aç'}</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -2338,7 +2596,7 @@ function MainApp() {
                       style={styles.reliabilityTestBtn}
                       onPress={() => {
                         triggerHaptic();
-                        showToast('⏱️ 5 saniye sonra test alarmı çalacak! Telefonu kilitleyip deneyebilirsiniz.');
+                        showToast(language === 'en' ? '⏱️ Test alarm will sound in 5 seconds! You can lock your phone to test.' : '⏱️ 5 saniye sonra test alarmı çalacak! Telefonu kilitleyip deneyebilirsiniz.');
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
@@ -2353,7 +2611,7 @@ function MainApp() {
                       }}
                     >
                       <Ionicons name="flash" size={18} color="#081624" />
-                      <Text style={styles.reliabilityTestBtnText}>5 Sn Sonra Canlı Alarmı Test Et (Kilit Ekranı)</Text>
+                      <Text style={styles.reliabilityTestBtnText}>{language === 'en' ? 'Test Live Alarm in 5s (Lock Screen)' : '5 Sn Sonra Canlı Alarmı Test Et (Kilit Ekranı)'}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -2364,30 +2622,32 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="cube-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>STOK VE ENVANTER</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsStock.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={styles.settingTitle}>Varsayılan Kritik Stok Eşiği</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Default Low Stock Alert Threshold' : 'Varsayılan Kritik Stok Eşiği'}</Text>
                         <View style={styles.selectedPillBadge}>
-                          <Text style={styles.selectedPillBadgeText}>{defaultStockThreshold} Doz</Text>
+                          <Text style={styles.selectedPillBadgeText}>{defaultStockThreshold} {language === 'en' ? 'Doses' : 'Doz'}</Text>
                         </View>
                       </View>
-                      <Text style={styles.settingSub}>İlaç miktarı bu sayının altına inince eczane uyarısı verilir</Text>
+                      <Text style={styles.settingSub}>
+                        {language === 'en' ? 'Low stock alert is shown when medication count falls below this threshold' : 'İlaç miktarı bu sayının altına inince eczane uyarısı verilir'}
+                      </Text>
                       <View style={styles.chipSelector}>
-                        {STOCK_THRESHOLD_OPTIONS.map(t => (
+                        {STOCK_THRESHOLD_OPTIONS.map(thresholdVal => (
                           <TouchableOpacity
-                            key={t}
-                            style={[styles.choiceChip, defaultStockThreshold === t && styles.choiceChipActive]}
+                            key={thresholdVal}
+                            style={[styles.choiceChip, defaultStockThreshold === thresholdVal && styles.choiceChipActive]}
                             onPress={() => {
                               triggerHaptic();
-                              setDefaultStockThreshold(t);
-                              showToast(`Kritik stok eşiği ${t} doz olarak ayarlandı`);
+                              setDefaultStockThreshold(thresholdVal);
+                              showToast(language === 'en' ? `Low stock alert threshold set to ${thresholdVal} doses` : `Kritik stok eşiği ${thresholdVal} doz olarak ayarlandı`);
                             }}
                           >
-                            <Text style={[styles.choiceChipText, defaultStockThreshold === t && styles.choiceChipTextActive]}>
-                              {t} Doz
+                            <Text style={[styles.choiceChipText, defaultStockThreshold === thresholdVal && styles.choiceChipTextActive]}>
+                              {thresholdVal} {language === 'en' ? 'Doses' : 'Doz'}
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -2398,15 +2658,15 @@ function MainApp() {
 
                     <View style={styles.settingRow}>
                       <View>
-                        <Text style={styles.settingTitle}>Kritik Stok Bildirimi</Text>
-                        <Text style={styles.settingSub}>İlaç azaldığında cihaz uyarısı göster</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Low Stock Notification' : 'Kritik Stok Bildirimi'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'Show device notification when stock runs low' : 'İlaç azaldığında cihaz uyarısı göster'}</Text>
                       </View>
                       <Switch
                         value={stockAlertsEnabled}
                         onValueChange={val => {
                           triggerHaptic();
                           setStockAlertsEnabled(val);
-                          showToast(val ? 'Stok uyarıları açıldı' : 'Stok uyarıları kapatıldı');
+                          showToast(val ? (language === 'en' ? 'Stock alerts enabled' : 'Stok uyarıları açıldı') : (language === 'en' ? 'Stock alerts disabled' : 'Stok uyarıları kapatıldı'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
@@ -2420,13 +2680,13 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="shield-checkmark-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>GİZLİLİK VE KİLİT EKRANI</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsPrivacy.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
                       <View>
-                        <Text style={styles.settingTitle}>İlaç Adını Gizle</Text>
-                        <Text style={styles.settingSub}>Kilit ekranında ilacın adını sakla</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Hide Medication Name' : 'İlaç Adını Gizle'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'Hide medication name on lock screen notifications' : 'Kilit ekranında ilacın adını sakla'}</Text>
                       </View>
                       <Switch
                         value={privateMode}
@@ -2442,8 +2702,8 @@ function MainApp() {
 
                     <View style={styles.settingRow}>
                       <View>
-                        <Text style={styles.settingTitle}>Doz Miktarını Gizle</Text>
-                        <Text style={styles.settingSub}>Kilit ekranında kaç tablet/damla olduğu bilgisini sakla</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Hide Dose Amount' : 'Doz Miktarını Gizle'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'Hide quantity/unit details on lock screen' : 'Kilit ekranında kaç tablet/damla olduğu bilgisini sakla'}</Text>
                       </View>
                       <Switch
                         value={hideDoseAmount}
@@ -2458,7 +2718,7 @@ function MainApp() {
                     {/* Lockscreen Preview */}
                     <View style={styles.notifPreviewCard}>
                       <View style={styles.notifPreviewHeaderRow}>
-                        <Text style={styles.notifPreviewTag}>KİLİT EKRANI BİLDİRİM ÖNİZLEMESİ</Text>
+                        <Text style={styles.notifPreviewTag}>{language === 'en' ? 'LOCK SCREEN NOTIFICATION PREVIEW' : 'KİLİT EKRANI BİLDİRİM ÖNİZLEMESİ'}</Text>
                         <View style={styles.previewSoundBadge}>
                           <Ionicons
                             name={soundEnabled && soundType !== 'silent' ? 'volume-medium' : 'volume-mute'}
@@ -2468,26 +2728,26 @@ function MainApp() {
                           <Text style={styles.previewSoundBadgeText}>
                             {soundEnabled && soundType !== 'silent'
                               ? (soundType === 'alarm'
-                                  ? 'Alarm Sesi'
+                                  ? (language === 'en' ? 'Alarm Tone' : 'Alarm Sesi')
                                   : soundType === 'gentle'
-                                  ? 'Kibar Ton'
+                                  ? (language === 'en' ? 'Gentle Tone' : 'Kibar Ton')
                                   : soundType === 'chime'
-                                  ? 'Kristal Zil'
+                                  ? (language === 'en' ? 'Crystal Chime' : 'Kristal Zil')
                                   : soundType === 'system_custom'
-                                  ? 'Cihaz Sesi'
-                                  : 'Sistem Sesi')
-                              : 'Sessiz'}
+                                  ? (language === 'en' ? 'Device Sound' : 'Cihaz Sesi')
+                                  : (language === 'en' ? 'System Sound' : 'Sistem Sesi'))
+                              : (language === 'en' ? 'Silent' : 'Sessiz')}
                           </Text>
                         </View>
                       </View>
                       {(() => {
                         const sampleDose = doses[0] ?? {
                           id: 999,
-                          name: 'Örnek İlaç',
+                          name: language === 'en' ? 'Sample Medication' : 'Örnek İlaç',
                           amount: '1 tablet',
                           time: '09:00',
                           mealCondition: 'tok',
-                          instructions: 'Kullanım talimatına göre alınız.',
+                          instructions: language === 'en' ? 'Take according to directions.' : 'Kullanım talimatına göre alınız.',
                           stock: 30,
                           stockThreshold: 5,
                           form: 'tablet',
@@ -2504,16 +2764,18 @@ function MainApp() {
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                               <Text style={styles.notifPreviewTitle}>
-                                {notifications ? previewContent.title : 'Hatırlatıcılar Kapalı'}
+                                {notifications ? previewContent.title : (language === 'en' ? 'Reminders Off' : 'Hatırlatıcılar Kapalı')}
                               </Text>
                               <Text style={styles.notifPreviewBody}>
-                                {notifications ? previewContent.body : 'Doz bildirimleri kapalı durumdadır.'}
+                                {notifications ? previewContent.body : (language === 'en' ? 'Dose notifications are currently turned off.' : 'Doz bildirimleri kapalı durumdadır.')}
                               </Text>
                               {notifications && repeatNagEnabled && (
                                 <View style={styles.notifRepeatNagBadge}>
                                   <Ionicons name="repeat" size={12} color="#a9dfca" />
                                   <Text style={styles.notifRepeatNagBadgeText}>
-                                    Onaylanmazsa her 3 dk tekrarlanır ({repeatNagCount} tekrar)
+                                    {language === 'en'
+                                      ? `Repeats every 3 min until confirmed (${repeatNagCount} repeats)`
+                                      : `Onaylanmazsa her 3 dk tekrarlanır (${repeatNagCount} tekrar)`}
                                   </Text>
                                 </View>
                               )}
@@ -2528,7 +2790,7 @@ function MainApp() {
                       style={styles.testNotificationBtn}
                       onPress={() => {
                         triggerHaptic();
-                        showToast('🔔 Test bildirimi zamanlandı! 3 saniye sonra bildirim inecek.');
+                        showToast(language === 'en' ? '🔔 Test notification scheduled! It will arrive in 3 seconds.' : '🔔 Test bildirimi zamanlandı! 3 saniye sonra bildirim inecek.');
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
@@ -2540,7 +2802,7 @@ function MainApp() {
                       }}
                     >
                       <Ionicons name="paper-plane-outline" size={18} color="#081624" />
-                      <Text style={styles.testNotificationBtnText}>3 Sn Sonra Test Bildirimi Gönder</Text>
+                      <Text style={styles.testNotificationBtnText}>{language === 'en' ? 'Send Test Notification in 3s' : '3 Sn Sonra Test Bildirimi Gönder'}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -2583,7 +2845,9 @@ function MainApp() {
                             try { Vibration.vibrate(40); } catch {}
                           }
                           setHapticsEnabled(val);
-                          showToast(val ? 'Titreşimli geri bildirim açıldı' : 'Titreşim kapatıldı');
+                          showToast(val
+                            ? (language === 'en' ? 'Haptic feedback enabled' : 'Titreşimli geri bildirim açıldı')
+                            : (language === 'en' ? 'Haptic feedback disabled' : 'Titreşim kapatıldı'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
@@ -2597,38 +2861,298 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
-                    <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>UBUNTU / SELF-HOSTED EŞİTLEME</Text>
+                    <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
+                      {language === 'en' ? 'SELF-HOSTED / SERVER SYNC' : 'UBUNTU / SELF-HOSTED EŞİTLEME'}
+                    </Text>
                   </View>
 
                   <View style={styles.syncCard}>
                     <Text style={styles.syncCardDesc}>
-                      Kendi Ubuntu sunucunuzdaki veya yerel ağınızdaki Reminder Health REST API'si ile verilerinizi çift yönlü (Smart Merge) senkronize edin.
+                      {language === 'en'
+                        ? 'Synchronize your data bi-directionally (Smart Merge) with your self-hosted Reminder Health REST API on your local network or server.'
+                        : "Kendi Ubuntu sunucunuzdaki veya yerel ağınızdaki Reminder Health REST API'si ile verilerinizi çift yönlü (Smart Merge) senkronize edin."}
                     </Text>
 
                     {/* Server URL Input */}
-                    <Text style={styles.inputLabel}>Sunucu Adresi (URL)</Text>
+                    <Text style={styles.inputLabel}>{t.syncServerUrl}</Text>
                     <TextInput
                       style={styles.textInput}
                       value={serverUrl}
+                      editable={!authBusy && syncStatus !== 'syncing'}
                       onChangeText={setServerUrl}
-                      placeholder="http://192.168.1.50:3000"
+                      placeholder="http://192.168.1.100:3050"
                       placeholderTextColor="#667"
                       autoCapitalize="none"
                       autoCorrect={false}
                     />
 
-                    {/* API Token Input */}
-                    <Text style={styles.inputLabel}>Erişim Anahtarı (API Token - Opsiyonel)</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={apiToken}
-                      onChangeText={setApiToken}
-                      placeholder="Bearer token veya boş bırakın"
-                      placeholderTextColor="#667"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      secureTextEntry
-                    />
+                    {session ? (
+                      <View>
+                        <Text style={styles.syncCardDesc}>{t.syncConnectedAccount}: <Text style={{ color: '#34d399', fontWeight: '700' }}>{session.user.name}</Text></Text>
+                        
+                        <View style={{ backgroundColor: '#071626', padding: 10, borderRadius: 8, marginVertical: 6, borderWidth: 1, borderColor: '#1e293b' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: '#94a3b8', fontSize: 12 }}>
+                              ✉️ {t.syncEmailLabel}: <Text style={{ color: session.user.email ? '#38bdf8' : '#64748b', fontWeight: '600' }}>{session.user.email || (language === 'en' ? 'Not set' : 'Belirtilmedi')}</Text>
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setAuthEmail(session.user.email || '');
+                                setEditingEmail(!editingEmail);
+                              }}
+                              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+                            >
+                              <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>
+                                {editingEmail ? t.cancel : (session.user.email ? (language === 'en' ? 'Edit' : 'Değiştir') : (language === 'en' ? '+ Add' : '+ Ekle'))}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                          {editingEmail && (
+                            <View style={{ marginTop: 8, gap: 6 }}>
+                              <TextInput
+                                style={[styles.textInput, { height: 38, fontSize: 12 }]}
+                                value={authEmail}
+                                onChangeText={setAuthEmail}
+                                placeholder={t.syncEmailPlaceholder}
+                                placeholderTextColor="#667"
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                autoCorrect={false}
+                              />
+                              <TouchableOpacity
+                                style={[styles.syncPrimaryBtn, { height: 36, marginTop: 4 }]}
+                                onPress={handleUpdateEmail}
+                                disabled={authBusy || !authEmail.trim()}
+                              >
+                                <Text style={[styles.syncPrimaryBtnText, { fontSize: 12 }]}>
+                                  {authBusy ? '...' : t.syncUpdateEmail}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                        
+                        {activeSyncCode && (
+                          <View style={{ backgroundColor: '#071626', padding: 12, borderRadius: 8, marginVertical: 10, borderWidth: 1, borderColor: '#1e293b' }}>
+                            <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
+                              {language === 'en' ? '📱 SYNC CODE FOR 2ND DEVICE:' : '📱 2. CİHAZ İÇİN EŞİTLEME KODUNUZ:'}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#030c14', padding: 8, borderRadius: 6, gap: 8 }}>
+                              <Text selectable style={{ color: '#f8fafc', fontSize: 11, flex: 1 }}>
+                                {activeSyncCode}
+                              </Text>
+                              <TouchableOpacity
+                                style={{ backgroundColor: '#38bdf8', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4 }}
+                                onPress={() => Share.share({ message: language === 'en' ? `Reminder Sync Code: ${activeSyncCode}` : `Reminder Eşitleme Kodu: ${activeSyncCode}` })}
+                              >
+                                <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                              </TouchableOpacity>
+                            </View>
+                            <Text style={{ color: '#64748b', fontSize: 11, marginTop: 6 }}>
+                              {language === 'en'
+                                ? 'Enter this code on your second phone to link to the same account instantly.'
+                                : 'İkinci telefonunuza bu kodu girerek aynı hesaba anında bağlayabilirsiniz.'}
+                            </Text>
+                          </View>
+                        )}
+
+                        <TouchableOpacity style={styles.syncSecondaryBtn} onPress={handleLogout} disabled={authBusy || syncStatus === 'syncing'}>
+                          <Text style={styles.syncSecondaryBtnText}>{t.syncDisconnect}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : recoveryMode ? (
+                      <View style={{ gap: 8 }}>
+                        <Text style={styles.inputLabel}>{t.syncRecoveryKeyLabel}</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          value={recoveryKey}
+                          onChangeText={setRecoveryKey}
+                          placeholder={t.syncRecoveryKeyPlaceholder}
+                          placeholderTextColor="#667"
+                          autoCapitalize="characters"
+                          autoCorrect={false}
+                        />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity
+                            style={[styles.syncPrimaryBtn, { flex: 1 }]}
+                            onPress={handleRecover}
+                            disabled={authBusy || !recoveryKey.trim()}
+                          >
+                            <Text style={styles.syncPrimaryBtnText}>
+                              {authBusy ? (language === 'en' ? 'Recovering…' : 'Kurtarılıyor…') : t.syncRecoverBtn}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.syncSecondaryBtn}
+                            onPress={() => { setRecoveryMode(false); setRecoveryKey(''); }}
+                            disabled={authBusy}
+                          >
+                            <Text style={styles.syncSecondaryBtnText}>{t.cancel}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <View>
+                        <View style={{ backgroundColor: '#071b2e', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#38bdf8', marginBottom: 12 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <Ionicons name="sparkles" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
+                            <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '700' }}>
+                              {language === 'en' ? 'INITIAL SETUP (DEVICE 1)' : 'İLK KURULUM (1. CİHAZ)'}
+                            </Text>
+                          </View>
+                          <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                            {language === 'en'
+                              ? 'Enter your email (optional) and generate a new sync code.'
+                              : 'E-posta adresinizi girin ve yeni bir eşitleme kodu oluşturarak başlayın.'}
+                          </Text>
+                          <View style={{ marginBottom: 10 }}>
+                            <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 4 }]}>{t.syncEmailLabel}</Text>
+                            <TextInput
+                              style={[styles.textInput, { height: 40, fontSize: 12 }]}
+                              value={authEmail}
+                              onChangeText={setAuthEmail}
+                              placeholder={t.syncEmailPlaceholder}
+                              placeholderTextColor="#667"
+                              autoCapitalize="none"
+                              keyboardType="email-address"
+                              autoCorrect={false}
+                            />
+                          </View>
+                          <TouchableOpacity
+                            style={[styles.syncPrimaryBtn, { marginTop: 0 }]}
+                            onPress={handleRegister}
+                            disabled={authBusy}
+                          >
+                            <Ionicons name="key-outline" size={16} color="#081624" />
+                            <Text style={styles.syncPrimaryBtnText}>
+                              {authBusy
+                                ? (language === 'en' ? 'Creating…' : 'Oluşturuluyor…')
+                                : (language === 'en' ? '✨ Generate New Sync Code' : '✨ Yeni Eşitleme Kodu Oluştur')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
+                          <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
+                          <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700', marginHorizontal: 10 }}>
+                            {language === 'en' ? 'OR CONNECT 2ND DEVICE' : 'VEYA 2. CİHAZI BAĞLA'}
+                          </Text>
+                          <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
+                        </View>
+
+                        <View style={{ gap: 8 }}>
+                          <Text style={styles.inputLabel}>{t.syncCodeLabel}</Text>
+                          <TextInput
+                            style={styles.textInput}
+                            value={syncCode}
+                            onChangeText={setSyncCode}
+                            placeholder={language === 'en' ? 'Enter code from 1st device here' : '1. cihazdaki kodu buraya girin'}
+                            placeholderTextColor="#667"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            secureTextEntry
+                          />
+                          <TouchableOpacity
+                            style={styles.syncPrimaryBtn}
+                            onPress={handleLogin}
+                            disabled={authBusy || !syncCode.trim()}
+                          >
+                            <Text style={styles.syncPrimaryBtnText}>
+                              {authBusy ? (language === 'en' ? 'Connecting…' : 'Bağlanıyor…') : t.syncConnectBtn}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ paddingVertical: 6 }}
+                            onPress={() => setRecoveryMode(true)}
+                            disabled={authBusy}
+                          >
+                            <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '500' }}>🔑 {t.syncForgotCode}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {recoveredCredentials && (
+                      <View style={{
+                        backgroundColor: '#0c2238',
+                        borderColor: '#38bdf8',
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        padding: 12,
+                        marginTop: 12
+                      }}>
+                        <Text style={{ color: '#38bdf8', fontSize: 15, fontWeight: '700', marginBottom: 4 }}>
+                          {t.syncNewCredentialsTitle}
+                        </Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                          {t.syncNewCredentialsWarning}
+                        </Text>
+                        <View style={{ marginBottom: 8 }}>
+                          <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                            {t.syncNewSyncCode}
+                          </Text>
+                          <View style={{
+                            backgroundColor: '#071626',
+                            padding: 8,
+                            borderRadius: 6,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}>
+                            <Text selectable style={{ color: '#f1f5f9', fontSize: 11, flex: 1, marginRight: 8 }}>
+                              {recoveredCredentials.syncCode}
+                            </Text>
+                            <TouchableOpacity
+                              style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                              onPress={() => {
+                                Share.share({
+                                  message: language === 'en'
+                                    ? `Sync Code: ${recoveredCredentials.syncCode}`
+                                    : `Eşitleme Kodu: ${recoveredCredentials.syncCode}`
+                                });
+                              }}
+                            >
+                              <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                            {t.syncNewRecoveryKey}
+                          </Text>
+                          <View style={{
+                            backgroundColor: '#071626',
+                            padding: 8,
+                            borderRadius: 6,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}>
+                            <Text selectable style={{ color: '#f1f5f9', fontSize: 11, letterSpacing: 1, flex: 1, marginRight: 8 }}>
+                              {recoveredCredentials.recoveryKey}
+                            </Text>
+                            <TouchableOpacity
+                              style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                              onPress={() => {
+                                Share.share({
+                                  message: language === 'en'
+                                    ? `Recovery Key: ${recoveredCredentials.recoveryKey}`
+                                    : `Kurtarma Anahtarı: ${recoveredCredentials.recoveryKey}`
+                                });
+                              }}
+                            >
+                              <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.syncPrimaryBtn, { marginTop: 0 }]}
+                          onPress={() => setRecoveredCredentials(null)}
+                        >
+                          <Text style={styles.syncPrimaryBtnText}>{language === 'en' ? 'Done' : 'Tamam'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
                     {/* Status Badge */}
                     {syncStatusMsg ? (
@@ -2656,22 +3180,26 @@ function MainApp() {
                       <TouchableOpacity
                         style={styles.syncSecondaryBtn}
                         onPress={handleTestConnection}
-                        disabled={syncStatus === 'testing' || syncStatus === 'syncing'}
+                        disabled={authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                       >
                         <Ionicons name="wifi-outline" size={16} color="#a9dfca" />
                         <Text style={styles.syncSecondaryBtnText}>
-                          {syncStatus === 'testing' ? 'Bağlanıyor...' : 'Bağlantıyı Test Et'}
+                          {syncStatus === 'testing'
+                            ? (language === 'en' ? 'Connecting...' : 'Bağlanıyor...')
+                            : (language === 'en' ? 'Test Connection' : 'Bağlantıyı Test Et')}
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         style={styles.syncPrimaryBtn}
                         onPress={handleSyncNow}
-                        disabled={syncStatus === 'testing' || syncStatus === 'syncing'}
+                        disabled={!session || authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                       >
                         <Ionicons name="sync-outline" size={16} color="#081624" />
                         <Text style={styles.syncPrimaryBtnText}>
-                          {syncStatus === 'syncing' ? 'Eşitleniyor...' : 'Şimdi Eşitle'}
+                          {syncStatus === 'syncing'
+                            ? (language === 'en' ? 'Syncing...' : 'Eşitleniyor...')
+                            : (language === 'en' ? 'Sync Now' : 'Şimdi Eşitle')}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2679,21 +3207,30 @@ function MainApp() {
 
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="options-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>OTOMATİK EŞİTLEME</Text>
+                    <Text style={styles.settingGroupTitle}>
+                      {language === 'en' ? 'AUTO SYNC' : 'OTOMATİK EŞİTLEME'}
+                    </Text>
                   </View>
 
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.settingTitle}>Otomatik Senkronizasyon</Text>
-                        <Text style={styles.settingSub}>Uygulama açıldığında arka planda sunucuyla eşitler</Text>
+                        <Text style={styles.settingTitle}>
+                          {language === 'en' ? 'Automatic Synchronization' : 'Otomatik Senkronizasyon'}
+                        </Text>
+                        <Text style={styles.settingSub}>
+                          {language === 'en' ? 'Use Sync Now button for now' : 'Şimdilik Şimdi Eşitle düğmesini kullanın'}
+                        </Text>
                       </View>
                       <Switch
-                        value={autoSync}
+                        value={false}
+                        disabled
                         onValueChange={val => {
                           triggerHaptic();
                           setAutoSync(val);
-                          showToast(val ? 'Otomatik eşitleme açıldı' : 'Otomatik eşitleme kapatıldı');
+                          showToast(val
+                            ? (language === 'en' ? 'Automatic sync enabled' : 'Otomatik eşitleme açıldı')
+                            : (language === 'en' ? 'Automatic sync disabled' : 'Otomatik eşitleme kapatıldı'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
@@ -2701,7 +3238,7 @@ function MainApp() {
                     {lastSyncAt && (
                       <View style={styles.settingDivider}>
                         <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 8 }}>
-                          🕒 Son başarılı eşitleme: {lastSyncAt}
+                          {language === 'en' ? '🕒 Last successful sync: ' : '🕒 Son başarılı eşitleme: '}{lastSyncAt}
                         </Text>
                       </View>
                     )}
@@ -2709,17 +3246,23 @@ function MainApp() {
 
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="save-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>ÇEVRİMDIŞI JSON YEDEKLEME</Text>
+                    <Text style={styles.settingGroupTitle}>
+                      {language === 'en' ? 'OFFLINE JSON BACKUP' : 'ÇEVRİMDIŞI JSON YEDEKLEME'}
+                    </Text>
                   </View>
 
                   <View style={styles.syncCard}>
                     <Text style={styles.syncCardDesc}>
-                      Sunucunuz olmasa dahi telefonunuzdaki tüm ilaçları, kullanım geçmişini ve ayarları .json dosyası olarak telefonunuza kaydedebilir veya geri yükleyebilirsiniz.
+                      {language === 'en'
+                        ? 'Even without a server, you can export and backup all your medications, history, and settings as a .json file on your phone.'
+                        : 'Sunucunuz olmasa dahi telefonunuzdaki tüm ilaçları, kullanım geçmişini ve ayarları .json dosyası olarak telefonunuza kaydedebilir veya geri yükleyebilirsiniz.'}
                     </Text>
 
                     <TouchableOpacity style={styles.backupExportBtn} onPress={handleExportBackup}>
                       <Ionicons name="download-outline" size={18} color="#a9dfca" />
-                      <Text style={styles.backupExportBtnText}>Yedeği Dışa Aktar (.json)</Text>
+                      <Text style={styles.backupExportBtnText}>
+                        {language === 'en' ? 'Export Backup (.json)' : 'Yedeği Dışa Aktar (.json)'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -2730,18 +3273,18 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="bug-outline" size={16} color="#f0b484" />
-                    <Text style={[styles.settingGroupTitle, { color: '#f0b484' }]}>HATA & TANILAMA GÜNLÜĞÜ</Text>
+                    <Text style={[styles.settingGroupTitle, { color: '#f0b484' }]}>{t.settingsDiagnostics.toUpperCase()}</Text>
                   </View>
 
                   {/* Summary & Action Card */}
                   <View style={styles.settingCard}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.settingTitle}>Sistem Sağlık Durumu</Text>
+                        <Text style={styles.settingTitle}>{t.diagHealthStatus}</Text>
                         <Text style={styles.settingSub}>
                           {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length > 0
-                            ? `${diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} hata kaydı mevcut`
-                            : 'Sistem kararlı, aktif hata yok'}
+                            ? `${diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} ${t.diagErrorsCount}`
+                            : t.diagAllOk}
                         </Text>
                       </View>
                       <View style={{
@@ -2757,7 +3300,7 @@ function MainApp() {
                           fontSize: 12,
                           fontWeight: '700',
                         }}>
-                          {diagnosticsLogs.length} / 100 Kayıt
+                          {diagnosticsLogs.length} / 100 {t.diagRecordsCount}
                         </Text>
                       </View>
                     </View>
@@ -2771,16 +3314,16 @@ function MainApp() {
                           const text = logger.exportLogsAsText();
                           try {
                             await Share.share({
-                              title: 'Reminder Health Tanılama Günlüğü',
+                              title: language === 'en' ? 'Reminder Health Diagnostics Log' : 'Reminder Health Tanılama Günlüğü',
                               message: text,
                             });
                           } catch (err) {
-                            Alert.alert('Paylaşılamadı', 'Günlük panoya aktarılamadı.');
+                            Alert.alert(language === 'en' ? 'Share Failed' : 'Paylaşılamadı', language === 'en' ? 'Could not export logs.' : 'Günlük panoya aktarılamadı.');
                           }
                         }}
                       >
                         <Ionicons name="share-outline" size={16} color="#38bdf8" />
-                        <Text style={[styles.diagActionBtnText, { color: '#38bdf8' }]}>Paylaş / Dışa Aktar</Text>
+                        <Text style={[styles.diagActionBtnText, { color: '#38bdf8' }]}>{t.diagShareExport}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -2788,16 +3331,16 @@ function MainApp() {
                         onPress={() => {
                           triggerHaptic();
                           Alert.alert(
-                            'Logları Temizle',
-                            'Tüm hata ve tanılama kayıtları silinsin mi?',
+                            language === 'en' ? 'Clear Logs' : 'Logları Temizle',
+                            language === 'en' ? 'Are you sure you want to delete all diagnostic and error logs?' : 'Tüm hata ve tanılama kayıtları silinsin mi?',
                             [
-                              { text: 'Vazgeç', style: 'cancel' },
+                              { text: t.cancel, style: 'cancel' },
                               {
-                                text: 'Temizle',
+                                text: t.clear,
                                 style: 'destructive',
                                 onPress: () => {
                                   logger.clearLogs();
-                                  showToast('Tanılama günlüğü temizlendi');
+                                  showToast(language === 'en' ? 'Diagnostics log cleared' : 'Tanılama günlüğü temizlendi');
                                 }
                               }
                             ]
@@ -2805,25 +3348,25 @@ function MainApp() {
                         }}
                       >
                         <Ionicons name="trash-outline" size={16} color="#ff9696" />
-                        <Text style={[styles.diagActionBtnText, { color: '#ff9696' }]}>Temizle</Text>
+                        <Text style={[styles.diagActionBtnText, { color: '#ff9696' }]}>{t.diagClear}</Text>
                       </TouchableOpacity>
                     </View>
 
                     {/* Test Error Generation */}
                     <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#203244' }}>
                       <Text style={{ fontSize: 11.5, color: '#8e9eaf', marginBottom: 8, fontWeight: '600' }}>
-                        Hata Test ve Tanılama Simülasyonu:
+                        {language === 'en' ? 'Error Testing & Diagnostics Simulation:' : 'Hata Test ve Tanılama Simülasyonu:'}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
                         <TouchableOpacity
                           style={[styles.diagTestBtn, { backgroundColor: '#281a13', borderColor: '#573318' }]}
                           onPress={() => {
                             triggerHaptic();
-                            logger.warn('Test', 'Kullanıcı tarafından test uyarısı üretildi.', { source: 'DiagnosticsUI' });
-                            showToast('⚠️ Test uyarısı günlüğe eklendi');
+                            logger.warn('Test', 'User simulated test warning.', { source: 'DiagnosticsUI' });
+                            showToast(language === 'en' ? '⚠️ Test warning added to log' : '⚠️ Test uyarısı günlüğe eklendi');
                           }}
                         >
-                          <Text style={[styles.diagTestBtnText, { color: '#f0b484' }]}>⚠️ Test Uyarısı (WARN)</Text>
+                          <Text style={[styles.diagTestBtnText, { color: '#f0b484' }]}>{t.diagSimulateWarn}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -2831,14 +3374,14 @@ function MainApp() {
                           onPress={() => {
                             triggerHaptic();
                             try {
-                              throw new Error('Kullanıcı kontrollü test hatası (Simüle Edilmiş Hata)');
+                              throw new Error('User controlled simulated test error');
                             } catch (e) {
-                              logger.error('Test', 'Simüle edilmiş hata yakalandı.', e, { origin: 'ManualTrigger' });
+                              logger.error('Test', 'Simulated error caught.', e, { origin: 'ManualTrigger' });
                             }
-                            showToast('💥 Test hatası yakalandı ve kaydedildi');
+                            showToast(language === 'en' ? '💥 Test error caught and logged' : '💥 Test hatası yakalandı ve kaydedildi');
                           }}
                         >
-                          <Text style={[styles.diagTestBtnText, { color: '#fca5a5' }]}>💥 Test Hatası (ERROR)</Text>
+                          <Text style={[styles.diagTestBtnText, { color: '#fca5a5' }]}>{t.diagSimulateError}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -2870,7 +3413,7 @@ function MainApp() {
                             diagnosticsFilter === f && styles.choiceChipTextActive,
                             { fontSize: 12 }
                           ]}>
-                            {f === 'ALL' ? 'Tümü' : f === 'ERROR' ? 'Hatalar' : 'Uyarılar'} ({count})
+                            {f === 'ALL' ? t.diagFilterAll : f === 'ERROR' ? t.diagFilterErrors : t.diagFilterWarnings} ({count})
                           </Text>
                         </TouchableOpacity>
                       );
@@ -2888,12 +3431,12 @@ function MainApp() {
                     <View style={[styles.settingCard, { alignItems: 'center', paddingVertical: 32 }]}>
                       <Ionicons name="checkmark-circle-outline" size={44} color="#a9dfca" />
                       <Text style={{ color: '#f5f3f0', fontSize: 15, fontWeight: '700', marginTop: 10 }}>
-                        Tertemiz!
+                        {t.diagCleanTitle}
                       </Text>
                       <Text style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
                         {diagnosticsFilter === 'ALL'
-                          ? 'Henüz kaydedilmiş bir sistem günlüğü veya hata bulunmuyor.'
-                          : 'Seçili filtreye uygun kayıt bulunmuyor.'}
+                          ? t.diagCleanDesc
+                          : (language === 'en' ? 'No records match the selected filter.' : 'Seçili filtreye uygun kayıt bulunmuyor.')}
                       </Text>
                     </View>
                   ) : (
@@ -2944,7 +3487,9 @@ function MainApp() {
                             {/* Expandable Indicator */}
                             {(log.stack || (log.breadcrumbs && log.breadcrumbs.length > 0) || log.details) && (
                               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8, gap: 4 }}>
-                                <Text style={{ color: '#68778d', fontSize: 11 }}>{isExpanded ? 'Gizle' : 'Detayları Gör'}</Text>
+                                <Text style={{ color: '#68778d', fontSize: 11 }}>
+                                  {isExpanded ? (language === 'en' ? 'Hide' : 'Gizle') : (language === 'en' ? 'View Details' : 'Detayları Gör')}
+                                </Text>
                                 <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={12} color="#68778d" />
                               </View>
                             )}
@@ -2954,7 +3499,7 @@ function MainApp() {
                               <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1c2d3e' }}>
                                 {log.details && (
                                   <View style={{ marginBottom: 8 }}>
-                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>DETAYLAR:</Text>
+                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>{t.diagDetails}</Text>
                                     <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>
                                       {JSON.stringify(log.details, null, 2)}
                                     </Text>
@@ -2963,7 +3508,7 @@ function MainApp() {
 
                                 {log.breadcrumbs && log.breadcrumbs.length > 0 && (
                                   <View style={{ marginBottom: 8 }}>
-                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 3 }}>SON EYLEMLER (BREADCRUMBS):</Text>
+                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 3 }}>{t.diagBreadcrumbs}</Text>
                                     {log.breadcrumbs.map((b, bi) => (
                                       <Text key={bi} style={{ color: '#94a3b8', fontSize: 10, fontFamily: 'monospace', marginBottom: 1 }}>
                                         {b}
@@ -2974,7 +3519,7 @@ function MainApp() {
 
                                 {log.stack && (
                                   <View>
-                                    <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>STACK TRACE:</Text>
+                                    <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>{t.diagStackTrace}</Text>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                       <Text style={{ color: '#fca5a5', fontSize: 10, fontFamily: 'monospace' }}>
                                         {log.stack}
@@ -2996,15 +3541,21 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="refresh-outline" size={16} color="#ff9696" />
-                    <Text style={[styles.settingGroupTitle, { color: '#ff9696' }]}>VERİLERİ SIFIRLAMA</Text>
+                    <Text style={[styles.settingGroupTitle, { color: '#ff9696' }]}>
+                      {language === 'en' ? 'DATA RESET' : 'VERİLERİ SIFIRLAMA'}
+                    </Text>
                   </View>
                   <View style={styles.resetCard}>
                     <Text style={styles.resetCardText}>
-                      ⚠️ Bu işlem tüm ilaç kayıtlarınızı, geçmişinizi ve kişisel ayarlarınızı cihazdan tamamen siler ve ilk kurulum haline döndürür. Bu işlem geri alınamaz.
+                      {language === 'en'
+                        ? '⚠️ This action will permanently erase all medications, history, and custom settings from this device and return to initial setup. This cannot be undone.'
+                        : '⚠️ Bu işlem tüm ilaç kayıtlarınızı, geçmişinizi ve kişisel ayarlarınızı cihazdan tamamen siler ve ilk kurulum haline döndürür. Bu işlem geri alınamaz.'}
                     </Text>
                     <TouchableOpacity style={styles.resetBtn} onPress={resetAllData}>
                       <Ionicons name="trash-outline" size={18} color="#ff9696" />
-                      <Text style={styles.resetBtnText}>Tüm Verileri ve Ayarları Sıfırla</Text>
+                      <Text style={styles.resetBtnText}>
+                        {language === 'en' ? 'Reset All Data and Settings' : 'Tüm Verileri ve Ayarları Sıfırla'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -3024,13 +3575,7 @@ function MainApp() {
             <TouchableOpacity
               key={tabItem.id}
               style={styles.navItem}
-              onPress={() => {
-                if (tabItem.id === 'Ayarlar' && tab === 'Ayarlar') {
-                  setSettingsSubPage('main');
-                }
-                logger.breadcrumb(`Sekme değiştirildi: ${tabItem.id}`);
-                setTab(tabItem.id);
-              }}
+              onPress={() => handleTabPress(tabItem.id)}
             >
               <Ionicons name={tabItem.icon as any} size={22} color={tab === tabItem.id ? '#a9dfca' : '#adb3bf'} />
               <Text style={[styles.navLabel, tab === tabItem.id && styles.navLabelActive]}>{tabItem.label}</Text>
@@ -3076,8 +3621,8 @@ function MainApp() {
                   <Ionicons name="camera" size={18} color="#081624" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.scanBarcodeBtnTitle}>Karekod / Kutu Tara (ITS)</Text>
-                  <Text style={styles.scanBarcodeBtnSub}>Kutudaki DataMatrix karekoddan adı ve SKT'yi otomatik doldur</Text>
+                  <Text style={styles.scanBarcodeBtnTitle}>{t.scanBarcodeBanner}</Text>
+                  <Text style={styles.scanBarcodeBtnSub}>{t.scanBarcodeDesc}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#a9dfca" />
               </TouchableOpacity>
@@ -3087,9 +3632,9 @@ function MainApp() {
                 <View style={styles.scannedInfoCard}>
                   <Ionicons name="shield-checkmark" size={16} color="#34d399" />
                   <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={styles.scannedInfoTitle}>ITS Karekod Eşleşti</Text>
+                    <Text style={styles.scannedInfoTitle}>{t.itsMatched}</Text>
                     <Text style={styles.scannedInfoSub}>
-                      Barkod: {currentGTIN} {currentExpiryDate ? `· SKT: ${currentExpiryDate}` : ''}
+                      {language === 'en' ? 'Barcode:' : 'Barkod:'} {currentGTIN} {currentExpiryDate ? `· ${language === 'en' ? 'EXP:' : 'SKT:'} ${currentExpiryDate}` : ''}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -3106,12 +3651,24 @@ function MainApp() {
               )}
 
               {/* Name */}
-              <Text style={styles.inputLabel}>İlaç Adı</Text>
-              <TextInput style={styles.textInput} value={name} onChangeText={setName} placeholder="Örn. Coraspin" placeholderTextColor="#667" />
+              <Text style={styles.inputLabel}>{t.medName}</Text>
+              <TextInput
+                style={styles.textInput}
+                value={name}
+                onChangeText={setName}
+                placeholder={t.medNamePlaceholder}
+                placeholderTextColor="#667"
+              />
 
               {/* Amount & Quick Chips */}
-              <Text style={styles.inputLabel}>Doz Miktarı</Text>
-              <TextInput style={styles.textInput} value={amount} onChangeText={setAmount} placeholder="Örn. 1 tablet veya 1.5 tablet" placeholderTextColor="#667" />
+              <Text style={styles.inputLabel}>{t.doseAmount}</Text>
+              <TextInput
+                style={styles.textInput}
+                value={amount}
+                onChangeText={setAmount}
+                placeholder={t.doseAmountPlaceholder}
+                placeholderTextColor="#667"
+              />
               <View style={styles.quickRow}>
                 {['0.5 tablet', '1 tablet', '1.5 tablet', '2 tablet'].map(amt => (
                   <TouchableOpacity key={amt} style={[styles.quickChip, amount === amt && styles.quickChipActive]} onPress={() => setAmount(amt)}>
@@ -3121,20 +3678,20 @@ function MainApp() {
               </View>
 
               {/* Form & Meal */}
-              <Text style={styles.inputLabel}>İlaç Formu</Text>
+              <Text style={styles.inputLabel}>{t.medForm}</Text>
               <View style={styles.selectorGrid}>
                 {(['tablet', 'kapsul', 'damla', 'surup'] as const).map(f => (
                   <TouchableOpacity key={f} style={[styles.selectorBtn, formType === f && styles.selectorBtnActive]} onPress={() => setFormType(f)}>
-                    <Text style={[styles.selectorBtnText, formType === f && styles.selectorBtnTextActive]}>{formLabels[f]}</Text>
+                    <Text style={[styles.selectorBtnText, formType === f && styles.selectorBtnTextActive]}>{getFormLabel(f)}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>Açlık / Tokluk</Text>
+              <Text style={styles.inputLabel}>{t.mealCondition}</Text>
               <View style={styles.selectorGrid}>
                 {(['tok', 'ac', 'yemekle', 'farketmez'] as const).map(m => (
                   <TouchableOpacity key={m} style={[styles.selectorBtn, mealCondition === m && styles.selectorBtnActive]} onPress={() => setMealCondition(m)}>
-                    <Text style={[styles.selectorBtnText, mealCondition === m && styles.selectorBtnTextActive]}>{mealLabels[m]}</Text>
+                    <Text style={[styles.selectorBtnText, mealCondition === m && styles.selectorBtnTextActive]}>{getMealLabel(m)}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -3143,21 +3700,25 @@ function MainApp() {
               <View style={styles.timeSectionBox}>
                 <View style={styles.timeSectionHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.timeSectionTitle}>Alım Günündeki Doz Sayısı & Saatleri</Text>
-                    <Text style={styles.timeSectionSub}>Hızlı öğün saatlerini veya +/- 15 dk butonlarını kullanabilirsiniz</Text>
+                    <Text style={styles.timeSectionTitle}>
+                      {language === 'en' ? 'Dose Count & Times on Scheduled Days' : 'Alım Günündeki Doz Sayısı & Saatleri'}
+                    </Text>
+                    <Text style={styles.timeSectionSub}>
+                      {language === 'en' ? 'Use quick meal times or +/- 15 min buttons' : 'Hızlı öğün saatlerini veya +/- 15 dk butonlarını kullanabilirsiniz'}
+                    </Text>
                   </View>
                   <TouchableOpacity style={styles.addSlotMiniBtn} onPress={addDoseSlot}>
                     <Ionicons name="add-circle" size={16} color="#a9dfca" />
-                    <Text style={styles.addSlotMiniBtnText}>+ Saat Ekle</Text>
+                    <Text style={styles.addSlotMiniBtnText}>{t.addTime}</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Dose count selector chips */}
                 <View style={styles.doseCountSelectorRow}>
                   {[
-                    { count: 1, label: '1 Doz (Tek Sefer)' },
-                    { count: 2, label: '2 Doz (Sabah/Akşam)' },
-                    { count: 3, label: '3 Doz (Günde 3)' },
+                    { count: 1, label: language === 'en' ? '1 Dose (Single)' : '1 Doz (Tek Sefer)' },
+                    { count: 2, label: language === 'en' ? '2 Doses (Morning/Evening)' : '2 Doz (Sabah/Akşam)' },
+                    { count: 3, label: language === 'en' ? '3 Doses (3x Daily)' : '3 Doz (Günde 3)' },
                   ].map(item => (
                     <TouchableOpacity
                       key={item.count}
@@ -3174,23 +3735,25 @@ function MainApp() {
                 {/* Time Slots Cards */}
                 {times.map((slotTime, idx) => {
                   const hour = parseInt(slotTime.split(':')[0] || '9', 10);
-                  let mealHint = 'Sabah';
-                  if (hour >= 5 && hour < 11) mealHint = 'Sabah';
-                  else if (hour >= 11 && hour < 16) mealHint = 'Öğle';
-                  else if (hour >= 16 && hour < 22) mealHint = 'Akşam';
-                  else mealHint = 'Gece';
+                  let mealHint = language === 'en' ? 'Morning' : 'Sabah';
+                  if (hour >= 5 && hour < 11) mealHint = language === 'en' ? 'Morning' : 'Sabah';
+                  else if (hour >= 11 && hour < 16) mealHint = language === 'en' ? 'Noon' : 'Öğle';
+                  else if (hour >= 16 && hour < 22) mealHint = language === 'en' ? 'Evening' : 'Akşam';
+                  else mealHint = language === 'en' ? 'Night' : 'Gece';
 
                   return (
                     <View key={idx} style={styles.timeSlotCard}>
                       <View style={styles.timeSlotCardHeader}>
                         <View style={styles.timeSlotBadge}>
                           <Ionicons name="time" size={12} color="#a9dfca" />
-                          <Text style={styles.timeSlotBadgeText}>{idx + 1}. Doz · {mealHint}</Text>
+                          <Text style={styles.timeSlotBadgeText}>
+                            {language === 'en' ? `Dose ${idx + 1} · ${mealHint}` : `${idx + 1}. Doz · ${mealHint}`}
+                          </Text>
                         </View>
                         {times.length > 1 && (
                           <TouchableOpacity onPress={() => removeDoseSlot(idx)} style={styles.removeSlotBtn}>
                             <Ionicons name="trash-outline" size={13} color="#ff9696" />
-                            <Text style={styles.removeSlotBtnText}>Kaldır</Text>
+                            <Text style={styles.removeSlotBtnText}>{t.removeTime}</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -3200,15 +3763,16 @@ function MainApp() {
                         slotTime={slotTime}
                         onChange={val => setSlotTime(idx, val)}
                         onStep={delta => stepSlotMinutes(idx, delta)}
+                        lang={language}
                       />
 
                       {/* Quick Meal Preset Chips */}
                       <View style={styles.slotPresetsRow}>
                         {[
-                          { label: '08:00 Sabah', time: '08:00' },
-                          { label: '13:00 Öğle', time: '13:00' },
-                          { label: '19:00 Akşam', time: '19:00' },
-                          { label: '22:30 Gece', time: '22:30' },
+                          { label: language === 'en' ? '08:00 Morning' : '08:00 Sabah', time: '08:00' },
+                          { label: language === 'en' ? '13:00 Noon' : '13:00 Öğle', time: '13:00' },
+                          { label: language === 'en' ? '19:00 Evening' : '19:00 Akşam', time: '19:00' },
+                          { label: language === 'en' ? '22:30 Night' : '22:30 Gece', time: '22:30' },
                         ].map(p => (
                           <TouchableOpacity
                             key={p.time}
@@ -3227,13 +3791,15 @@ function MainApp() {
               </View>
 
               {/* Schedule & Cycle */}
-              <Text style={styles.inputLabel}>Kullanım Düzeni & Döngü</Text>
+              <Text style={styles.inputLabel}>
+                {language === 'en' ? 'Schedule & Regimen' : 'Kullanım Düzeni & Döngü'}
+              </Text>
               <View style={styles.selectorGrid}>
                 {[
-                  { id: 'everyday' as const, label: 'Her gün' },
-                  { id: 'alternate' as const, label: 'Gün aşırı' },
-                  { id: 'cycle' as const, label: 'Al / Ara Döngüsü' },
-                  { id: 'variable' as const, label: 'Değişken Doz' },
+                  { id: 'everyday' as const, label: t.freqEveryday },
+                  { id: 'alternate' as const, label: t.freqAlternate },
+                  { id: 'cycle' as const, label: t.freqCycle },
+                  { id: 'variable' as const, label: t.freqVariable },
                 ].map(opt => (
                   <TouchableOpacity key={opt.id} style={[styles.selectorBtn, frequencyType === opt.id && styles.selectorBtnActive]} onPress={() => setFrequencyType(opt.id)}>
                     <Text style={[styles.selectorBtnText, frequencyType === opt.id && styles.selectorBtnTextActive]}>{opt.label}</Text>
@@ -3244,18 +3810,26 @@ function MainApp() {
               {/* Cycle config */}
               {frequencyType === 'cycle' && (
                 <View style={styles.cycleBox}>
-                  <Text style={styles.cycleBoxTitle}>Alım & Ara Verme Döngüsü</Text>
+                  <Text style={styles.cycleBoxTitle}>
+                    {language === 'en' ? 'Take & Break Cycle' : 'Alım & Ara Verme Döngüsü'}
+                  </Text>
                   <View style={styles.presetRow}>
-                    <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(3, amount, 4, '0 (Ara)', 'cycle')}>
-                      <Text style={styles.presetBtnText}>3 gün al / 4 gün ara</Text>
+                    <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(3, amount, 4, language === 'en' ? '0 (Break)' : '0 (Ara)', 'cycle')}>
+                      <Text style={styles.presetBtnText}>
+                        {language === 'en' ? '3 days on / 4 days off' : '3 gün al / 4 gün ara'}
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(5, amount, 2, '0 (Ara)', 'cycle')}>
-                      <Text style={styles.presetBtnText}>5 gün al / 2 gün ara</Text>
+                    <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(5, amount, 2, language === 'en' ? '0 (Break)' : '0 (Ara)', 'cycle')}>
+                      <Text style={styles.presetBtnText}>
+                        {language === 'en' ? '5 days on / 2 days off' : '5 gün al / 2 gün ara'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.twoColRow}>
                     <View style={styles.col}>
-                      <Text style={styles.timeInputLabel}>Alım Gün Sayısı</Text>
+                      <Text style={styles.timeInputLabel}>
+                        {language === 'en' ? 'Dose Days' : 'Alım Gün Sayısı'}
+                      </Text>
                       <TextInput
                         style={styles.textInput}
                         value={cyclePhase1Days}
@@ -3266,7 +3840,9 @@ function MainApp() {
                       />
                     </View>
                     <View style={styles.col}>
-                      <Text style={styles.timeInputLabel}>Ara Gün Sayısı</Text>
+                      <Text style={styles.timeInputLabel}>
+                        {language === 'en' ? 'Break Days' : 'Ara Gün Sayısı'}
+                      </Text>
                       <TextInput
                         style={styles.textInput}
                         value={cyclePhase2Days}
@@ -3283,17 +3859,25 @@ function MainApp() {
               {/* Variable cycle config */}
               {frequencyType === 'variable' && (
                 <View style={styles.cycleBox}>
-                  <Text style={styles.cycleBoxTitle}>Değişken / Kademeli Doz Döngüsü</Text>
+                  <Text style={styles.cycleBoxTitle}>
+                    {language === 'en' ? 'Variable / Stepped Dose Cycle' : 'Değişken / Kademeli Doz Döngüsü'}
+                  </Text>
                   <View style={styles.presetRow}>
                     <TouchableOpacity style={[styles.presetBtn, styles.presetBtnHighlight]} onPress={() => applyCyclePreset(4, '1.5 tablet', 3, '1 tablet', 'variable')}>
-                      <Text style={styles.presetBtnHighlightText}>⭐ 4 gün 1.5 doz / 3 gün 1 doz</Text>
+                      <Text style={styles.presetBtnHighlightText}>
+                        {language === 'en' ? '⭐ 4 days 1.5 dose / 3 days 1 dose' : '⭐ 4 gün 1.5 doz / 3 gün 1 doz'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.phaseCard}>
-                    <Text style={styles.phaseCardBadge}>1. AŞAMA</Text>
+                    <Text style={styles.phaseCardBadge}>
+                      {language === 'en' ? 'PHASE 1' : '1. AŞAMA'}
+                    </Text>
                     <View style={styles.twoColRow}>
                       <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>Gün Sayısı</Text>
+                        <Text style={styles.timeInputLabel}>
+                          {language === 'en' ? 'Days' : 'Gün Sayısı'}
+                        </Text>
                         <TextInput
                           style={styles.textInput}
                           value={cyclePhase1Days}
@@ -3304,16 +3888,20 @@ function MainApp() {
                         />
                       </View>
                       <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>Doz Miktarı</Text>
+                        <Text style={styles.timeInputLabel}>{t.doseAmount}</Text>
                         <TextInput style={styles.textInput} value={cyclePhase1Amount} onChangeText={setCyclePhase1Amount} />
                       </View>
                     </View>
                   </View>
                   <View style={styles.phaseCard}>
-                    <Text style={styles.phaseCardBadge}>2. AŞAMA</Text>
+                    <Text style={styles.phaseCardBadge}>
+                      {language === 'en' ? 'PHASE 2' : '2. AŞAMA'}
+                    </Text>
                     <View style={styles.twoColRow}>
                       <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>Gün Sayısı</Text>
+                        <Text style={styles.timeInputLabel}>
+                          {language === 'en' ? 'Days' : 'Gün Sayısı'}
+                        </Text>
                         <TextInput
                           style={styles.textInput}
                           value={cyclePhase2Days}
@@ -3324,7 +3912,7 @@ function MainApp() {
                         />
                       </View>
                       <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>Doz Miktarı</Text>
+                        <Text style={styles.timeInputLabel}>{t.doseAmount}</Text>
                         <TextInput style={styles.textInput} value={cyclePhase2Amount} onChangeText={setCyclePhase2Amount} />
                       </View>
                     </View>
@@ -3332,15 +3920,43 @@ function MainApp() {
                 </View>
               )}
 
+              {/* Cycle Start Date Picker */}
+              {frequencyType !== 'everyday' && (
+                <View style={styles.datePickerCard}>
+                  <View style={styles.datePickerInfo}>
+                    <Text style={styles.datePickerLabel}>
+                      {language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi'}
+                    </Text>
+                    <Text style={styles.datePickerHint}>
+                      {language === 'en' ? 'Reference start date for day 1 of the cycle' : 'Döngünün 1. gününün referans başlangıç tarihi'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.datePickerBtn}
+                    onPress={() => openCalendarPicker('cycleStartDate', language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi')}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#34d399" />
+                    <Text style={styles.datePickerBtnText}>{formatLocalizedDate(cycleStartDate, language)}</Text>
+                    <View style={styles.datePickerChangeBadge}>
+                      <Text style={styles.datePickerChangeBadgeText}>
+                        {language === 'en' ? 'Change' : 'Değiştir'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Duration & Treatment Period */}
-              <Text style={styles.inputLabel}>Tedavi / Kullanım Süresi</Text>
+              <Text style={styles.inputLabel}>
+                {language === 'en' ? 'Treatment / Usage Duration' : 'Tedavi / Kullanım Süresi'}
+              </Text>
               <View style={styles.selectorGrid}>
                 <TouchableOpacity
                   style={[styles.selectorBtn, durationMode === 'continuous' && styles.selectorBtnActive]}
                   onPress={() => setDurationMode('continuous')}
                 >
                   <Text style={[styles.selectorBtnText, durationMode === 'continuous' && styles.selectorBtnTextActive]}>
-                    Sürekli (Kronik)
+                    {t.durationContinuous}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -3348,21 +3964,47 @@ function MainApp() {
                   onPress={() => setDurationMode('days')}
                 >
                   <Text style={[styles.selectorBtnText, durationMode === 'days' && styles.selectorBtnTextActive]}>
-                    Süreli Tedavi (Kür)
+                    {t.durationDays}
                   </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Treatment Start Date Picker */}
+              <View style={styles.datePickerCard}>
+                <View style={styles.datePickerInfo}>
+                  <Text style={styles.datePickerLabel}>
+                    {language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi'}
+                  </Text>
+                  <Text style={styles.datePickerHint}>
+                    {language === 'en' ? 'First day medication starts' : 'İlacın kullanılmaya başlandığı ilk gün'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.datePickerBtn}
+                  onPress={() => openCalendarPicker('startDate', language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi')}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#34d399" />
+                  <Text style={styles.datePickerBtnText}>{formatLocalizedDate(startDate, language)}</Text>
+                  <View style={styles.datePickerChangeBadge}>
+                    <Text style={styles.datePickerChangeBadgeText}>
+                      {language === 'en' ? 'Change' : 'Değiştir'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
               {durationMode === 'days' && (
                 <View style={styles.cycleBox}>
-                  <Text style={styles.cycleBoxTitle}>Tedavi Süresi & Bitiş Takvimi</Text>
+                  <Text style={styles.cycleBoxTitle}>
+                    {language === 'en' ? 'Treatment Duration & End Schedule' : 'Tedavi Süresi & Bitiş Takvimi'}
+                  </Text>
                   <View style={styles.presetRow}>
                     {[
-                      { days: '5', label: '5 Gün' },
-                      { days: '7', label: '7 Gün (Antibiyotik)' },
-                      { days: '10', label: '10 Gün' },
-                      { days: '14', label: '14 Gün (2 Hafta)' },
-                      { days: '30', label: '30 Gün (1 Kutu)' },
+                      { days: '5', label: language === 'en' ? '5 Days' : '5 Gün' },
+                      { days: '7', label: language === 'en' ? '7 Days (Antibiotic)' : '7 Gün (Antibiyotik)' },
+                      { days: '10', label: language === 'en' ? '10 Days' : '10 Gün' },
+                      { days: '14', label: language === 'en' ? '14 Days (2 Weeks)' : '14 Gün (2 Hafta)' },
+                      { days: '30', label: language === 'en' ? '30 Days (1 Box)' : '30 Gün (1 Kutu)' },
                     ].map(p => (
                       <TouchableOpacity
                         key={p.days}
@@ -3376,44 +4018,36 @@ function MainApp() {
                     ))}
                   </View>
 
-                  <View style={styles.twoColRow}>
-                    <View style={styles.col}>
-                      <Text style={styles.timeInputLabel}>Toplam Tedavi Günü</Text>
-                      <TextInput
-                        style={styles.textInput}
-                        value={durationDays}
-                        onChangeText={v => setDurationDays(v.replace(/[^0-9]/g, ''))}
-                        placeholder="7"
-                        placeholderTextColor="#667"
-                        keyboardType="numeric"
-                      />
-                    </View>
-                    <View style={styles.col}>
-                      <Text style={styles.timeInputLabel}>Başlangıç Tarihi</Text>
-                      <TextInput
-                        style={styles.textInput}
-                        value={startDate}
-                        onChangeText={setStartDate}
-                        placeholder={today}
-                        placeholderTextColor="#667"
-                      />
-                    </View>
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={styles.timeInputLabel}>
+                      {language === 'en' ? 'Total Treatment Days' : 'Toplam Tedavi Günü'}
+                    </Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={durationDays}
+                      onChangeText={v => setDurationDays(v.replace(/[^0-9]/g, ''))}
+                      placeholder="7"
+                      placeholderTextColor="#667"
+                      keyboardType="numeric"
+                    />
                   </View>
 
                   <View style={styles.durationSummaryBanner}>
                     <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
                     <Text style={styles.durationSummaryBannerText}>
-                      {startDate} tarihinde başlar · {calculateEndDate(startDate, Number(durationDays) || 7)} tarihinde son doz ({durationDays || 7} gün).
+                      {language === 'en'
+                        ? `Starts on ${formatLocalizedDate(startDate, language)} · Last dose on ${formatLocalizedDate(calculateEndDate(startDate, Number(durationDays) || 7), language)} (${durationDays || 7} days).`
+                        : `${formatLocalizedDate(startDate, language)} tarihinde başlar · ${calculateEndDate(startDate, Number(durationDays) || 7)} tarihinde son doz (${durationDays || 7} gün).`}
                     </Text>
                   </View>
                 </View>
               )}
 
               {/* Stock & Box */}
-              <Text style={styles.inputLabel}>Kutu & Stok Takibi</Text>
+              <Text style={styles.inputLabel}>{t.stockTracking}</Text>
               <View style={styles.twoColRow}>
                 <View style={styles.col}>
-                  <Text style={styles.timeInputLabel}>Kalan Stok (adet)</Text>
+                  <Text style={styles.timeInputLabel}>{t.stockRemainingLabel}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={stock}
@@ -3424,7 +4058,7 @@ function MainApp() {
                   />
                 </View>
                 <View style={styles.col}>
-                  <Text style={styles.timeInputLabel}>Uyarı Eşiği</Text>
+                  <Text style={styles.timeInputLabel}>{t.stockThresholdLabel}</Text>
                   <TextInput
                     style={styles.textInput}
                     value={stockThreshold}
@@ -3440,18 +4074,21 @@ function MainApp() {
                 style={styles.refillBtn}
                 onPress={() => {
                   setStock(s => String((Number(s) || 0) + 30));
-                  Alert.alert('Kutu Eklendi', '+30 tablet stoğa eklendi.');
+                  Alert.alert(
+                    language === 'en' ? 'Box Added' : 'Kutu Eklendi',
+                    language === 'en' ? '+30 units added to stock.' : '+30 tablet stoğa eklendi.'
+                  );
                 }}
               >
                 <Ionicons name="refresh" size={16} color="#a9dfca" />
-                <Text style={styles.refillBtnText}>+30 Kutu Yenile</Text>
+                <Text style={styles.refillBtnText}>{t.refill30}</Text>
               </TouchableOpacity>
 
               {/* Delete if editing */}
               {editingId && (
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteDose(editingId)}>
                   <Ionicons name="trash-outline" size={18} color="#ff9696" />
-                  <Text style={styles.deleteBtnText}>İlacı Sil</Text>
+                  <Text style={styles.deleteBtnText}>{t.delete}</Text>
                 </TouchableOpacity>
               )}
             </ScrollView>
@@ -3464,6 +4101,17 @@ function MainApp() {
           onClose={() => setScannerOpen(false)}
           onScanResult={handleScanResult}
           learnedMeds={learnedMeds}
+          lang={language}
+        />
+
+        {/* Modern Calendar Picker Modal */}
+        <CalendarModal
+          visible={calendarOpen}
+          selectedDate={calendarTarget === 'startDate' ? startDate : cycleStartDate}
+          title={calendarTitle}
+          onSelect={handleDateSelected}
+          onClose={() => setCalendarOpen(false)}
+          lang={language}
         />
       </View>
     </SafeAreaView>
@@ -3492,27 +4140,27 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
 
   // Hero Card
-  heroCard: { backgroundColor: '#152332', borderRadius: 16, padding: 20, alignItems: 'center', marginVertical: 12 },
-  heroEyebrow: { color: '#a9dfca', fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
-  heroTime: { fontSize: 64, fontWeight: '700', color: '#f5f3f0', marginVertical: 4 },
-  heroName: { fontSize: 26, fontWeight: '700', color: '#f5f3f0' },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginVertical: 10 },
-  chipMeal: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#142d2a', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#234842' },
-  chipMealText: { color: '#a9dfca', fontSize: 11, fontWeight: '600' },
-  chipForm: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1a2938', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 },
-  chipFormText: { color: '#f5f3f0', fontSize: 11, fontWeight: '500' },
-  chipCycle: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#143532', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 },
-  chipCycleText: { color: '#a9dfca', fontSize: 11, fontWeight: '600' },
-  chipStock: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1a2938', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 },
-  chipStockText: { color: '#adb3bf', fontSize: 11, fontWeight: '500' },
+  heroCard: { backgroundColor: '#152332', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', marginVertical: 6 },
+  heroEyebrow: { color: '#a9dfca', fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  heroTime: { fontSize: 32, fontWeight: '800', color: '#f5f3f0', marginVertical: 1 },
+  heroName: { fontSize: 18, fontWeight: '700', color: '#f5f3f0', textAlign: 'center', lineHeight: 22 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center', marginVertical: 4 },
+  chipMeal: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#142d2a', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8, borderWidth: 1, borderColor: '#234842' },
+  chipMealText: { color: '#a9dfca', fontSize: 10.5, fontWeight: '600' },
+  chipForm: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1a2938', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
+  chipFormText: { color: '#f5f3f0', fontSize: 10.5, fontWeight: '500' },
+  chipCycle: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#143532', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
+  chipCycleText: { color: '#a9dfca', fontSize: 10.5, fontWeight: '600' },
+  chipStock: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1a2938', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
+  chipStockText: { color: '#adb3bf', fontSize: 10.5, fontWeight: '500' },
   chipStockLow: { backgroundColor: '#332214', borderColor: '#5c3e24', borderWidth: 1 },
   chipStockLowText: { color: '#f0b484', fontWeight: '700' },
-  heroAmount: { fontSize: 14, color: '#adb3bf', marginTop: 4, marginBottom: 16 },
-  takeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#a9dfca', width: '100%', height: 52, borderRadius: 12 },
-  takeBtnText: { color: '#092326', fontSize: 18, fontWeight: '700' },
-  heroSecondaryActions: { flexDirection: 'row', gap: 10, width: '100%', marginTop: 12 },
-  heroSecBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 10, borderWidth: 1, borderColor: '#3a4655' },
-  heroSecBtnText: { color: '#adb3bf', fontSize: 13, fontWeight: '500' },
+  heroAmount: { fontSize: 12, color: '#adb3bf', marginTop: 1, marginBottom: 6 },
+  takeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#a9dfca', width: '100%', height: 40, borderRadius: 10 },
+  takeBtnText: { color: '#092326', fontSize: 15, fontWeight: '700' },
+  heroSecondaryActions: { flexDirection: 'row', gap: 6, width: '100%', marginTop: 6 },
+  heroSecBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 32, borderRadius: 8, borderWidth: 1, borderColor: '#3a4655' },
+  heroSecBtnText: { color: '#adb3bf', fontSize: 11.5, fontWeight: '500' },
 
   // Off-Cycle Box
   offCycleBox: { backgroundColor: '#111e2b', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#233446', marginVertical: 12 },
@@ -4301,5 +4949,246 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#203244',
+  },
+
+  // Date Picker Card Styles
+  datePickerCard: {
+    backgroundColor: '#101e2b',
+    borderWidth: 1,
+    borderColor: '#1d364d',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  datePickerInfo: {
+    marginBottom: 8,
+  },
+  datePickerLabel: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  datePickerHint: {
+    color: '#8b9cb0',
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  datePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#16283b',
+    borderWidth: 1,
+    borderColor: '#244563',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  datePickerBtnText: {
+    color: '#f5f3f0',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  datePickerChangeBadge: {
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.4)',
+  },
+  datePickerChangeBadgeText: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Carousel Hero Styles
+  carouselContainer: {
+    marginVertical: 10,
+  },
+  carouselHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  carouselSessionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#132832',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1c4542',
+  },
+  carouselSessionBadgeText: {
+    color: '#a9dfca',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  carouselDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#23384c',
+  },
+  carouselDotActive: {
+    width: 16,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#a9dfca',
+  },
+  carouselCounterText: {
+    color: '#adb3bf',
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  carouselScrollContent: {
+    paddingVertical: 2,
+  },
+  heroCarouselCard: {
+    backgroundColor: '#152332',
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#20354b',
+    overflow: 'hidden',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 2,
+  },
+  timingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#142d2a',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#234842',
+  },
+  timingBadgeText: {
+    color: '#a9dfca',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  timingBadgeOverdue: {
+    backgroundColor: '#332214',
+    borderColor: '#5c3e24',
+  },
+  timingBadgeTextOverdue: {
+    color: '#f0b484',
+  },
+  cardPageBadge: {
+    backgroundColor: '#1e3347',
+    paddingVertical: 1.5,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+  },
+  cardPageBadgeText: {
+    color: '#adb3bf',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  heroVisualPillBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#0f1c29',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    width: '100%',
+    marginVertical: 3,
+    borderWidth: 1,
+    borderColor: '#1c2e42',
+  },
+  heroVisualFormText: {
+    color: '#f5f3f0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  heroInstructionText: {
+    color: '#a9dfca',
+    fontSize: 10.5,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    width: '100%',
+    marginBottom: 3,
+  },
+  takeAllSessionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#a9dfca',
+    borderRadius: 10,
+    height: 36,
+    marginTop: 6,
+  },
+  takeAllSessionBtnText: {
+    color: '#081624',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Overdue & Meal Guidance Box Styles
+  guidanceBox: {
+    width: '100%',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginVertical: 3,
+    borderWidth: 1,
+  },
+  guidanceBoxWarning: {
+    backgroundColor: '#261b11',
+    borderColor: '#54361e',
+  },
+  guidanceBoxCritical: {
+    backgroundColor: '#321414',
+    borderColor: '#692525',
+  },
+  guidanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 1,
+  },
+  guidanceTitle: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  guidanceTitleWarning: {
+    color: '#f0b484',
+  },
+  guidanceTitleCritical: {
+    color: '#ff7675',
+  },
+  guidanceMessage: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    lineHeight: 13,
+    width: '100%',
   },
 });

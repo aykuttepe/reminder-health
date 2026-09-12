@@ -1,13 +1,20 @@
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json tsconfig.json ./
+RUN npm install
+
+COPY src ./src
+RUN npm run build
+
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Native node:sqlite ve node:http kullandığı için ekstra bağımlılık gerektirmez
-COPY package.json tsconfig.json ./
-COPY src ./src
-
-# TypeScript derlemesi
-RUN npm install -g typescript && tsc
+COPY package.json package-lock.json* ./
+RUN npm install --omit=dev
+COPY --from=builder /app/dist ./dist
 
 # SQLite kalıcı veri dizini
 RUN mkdir -p /app/data && chown -R node:node /app

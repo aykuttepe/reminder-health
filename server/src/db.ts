@@ -1,271 +1,108 @@
 import path from 'node:path';
 import fs from 'node:fs';
-
-export interface DbDoseRow {
-  id: number;
-  name: string;
-  data: string; // JSON string
-  updated_at: number;
-  deleted_at: number | null;
-}
-
-export interface DbLearnedRow {
-  gtin: string;
-  name: string;
-  data: string; // JSON string
-  updated_at: number;
-}
-
-export interface DbSettingsRow {
-  key: string;
-  value: string; // JSON string
-  updated_at: number;
-}
+import { DatabaseSync, backup } from 'node:sqlite';
+import { doseId, randomUUID } from './identity.js';
 
 export class RutinDatabase {
-  private db: any = null;
-  private isNativeSqlite = false;
-  private fallbackDataPath: string;
-
-  constructor(dbPath?: string) {
-    const targetPath = dbPath || process.env.DB_PATH || path.join(process.cwd(), 'data', 'rutin.sqlite');
-    const dir = path.dirname(targetPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    this.fallbackDataPath = path.join(dir, 'rutin_fallback.json');
-
-    try {
-      // Node.js 22.5+ native sqlite
-      const { DatabaseSync } = (globalThis as any).require ? (globalThis as any).require('node:sqlite') : null;
-      if (DatabaseSync) {
-        this.db = new DatabaseSync(targetPath);
-        this.isNativeSqlite = true;
-        this.initTables();
+  public sql!: DatabaseSync;
+  public backupPath: string | null = null;
+  constructor(private dbPath = process.env.DB_PATH || path.join(process.cwd(), 'data', 'rutin.sqlite')) {}
+  async initAsync(dbPath = this.dbPath) {
+    if (this.sql) return;
+    this.dbPath = dbPath;
+    if (dbPath !== ':memory:') fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    this.sql = new DatabaseSync(dbPath);
+    this.sql.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
+    const version = Number((this.sql.prepare('PRAGMA user_version').get() as any).user_version);
+    if (version > 4) throw new Error('Veritabanı sürümü bu uygulamadan yeni.');
+    if (version >= 2 && version <= 3) {
+      const cols = (this.sql.prepare('PRAGMA table_info(users)').all() as any[]).map(c => c.name);
+      if (!cols.includes('recovery_hash')) {
+        this.sql.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT UNIQUE;');
       }
-    } catch {
-      // In ES modules or if require not available, try dynamic import or fallback
-    }
-  }
-
-  public async initAsync(dbPath?: string) {
-    if (this.db) return;
-    const targetPath = dbPath || process.env.DB_PATH || path.join(process.cwd(), 'data', 'rutin.sqlite');
-    const dir = path.dirname(targetPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    try {
-      const sqliteModule = await import('node:sqlite');
-      if (sqliteModule && sqliteModule.DatabaseSync) {
-        this.db = new sqliteModule.DatabaseSync(targetPath);
-        this.isNativeSqlite = true;
-        this.initTables();
-        return;
+      if (!cols.includes('email')) {
+        this.sql.exec('ALTER TABLE users ADD COLUMN email TEXT;');
+        this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;');
       }
-    } catch (e) {
-      console.warn('Native node:sqlite not available, using robust JSON file database fallback.');
-    }
-
-    // Fallback JSON setup
-    if (!fs.existsSync(this.fallbackDataPath)) {
-      fs.writeFileSync(this.fallbackDataPath, JSON.stringify({ doses: [], learnedMeds: {}, settings: {} }, null, 2));
-    }
-  }
-
-  private initTables() {
-    if (!this.db) return;
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS doses (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        data TEXT NOT NULL,
-        updated_at INTEGER NOT NULL,
-        deleted_at INTEGER DEFAULT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_doses_updated ON doses (updated_at);
-
-      CREATE TABLE IF NOT EXISTS learned_meds (
-        gtin TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        data TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-  }
-
-  public getAllDoses(): DbDoseRow[] {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare('SELECT * FROM doses');
-      return stmt.all() as DbDoseRow[];
-    }
-    const store = this.readFallback();
-    return store.doses || [];
-  }
-
-  public getDosesSince(sinceTimestamp: number): DbDoseRow[] {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare('SELECT * FROM doses WHERE updated_at > ? OR (deleted_at IS NOT NULL AND deleted_at > ?)');
-      return stmt.all(sinceTimestamp, sinceTimestamp) as DbDoseRow[];
-    }
-    const store = this.readFallback();
-    return (store.doses || []).filter((d: any) =>
-      d.updated_at > sinceTimestamp || (d.deleted_at && d.deleted_at > sinceTimestamp)
-    );
-  }
-
-  public upsertDose(id: number, name: string, dataJson: string, updatedAt: number, deletedAt: number | null = null) {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare(`
-        INSERT INTO doses (id, name, data, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          name = excluded.name,
-          data = excluded.data,
-          updated_at = excluded.updated_at,
-          deleted_at = excluded.deleted_at
-      `);
-      stmt.run(id, name, dataJson, updatedAt, deletedAt);
+      this.sql.exec('PRAGMA user_version=4;');
       return;
     }
-
-    const store = this.readFallback();
-    const existingIdx = (store.doses || []).findIndex((d: any) => d.id === id);
-    const row = { id, name, data: dataJson, updated_at: updatedAt, deleted_at: deletedAt };
-    if (existingIdx !== -1) {
-      store.doses[existingIdx] = row;
-    } else {
-      store.doses.push(row);
+    if (version === 4) return;
+    const legacy = (this.sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='doses'").get());
+    if (legacy && dbPath !== ':memory:') {
+      this.backupPath = `${dbPath}.pre-users-${Date.now()}.backup`;
+      await backup(this.sql, this.backupPath);
+      fs.chmodSync(this.backupPath, 0o600);
     }
-    this.writeFallback(store);
-  }
-
-  public getAllLearnedMeds(): Record<string, any> {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare('SELECT * FROM learned_meds');
-      const rows = stmt.all() as DbLearnedRow[];
-      const res: Record<string, any> = {};
-      for (const r of rows) {
-        try {
-          res[r.gtin] = JSON.parse(r.data);
-        } catch {
-          res[r.gtin] = { gtin: r.gtin, name: r.name };
+    this.transaction(() => {
+      if (legacy) this.sql.exec('ALTER TABLE doses RENAME TO legacy_doses; ALTER TABLE learned_meds RENAME TO legacy_learned_meds; ALTER TABLE settings RENAME TO legacy_settings; DROP INDEX IF EXISTS idx_doses_updated;');
+      this.sql.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, sync_hash TEXT UNIQUE,
+          recovery_hash TEXT UNIQUE, is_legacy_owner INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+        CREATE TABLE devices (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+          installation_id TEXT NOT NULL, name TEXT NOT NULL, session_hash TEXT UNIQUE NOT NULL,
+          csrf_hash TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('web','native')),
+          expires_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL);
+        CREATE INDEX devices_user ON devices(user_id);
+        CREATE TABLE rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+        CREATE TABLE doses (user_id TEXT NOT NULL REFERENCES users(id), id TEXT NOT NULL,
+          name TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER,
+          PRIMARY KEY(user_id,id));
+        CREATE INDEX idx_doses_updated ON doses(user_id,updated_at);
+        CREATE TABLE learned_meds (user_id TEXT NOT NULL REFERENCES users(id), gtin TEXT NOT NULL,
+          name TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(user_id,gtin));
+        CREATE TABLE settings (user_id TEXT NOT NULL REFERENCES users(id), key TEXT NOT NULL,
+          value TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(user_id,key));
+      `);
+      const owner = randomUUID();
+      this.sql.prepare('INSERT INTO users(id,name,is_legacy_owner,created_at) VALUES(?,?,1,?)').run(owner, 'Mevcut kayıtların sahibi', Date.now());
+      if (legacy) {
+        for (const row of this.sql.prepare('SELECT * FROM legacy_doses').all() as any[]) {
+          const data = JSON.parse(row.data); // Abort the entire migration rather than lose damaged records.
+          data.id = doseId(owner, row.id);
+          this.saveDose(owner, { ...data, name: row.name, updatedAt: row.updated_at, deletedAt: row.deleted_at });
         }
+        this.sql.prepare('INSERT INTO learned_meds SELECT ?,gtin,name,data,updated_at FROM legacy_learned_meds').run(owner);
+        this.sql.prepare('INSERT INTO settings SELECT ?,key,value,updated_at FROM legacy_settings').run(owner);
+        this.sql.exec('DROP TABLE legacy_doses; DROP TABLE legacy_learned_meds; DROP TABLE legacy_settings;');
       }
-      return res;
-    }
-    const store = this.readFallback();
-    return store.learnedMeds || {};
+      // Never retain old credentials in backups of application settings.
+      this.sql.exec("DELETE FROM settings WHERE key NOT IN ('userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language'); PRAGMA user_version=4;");
+    });
   }
-
-  public upsertLearnedMed(gtin: string, name: string, dataJson: string, updatedAt: number) {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare(`
-        INSERT INTO learned_meds (gtin, name, data, updated_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(gtin) DO UPDATE SET
-          name = excluded.name,
-          data = excluded.data,
-          updated_at = excluded.updated_at
-      `);
-      stmt.run(gtin, name, dataJson, updatedAt);
-      return;
-    }
-
-    const store = this.readFallback();
-    if (!store.learnedMeds) store.learnedMeds = {};
-    try {
-      store.learnedMeds[gtin] = JSON.parse(dataJson);
-    } catch {
-      store.learnedMeds[gtin] = { gtin, name };
-    }
-    this.writeFallback(store);
+  transaction<T>(fn: () => T): T {
+    this.sql.exec('BEGIN IMMEDIATE');
+    try { const result = fn(); this.sql.exec('COMMIT'); return result; }
+    catch (err) { this.sql.exec('ROLLBACK'); throw err; }
   }
-
-  public getAllSettings(): Record<string, any> {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare('SELECT * FROM settings');
-      const rows = stmt.all() as DbSettingsRow[];
-      const res: Record<string, any> = {};
-      for (const r of rows) {
-        try {
-          res[r.key] = JSON.parse(r.value);
-        } catch {
-          res[r.key] = r.value;
-        }
-      }
-      return res;
-    }
-    const store = this.readFallback();
-    return store.settings || {};
+  getAllDoses(userId: string): any[] {
+    return this.sql.prepare('SELECT * FROM doses WHERE user_id=?').all(userId).map((r: any) => ({ ...JSON.parse(r.data), id: r.id, updatedAt: r.updated_at, deletedAt: r.deleted_at || undefined }));
   }
-
-  public upsertSetting(key: string, valueJson: string, updatedAt: number) {
-    if (this.isNativeSqlite && this.db) {
-      const stmt = this.db.prepare(`
-        INSERT INTO settings (key, value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(key) DO UPDATE SET
-          value = excluded.value,
-          updated_at = excluded.updated_at
-      `);
-      stmt.run(key, valueJson, updatedAt);
-      return;
-    }
-    const store = this.readFallback();
-    if (!store.settings) store.settings = {};
-    try {
-      store.settings[key] = JSON.parse(valueJson);
-    } catch {
-      store.settings[key] = valueJson;
-    }
-    this.writeFallback(store);
+  saveDose(userId: string, dose: any) {
+    this.sql.prepare(`INSERT INTO doses VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET name=excluded.name,data=excluded.data,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at`)
+      .run(userId, dose.id, dose.name, JSON.stringify(dose), dose.updatedAt, dose.deletedAt || null);
   }
-
-  public wipeAndRestore(doses: any[], learnedMeds: Record<string, any>, settings: Record<string, any>) {
-    if (this.isNativeSqlite && this.db) {
-      this.db.exec('DELETE FROM doses; DELETE FROM learned_meds; DELETE FROM settings;');
-      for (const d of doses) {
-        this.upsertDose(d.id, d.name || 'İlaç', JSON.stringify(d), d.updatedAt || Date.now(), d.deletedAt || null);
-      }
-      for (const [gtin, med] of Object.entries(learnedMeds)) {
-        this.upsertLearnedMed(gtin, (med as any).name || 'İlaç', JSON.stringify(med), Date.now());
-      }
-      for (const [k, v] of Object.entries(settings)) {
-        this.upsertSetting(k, JSON.stringify(v), Date.now());
-      }
-      return;
-    }
-
-    const store = {
-      doses: doses.map(d => ({ id: d.id, name: d.name, data: JSON.stringify(d), updated_at: d.updatedAt || Date.now(), deleted_at: d.deletedAt || null })),
-      learnedMeds,
-      settings,
-    };
-    this.writeFallback(store);
+  getAllLearnedMeds(userId: string): Record<string, any> {
+    return Object.fromEntries(this.sql.prepare('SELECT gtin,data FROM learned_meds WHERE user_id=?').all(userId).map((r: any) => [r.gtin, JSON.parse(r.data)]));
   }
-
-  private readFallback(): any {
-    try {
-      return JSON.parse(fs.readFileSync(this.fallbackDataPath, 'utf8'));
-    } catch {
-      return { doses: [], learnedMeds: {}, settings: {} };
-    }
+  upsertLearnedMed(userId: string, gtin: string, med: any) {
+    this.sql.prepare(`INSERT INTO learned_meds VALUES(?,?,?,?,?) ON CONFLICT(user_id,gtin) DO UPDATE SET name=excluded.name,data=excluded.data,updated_at=excluded.updated_at`)
+      .run(userId, gtin, med.name || 'İlaç', JSON.stringify(med), Date.now());
   }
-
-  private writeFallback(data: any) {
-    try {
-      fs.writeFileSync(this.fallbackDataPath, JSON.stringify(data, null, 2));
-    } catch (e) {
-      console.error('Failed to write fallback data', e);
+  getAllSettings(userId: string): Record<string, any> {
+    const settings = Object.fromEntries(this.sql.prepare('SELECT key,value FROM settings WHERE user_id=?').all(userId).map((r: any) => [r.key, JSON.parse(r.value)]));
+    if (!settings.userName) {
+      const user = this.sql.prepare('SELECT name FROM users WHERE id=?').get(userId) as any;
+      if (user?.name) settings.userName = user.name;
     }
+    return settings;
   }
+  upsertSetting(userId: string, key: string, value: any) {
+    this.sql.prepare(`INSERT INTO settings VALUES(?,?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`).run(userId, key, JSON.stringify(value), Date.now());
+  }
+  clearUserData(userId: string) {
+    for (const table of ['doses','learned_meds','settings']) this.sql.prepare(`DELETE FROM ${table} WHERE user_id=?`).run(userId);
+  }
+  close() { this.sql?.close(); }
 }

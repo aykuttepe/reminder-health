@@ -75,4 +75,6 @@ When any text-entry control loses focus, dismiss the simulated keyboard. If the 
 - Selected source: design/selected-concept.png (third displayed concept).
 - Dark navy, mint accent, large time and medication name; bottom tabs Bugün, İlaçlarım, Geçmiş, Ayarlar.
 - Keep communication concise and tools focused to conserve tokens.
-- This phase is an interactive prototype; native notifications and persistent storage are future work.
+- The project includes the web prototype, an Expo native app with notifications and persistent storage, and a self-hosted sync server.
+- The local sync server is `http://192.168.1.100:3050`; port 3000 is occupied by another application. The deployment directory is `/home/tepe/apps/reminder-sync` and the container is `reminder-sync-server` (host 3050 -> container 3000).
+- Preserve local `data/` and `server/data/` directories; they are ignored by Git and must not be deleted during checks.

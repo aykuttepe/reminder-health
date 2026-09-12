@@ -12,7 +12,7 @@ export type MedicineForm = 'tablet' | 'kapsul' | 'damla' | 'surup';
 export type FrequencyType = 'everyday' | 'alternate' | 'cycle' | 'variable';
 
 export type Dose = {
-  id: number;
+  id: string | number;
   name: string;
   amount: string;
   time: string;
@@ -74,7 +74,9 @@ export function getDurationInfo(dose: Dose, targetDateStr = localDateKey(), lang
       currentDay: 1,
       totalDays: 0,
       daysRemaining: 0,
-      badgeText: lang === 'en' ? 'Continuous Use' : 'Sürekli Kullanım',
+      badgeText: !hasStarted
+        ? (lang === 'en' ? 'Not Started Yet' : 'Henüz Başlamadı')
+        : (lang === 'en' ? 'Continuous Use' : 'Sürekli Kullanım'),
     };
   }
 
@@ -129,7 +131,7 @@ export type CycleInfo = {
 
 export type ScheduledSlot = {
   slotId: string;
-  doseId: number;
+  doseId: string | number;
   dose: Dose;
   time: string;
   status: 'pending' | 'taken' | 'skipped';
@@ -298,7 +300,7 @@ export function isDoseActive(dose: Dose, date: string): boolean {
 }
 
 export function updateDoseSlot(dose: Dose, time: string, date: string, status: Dose['status']): Dose {
-  const current = normalizeDoseDay(dose);
+  const current = {...normalizeDoseDay(dose), updatedAt: Date.now()};
   const previous = slotStatus(current, time, date);
   const amount = parseDoseAmount(getCycleInfo(current, date).todayAmount);
   const delta = (previous === 'taken' ? amount : 0) - (status === 'taken' ? amount : 0);

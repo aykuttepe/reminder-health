@@ -1,3 +1,9 @@
+let notificationIds: Record<string,string> = {};
+export function setNotificationIdMap(map:Record<string,string>){ notificationIds=map; }
+function notificationId(value:unknown):string|number|undefined {
+ if(value===undefined)return undefined;
+ return notificationIds[String(value)] ?? (typeof value==='number'?value:String(value));
+}
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform, Vibration } from 'react-native';
 
@@ -13,7 +19,7 @@ function serializeNotifications<T>(operation: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export type DoseStatusChecker = (doseId: number, timeStr?: string, date?: string) => boolean;
+export type DoseStatusChecker = (doseId: string | number, timeStr?: string, date?: string) => boolean;
 let isDoseConfirmedTaken: DoseStatusChecker | null = null;
 
 export function registerDoseStatusChecker(checker: DoseStatusChecker | null): void {
@@ -23,7 +29,7 @@ export function registerDoseStatusChecker(checker: DoseStatusChecker | null): vo
 export type ActiveNotificationPayload = {
   title: string;
   body: string;
-  doseId?: number;
+  doseId?: string | number;
   time?: string;
   date?: string;
   isRepeat?: boolean;
@@ -342,7 +348,7 @@ export async function openExactAlarmSettings(): Promise<boolean> {
 const createNotificationHandler = (shouldPlaySound: boolean) => async (notif: Notifications.Notification) => {
   try {
     const data = notif.request?.content?.data as any;
-    const doseId = data?.doseId !== undefined ? Number(data.doseId) : undefined;
+    const doseId = data?.doseId !== undefined ? notificationId(data.doseId) : undefined;
     const timeStr = data?.time as string | undefined;
     const isRepeat = data?.isRepeat as boolean | undefined;
 
@@ -502,7 +508,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 export type NotificationActionResponse = {
   actionId: string;
-  doseId?: number;
+  doseId?: string | number;
   timeStr?: string;
   date?: string;
   isRepeat?: boolean;
@@ -515,7 +521,7 @@ export function addNotificationResponseListener(
     try {
       const actionId = res.actionIdentifier;
       const data = res.notification.request.content.data as any;
-      const doseId = data?.doseId !== undefined ? Number(data.doseId) : undefined;
+      const doseId = data?.doseId !== undefined ? notificationId(data.doseId) : undefined;
       const timeStr = data?.time as string | undefined;
       const isRepeat = data?.isRepeat as boolean | undefined;
 
@@ -537,14 +543,14 @@ export function addNotificationResponseListener(
 }
 
 export function addNotificationReceivedListener(
-  listener: (notification: { isRepeat?: boolean; doseId?: number; time?: string; date?: string; title: string; body: string }) => void
+  listener: (notification: { isRepeat?: boolean; doseId?: string | number; time?: string; date?: string; title: string; body: string }) => void
 ): () => void {
   const sub = Notifications.addNotificationReceivedListener(notif => {
     try {
       const data = notif.request.content.data as any;
       listener({
         isRepeat: data?.isRepeat,
-        doseId: data?.doseId !== undefined ? Number(data.doseId) : undefined,
+        doseId: data?.doseId !== undefined ? notificationId(data.doseId) : undefined,
         time: data?.time,
         date: data?.date,
         title: notif.request.content.title ?? 'İlaç Vakti',
@@ -594,13 +600,13 @@ export async function playTestSound(
  * Also dismisses any already delivered notifications from the notification tray.
  * Called immediately when the dose is confirmed (taken or skipped).
  */
-export function cancelDoseRepeatNotifications(doseId: number, timeStr?: string, date = localDateKey()): Promise<void> {
+export function cancelDoseRepeatNotifications(doseId: string | number, timeStr?: string, date = localDateKey()): Promise<void> {
   return serializeNotifications(async () => {
     try {
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       for (const item of scheduled) {
         const d = item.content?.data;
-        if (d && (d.doseId === doseId || d.doseId === String(doseId) || d.isTest)) {
+        if (d && (notificationId(d.doseId) === doseId || String(notificationId(d.doseId)) === String(doseId) || d.isTest)) {
           if (!timeStr || d.time === timeStr || d.isTest) {
             if ((d.isRepeat && (!d.date || d.date === date)) || d.isTest) {
               await Notifications.cancelScheduledNotificationAsync(item.identifier);
@@ -614,7 +620,7 @@ export function cancelDoseRepeatNotifications(doseId: number, timeStr?: string, 
         const presented = await Notifications.getPresentedNotificationsAsync();
         for (const item of presented) {
           const d = item.request?.content?.data;
-          if (d && (d.doseId === doseId || d.doseId === String(doseId) || d.isTest)) {
+          if (d && (notificationId(d.doseId) === doseId || String(notificationId(d.doseId)) === String(doseId) || d.isTest)) {
             if ((!timeStr || d.time === timeStr || d.isTest) && (!d.date || d.date === date)) {
               await Notifications.dismissNotificationAsync(item.request.identifier);
             }
@@ -696,7 +702,12 @@ export function buildMedicationSchedule(
         if (snoozedSlots.has(`${dose.id}|${date}|${time}`)) continue;
         const [hour, minute] = time.split(':').map(Number);
         const due = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute);
-        for (let repeatIndex = 0; repeatIndex <= repeats; repeatIndex++) {
+        // Repeat nag reminders (every 3 minutes) are only critical for the immediate window:
+        // yesterday (for overnight crossing), today, and tomorrow (offset <= 1).
+        // For future days (> 1), we schedule only the main dose reminder (repeatIndex === 0).
+        // As time advances or when the app opens, the schedule automatically refreshes upcoming repeat nags.
+        const maxRepeatForDay = offset <= 1 ? repeats : 0;
+        for (let repeatIndex = 0; repeatIndex <= maxRepeatForDay; repeatIndex++) {
           // Repeat reminders are measured from the dose time, not its early heads-up.
           const fireAt = new Date(due.getTime() + (repeatIndex ? repeatIndex * 3 : -(options.leadTimeMinutes ?? 0)) * 60000);
           if (fireAt <= now) continue;
@@ -736,39 +747,61 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
     const snoozes = owned.filter(item => {
       const data = item.content.data;
       if (!options.enabled || !data?.isSnooze) return false;
-      const input = doses.find(d => d.id === Number(data.doseId));
+      const input = doses.find(d => d.id === notificationId(data.doseId));
       if (!input || typeof data.date !== 'string' || Number(data.fireAt) <= now.getTime()) return false;
       const dose: Dose = { ...input, status: input.status ?? 'pending' };
       return (dose.times?.length ? dose.times : [dose.time]).includes(String(data.time)) && isDoseActive(dose, data.date) && slotStatus(dose, String(data.time), data.date) === 'pending';
     });
     const snoozedSlots = new Set(snoozes.map(item => {
       const d = item.content.data!;
-      return `${d.doseId}|${d.date}|${d.time}`;
+      return `${notificationId(d.doseId)}|${d.date}|${d.time}`;
     }));
     const planned = buildMedicationSchedule(doses, options, now, snoozedSlots);
-    // Leave space for immediate sound tests and preserve explicit snoozes first.
-    const budget = Math.max(0, (Platform.OS === 'ios' ? 60 : 500) - snoozes.length - (existing.length - owned.length));
+    // Platform budget: iOS hard limit is 64 (we use 60).
+    // Android AlarmManager has a system-wide hard ceiling of 500 concurrent alarms per UID.
+    // Setting Android budget to 180 provides 1-2+ weeks of coverage with plenty of safety margin (>300 free slots),
+    // preventing "Maximum limit of concurrent alarms 500 reached" crashes.
+    const platformBudget = Platform.OS === 'ios' ? 60 : 180;
+    const budget = Math.max(0, platformBudget - snoozes.length - (existing.length - owned.length));
     const desired = [
       ...snoozes.map(item => {
         const data = item.content.data!;
-        const dose = doses.find(d => d.id === Number(data.doseId))!;
+        const dose = doses.find(d => d.id === notificationId(data.doseId))!;
         return buildSnoozeRequest({ ...dose, time: String(data.time), statusDate: String(data.date),
           amount: getCycleInfo({ ...dose, status: dose.status ?? 'pending' }, String(data.date)).todayAmount }, Number(data.fireAt), options);
       }),
       ...planned.slice(0, budget),
     ];
-    const keep = new Set([...desired.map(r => r.identifier), ...snoozes.map(r => r.identifier)]);
+    const keep = new Set(desired.map(r => r.identifier));
     for (const item of owned) {
-      if (!keep.has(item.identifier)) await Notifications.cancelScheduledNotificationAsync(item.identifier);
+      if (!keep.has(item.identifier)) {
+        try {
+          await Notifications.cancelScheduledNotificationAsync(item.identifier);
+        } catch {}
+      }
+    }
+    // Proactively cancel any already-expired alarms (fireAt in the past) to free Android AlarmManager slots
+    for (const item of existing) {
+      const fireAt = Number(item.content?.data?.fireAt);
+      if (fireAt && fireAt < now.getTime() - 60000 && !keep.has(item.identifier)) {
+        try {
+          await Notifications.cancelScheduledNotificationAsync(item.identifier);
+        } catch {}
+      }
     }
     for (const request of desired) {
       // Compare our own signature: native APIs may normalize returned content/trigger values.
       const signature = JSON.stringify(request.content);
       const previous = owned.find(item => item.identifier === request.identifier);
       if (previous?.content.data?.planSignature === signature) continue;
-      await Notifications.scheduleNotificationAsync({ ...request,
-        content: { ...request.content, data: { ...request.content.data, planSignature: signature } },
-      });
+      try {
+        await Notifications.scheduleNotificationAsync({ ...request,
+          content: { ...request.content, data: { ...request.content.data, planSignature: signature } },
+        });
+      } catch (scheduleError) {
+        console.warn('Notifications: Failed to schedule single alarm, quota or OS restriction:', scheduleError);
+        break; // Stop scheduling further alarms to prevent cascade errors if system cap is reached
+      }
     }
     const horizon = dateFromKey(localDateKey(now));
     horizon.setDate(horizon.getDate() + 30);

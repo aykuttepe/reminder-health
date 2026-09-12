@@ -3,15 +3,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rutin-sync-server
+    container_name: reminder-sync-server
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3050:3000"
     environment:
       - PORT=3000
       - HOST=0.0.0.0
       - DB_PATH=/app/data/rutin.sqlite
-      # İsteğe bağlı token koruması için aşağıdaki satırı açın:
-      # - API_TOKEN=gizli_anahtariniz_123
+      - WEB_ROOT=/app/web
     volumes:
       - ./data:/app/data
+      - ./web:/app/web
+

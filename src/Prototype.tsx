@@ -1,9 +1,13 @@
+import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, type Session, type Snapshot} from './account';
+import {login, recover, registerAccount, updateUserEmail, getStoredSyncCode, getSession, logout, authRequest, localStore, isSameServer} from './authClient';
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple, Bug, Globe } from '@phosphor-icons/react';
 import { BottomSheet, KeyboardInput, MobileScroll, useKeyboard, useKeyboardInsets } from './mobile';
 import { parseITSKarekod } from './itsParser';
 import { findMedicineByGTIN, type CatalogMedicine } from './data/medCatalog';
 import {
+  DEFAULT_SYNC_SERVER_URL,
+  restoreServerUrl,
   checkServerHealth,
   syncWithServer,
   smartMergeDoses,
@@ -34,7 +38,7 @@ type MedicineForm = 'tablet' | 'kapsul' | 'damla' | 'surup';
 type FrequencyType = 'everyday' | 'alternate' | 'cycle' | 'variable';
 
 type Dose = {
-  id: number;
+  id: string | number;
   name: string;
   amount: string;
   time: string;
@@ -228,7 +232,7 @@ type PastDayRecord = {
   label: string;
   dateStr: string;
   isToday?: boolean;
-  doses?: { id: number; name: string; time: string; amount: string; status: 'taken' | 'skipped' }[];
+  doses?: { id: string | number; name: string; time: string; amount: string; status: 'taken' | 'skipped' }[];
 };
 
 const initial: Dose[] = [];
@@ -405,6 +409,18 @@ const STORAGE_KEY_SETTINGS = 'rutin_settings';
 const STORAGE_KEY_LEARNED_MEDS = 'rutin_learned_meds_v1';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_sync_config';
 const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
+if (typeof window !== 'undefined') {
+  const pending = localStorage.getItem('reminder_pending_switch_v2');
+  if (pending) {
+    const {snapshot,key} = JSON.parse(pending);
+    localStorage.setItem(STORAGE_KEY_DOSES,JSON.stringify(snapshot.doses));
+    localStorage.setItem(STORAGE_KEY_LEARNED_MEDS,JSON.stringify(snapshot.learnedMeds));
+    localStorage.setItem(STORAGE_KEY_SETTINGS,JSON.stringify(snapshot.settings));
+    localStorage.setItem('reminder_bound_account_v2',key);
+    localStorage.removeItem('reminder_pending_switch_v2');
+  }
+}
+
 
 function loadStoredLanguage(): Language {
   if (typeof window === 'undefined') return 'tr';
@@ -695,7 +711,7 @@ function InnerPrototype() {
   const [activeSimulatedNotification, setActiveSimulatedNotification] = useState<{
     title: string;
     body: string;
-    doseId?: number;
+    doseId?: string | number;
     time?: string;
     isRepeat?: boolean;
   } | null>(null);
@@ -703,16 +719,22 @@ function InnerPrototype() {
   // Sync & Cloud states
   const [serverUrl, setServerUrl] = useState<string>(() => {
     try {
+      const hostedOrigin = document.querySelector<HTMLMetaElement>('meta[name="reminder-api-origin"]')?.content;
+      if (hostedOrigin) return hostedOrigin;
       const cfg = localStorage.getItem(STORAGE_KEY_SYNC_CONFIG);
-      return cfg ? JSON.parse(cfg).serverUrl || 'http://localhost:3000' : 'http://localhost:3000';
-    } catch { return 'http://localhost:3000'; }
+      return restoreServerUrl(cfg ? JSON.parse(cfg)?.serverUrl : undefined);
+    } catch { return DEFAULT_SYNC_SERVER_URL; }
   });
-  const [apiToken, setApiToken] = useState<string>(() => {
-    try {
-      const cfg = localStorage.getItem(STORAGE_KEY_SYNC_CONFIG);
-      return cfg ? JSON.parse(cfg).apiToken || '' : '';
-    } catch { return ''; }
-  });
+  const [syncCode, setSyncCode] = useState('');
+  const [activeSyncCode, setActiveSyncCode] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState('');
+  const [recoveredCredentials, setRecoveredCredentials] = useState<{ syncCode: string; recoveryKey: string } | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const switchingAccount = useRef(false);
   const [autoSync, setAutoSync] = useState<boolean>(() => {
     try {
       const cfg = localStorage.getItem(STORAGE_KEY_SYNC_CONFIG);
@@ -748,7 +770,6 @@ function InnerPrototype() {
         STORAGE_KEY_SYNC_CONFIG,
         JSON.stringify({
           serverUrl,
-          apiToken,
           autoSync,
           lastSyncAt,
         })
@@ -756,7 +777,7 @@ function InnerPrototype() {
     } catch (e) {
       console.error('Failed to save sync config to localStorage', e);
     }
-  }, [serverUrl, apiToken, autoSync, lastSyncAt]);
+  }, [serverUrl, autoSync, lastSyncAt]);
 
   useEffect(() => {
     try {
@@ -817,7 +838,7 @@ function InnerPrototype() {
 
   type ScheduledSlot = {
     slotId: string;
-    doseId: number;
+    doseId: string | number;
     dose: Dose;
     time: string;
     status: 'pending' | 'taken' | 'skipped';
@@ -857,7 +878,7 @@ function InnerPrototype() {
   const totalWeeklyTotal = todaySlots.length;
   const weeklyAdherence = totalWeeklyTotal > 0 ? Math.round((totalWeeklyTaken / totalWeeklyTotal) * 100) : 100;
 
-  const change = (id: number, patch: Partial<Dose>, text: string) => {
+  const change = (id: string | number, patch: Partial<Dose>, text: string) => {
     const previous = doses;
     setDoses(ds => ds.map(d => d.id === id ? {...d,...patch} : d));
     setToast({text,previous});
@@ -924,7 +945,7 @@ function InnerPrototype() {
     takeSlot(nextSlot);
   };
 
-  const deleteMedicine = (id: number) => {
+  const deleteMedicine = (id: string | number) => {
     keyboard.hide();
     const previous = doses;
     const target = doses.find(d => d.id === id);
@@ -940,6 +961,9 @@ function InnerPrototype() {
     webLogger.breadcrumb(`Sekme değiştirildi: ${nextTab}`);
     setTab(nextTab);
     setSettingsSubPage('main');
+    if (nextTab === 'Geçmiş') {
+      setSelectedHistoryDate(6);
+    }
     setEditor(null);
     setToast(null);
   };
@@ -1109,16 +1133,131 @@ function InnerPrototype() {
     }
 
     if (editor?.id) setDoses(ds => ds.map(d => d.id === editor.id ? {...d,...patch} : d));
-    else setDoses(ds => [...ds,{id:Date.now(),...patch,status:'pending',slotStatuses:{}}]);
+    else setDoses(ds => [...ds,{id:newId(),...patch,status:'pending',slotStatuses:{}}]);
     closeEditor(); setTab('İlaçlarım'); setToast({text:editor?.id ? 'İlaç güncellendi' : 'İlaç planına eklendi',previous});
   };
 
   // Sync Action Handlers
+
+  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, notifications, soundEnabled, soundType, snoozeMinutes}});
+  const bindAccount = async (next: Session) => {
+    switchingAccount.current = true;
+    try {
+      const before = doses;
+      const snapshot = await switchAccount(localStore, serverUrl, next.user, accountSnapshot());
+      await finishSwitch(localStore, {doses:STORAGE_KEY_DOSES, learned:STORAGE_KEY_LEARNED_MEDS, settings:STORAGE_KEY_SETTINGS});
+      
+      setDoses(snapshot.doses);
+      setLearnedMeds(snapshot.learnedMeds);
+      setUserName(snapshot.settings.userName || '');
+      setNotifications(snapshot.settings.notifications ?? true);
+      setSoundEnabled(snapshot.settings.soundEnabled ?? true);
+      setSoundType(snapshot.settings.soundType || 'default');
+      setSnoozeMinutes(snapshot.settings.snoozeMinutes ?? 10);
+      setToast(null);
+      setLastSyncAt(null);
+      setSession(next);
+    } finally { switchingAccount.current = false; }
+  };
+  const handleRegister = async () => {
+    keyboard.hide();
+    setAuthBusy(true);
+    try {
+      const res = await registerAccount(serverUrl, userName || 'Aykut', authEmail.trim() || undefined);
+      await bindAccount(res);
+      setActiveSyncCode(res.syncCode);
+      setRecoveredCredentials({ syncCode: res.syncCode, recoveryKey: res.recoveryKey });
+      setSyncStatusMsg(`${res.user.name} için yeni eşitleme kodu oluşturuldu`);
+      setSyncStatus('connected');
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || 'Hesap oluşturulamadı.');
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleUpdateEmail = async () => {
+    if (!authEmail.trim()) return;
+    keyboard.hide();
+    setAuthBusy(true);
+    try {
+      const res = await updateUserEmail(serverUrl, authEmail.trim(), session || undefined);
+      if (session) {
+        setSession({ ...session, user: { ...session.user, email: res.email } });
+      }
+      setEditingEmail(false);
+      setToast({ text: t.syncEmailSaved });
+      setTimeout(() => setToast(null), 2500);
+      setSyncStatusMsg(t.syncEmailSaved);
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || 'E-posta kaydedilemedi');
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleLogin = async () => {
+    keyboard.hide();
+    setAuthBusy(true);
+    try {
+      const next = await login(serverUrl, syncCode);
+      const code = syncCode;
+      setSyncCode('');
+      await bindAccount(next);
+      setActiveSyncCode(code);
+      setSyncStatusMsg(`${next.user.name} hesabına bağlandı`);
+      setSyncStatus('connected');
+    } catch (err:any) { setSyncStatusMsg(err.message || 'Bağlantı başarısız.'); setSyncStatus('error'); }
+    finally { setAuthBusy(false); }
+  };
+  const handleRecover = async () => {
+    keyboard.hide();
+    setAuthBusy(true);
+    try {
+      const res = await recover(serverUrl, recoveryKey);
+      setRecoveryKey('');
+      setRecoveryMode(false);
+      await bindAccount(res);
+      setActiveSyncCode(res.newSyncCode);
+      setRecoveredCredentials({ syncCode: res.newSyncCode, recoveryKey: res.newRecoveryKey });
+      setSyncStatusMsg(`${res.user.name} hesabı kurtarıldı`);
+      setSyncStatus('connected');
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || 'Kurtarma başarısız.');
+      setSyncStatus('error');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+  const handleLogout = async () => {
+    keyboard.hide();
+    setAuthBusy(true);
+    try { if(session) await logout(serverUrl, session); }
+    catch { setSyncStatusMsg('Sunucuya ulaşılamadı. Oturumu kapatmak için bağlantıyı kontrol edin.'); return; }
+    finally { setAuthBusy(false); }
+    setSession(null); setActiveSyncCode(null); setSyncCode(''); setSyncStatusMsg('Bağlantı kapatıldı. Yerel kayıtlar bu cihazda korunuyor.');
+  };
+  useEffect(() => {
+    let active = true;
+    setSession(null);
+    getSession(serverUrl).then(async next => {
+      if(active) {
+        setAuthBusy(true);
+        try {
+          await bindAccount(next);
+          const savedCode = getStoredSyncCode();
+          if (active) setActiveSyncCode(savedCode);
+        } finally {setAuthBusy(false);}
+      }
+    }).catch(() => {});
+    return () => {active=false;};
+  }, [serverUrl]);
+
   const handleTestConnection = async () => {
     keyboard.hide();
     setSyncStatus('testing');
     setSyncStatusMsg('Sunucuya bağlanılıyor...');
-    const result = await checkServerHealth(serverUrl, apiToken);
+    const result = await checkServerHealth(serverUrl);
     if (result.ok) {
       setSyncStatus('connected');
       setSyncStatusMsg(`Sunucu Çevrimiçi (v${result.version} · ${result.latencyMs}ms)`);
@@ -1136,7 +1275,11 @@ function InnerPrototype() {
     setSyncStatus('syncing');
     setSyncStatusMsg('Eşitleniyor...');
     try {
-      const response = await syncWithServer(serverUrl, apiToken, {
+      if (!session) throw new Error('Önce kişisel eşitleme kodunuzla bağlanın.');
+      await assertAccount(localStore, serverUrl, session.user);
+      const currentSession = await getSession(serverUrl);
+      if (currentSession.user.id !== session.user.id) throw new Error('Hesap değişti; yeniden bağlanın.');
+      const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: d.updatedAt || Date.now() })),
         learnedMeds,
         settings: {
@@ -1146,7 +1289,7 @@ function InnerPrototype() {
           soundType,
           snoozeMinutes,
         },
-      });
+      }, currentSession);
 
       if (response.success) {
         const merged = smartMergeDoses(doses as SyncDose[], response.doses);
@@ -1157,7 +1300,7 @@ function InnerPrototype() {
         const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncAt(nowStr);
         setSyncStatus('connected');
-        const activeCount = response.doses.filter(d => !d.deletedAt).length;
+        const activeCount = response.doses.filter((d: SyncDose) => !d.deletedAt).length;
         setSyncStatusMsg(`Eşitlendi (${activeCount} aktif ilaç)`);
         setToast({ text: 'Eşitleme tamamlandı' });
         webLogger.info('Sync', `Sunucu ile eşitlendi (${activeCount} aktif ilaç)`);
@@ -1177,6 +1320,7 @@ function InnerPrototype() {
   const handleExportBackup = () => {
     keyboard.hide();
     const backup = createBackupPayload({
+      ownerId: session?.user.id,
       doses,
       settings: {
         userName,
@@ -1215,8 +1359,9 @@ function InnerPrototype() {
         return;
       }
       const data = validation.data;
+      if (!session || (data.version === 2 ? data.ownerId !== session.user.id : !session.user.legacyOwner)) { alert('Bu yedeğin hesabına kodla bağlanın.'); return; }
       if (confirm(`Yedek dosyasından ${data.doses.length} ilaç ve ayarlar geri yüklensin mi?`)) {
-        setDoses(data.doses);
+        setDoses(migrateDoseIds(data.doses, session.user.id));
         if (data.learnedMeds) setLearnedMeds(data.learnedMeds);
         if (data.settings?.userName) setUserName(data.settings.userName);
         setToast({ text: `Yedekten ${data.doses.length} ilaç geri yüklendi` });
@@ -2664,20 +2809,119 @@ function InnerPrototype() {
                         Sunucu Adresi (URL)
                         <KeyboardInput
                           value={serverUrl}
+                          disabled={authBusy || syncStatus === 'syncing'}
                           onChange={e => setServerUrl(e.target.value)}
-                          placeholder="http://localhost:3000"
+                          placeholder="http://192.168.1.100:3050"
                         />
                       </label>
 
-                      <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-                        Erişim Anahtarı (API Token - Opsiyonel)
-                        <KeyboardInput
-                          type="password"
-                          value={apiToken}
-                          onChange={e => setApiToken(e.target.value)}
-                          placeholder="Bearer token veya boş bırakın"
-                        />
-                      </label>
+                      {!isSameServer(serverUrl) ? <p className="sync-card-desc-web">Tarayıcıda eşitleme için <a href={serverUrl}>sunucudaki uygulamayı aç</a>.</p> : session ? <div>
+                        <p className="sync-card-desc-web">{t.syncConnectedAccount}: <strong style={{ color: '#34d399' }}>{session.user.name}</strong></p>
+                        
+                        <div style={{ background: '#071626', padding: 8, borderRadius: 6, margin: '8px 0', border: '1px solid #1e293b' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#94a3b8', fontSize: 11 }}>
+                              ✉️ {t.syncEmailLabel}: <strong style={{ color: session.user.email ? '#38bdf8' : '#64748b' }}>{session.user.email || 'Belirtilmedi'}</strong>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => { setAuthEmail(session.user.email || ''); setEditingEmail(!editingEmail); }}
+                              style={{ background: 'transparent', border: 'none', color: '#38bdf8', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {editingEmail ? t.cancel : (session.user.email ? 'Değiştir' : '+ Ekle')}
+                            </button>
+                          </div>
+                          {editingEmail && (
+                            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                              <KeyboardInput type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.syncEmailPlaceholder} style={{ flex: 1, height: 32, fontSize: 11 }} />
+                              <button type="button" className="sync-primary-btn-web" style={{ padding: '0 10px', height: 32, fontSize: 11 }} onClick={handleUpdateEmail} disabled={authBusy || !authEmail.trim()}>
+                                {authBusy ? '...' : t.syncUpdateEmail}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {activeSyncCode && (
+                          <div style={{ background: '#071626', padding: 10, borderRadius: 8, margin: '10px 0', border: '1px solid #1e293b' }}>
+                            <div style={{ color: '#a9dfca', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                              📱 2. CİHAZ İÇİN EŞİTLEME KODUNUZ:
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', background: '#030c14', padding: '6px 8px', borderRadius: 4, gap: 6 }}>
+                              <code style={{ flex: 1, wordBreak: 'break-all', fontSize: 11, color: '#f8fafc' }}>{activeSyncCode}</code>
+                              <button
+                                type="button"
+                                style={{ background: '#38bdf8', color: '#04101e', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}
+                                onClick={() => { navigator.clipboard?.writeText(activeSyncCode); setToast({ text: t.syncCopied }); setTimeout(() => setToast(null), 2500); }}
+                              >
+                                {t.syncCopy}
+                              </button>
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: 10, marginTop: 4 }}>
+                              İkinci telefonunuza bu kodu girerek aynı hesaba anında bağlayabilirsiniz.
+                            </div>
+                          </div>
+                        )}
+
+                        <button className="sync-secondary-btn-web" onClick={handleLogout} disabled={authBusy || syncStatus === 'syncing'}>{t.syncDisconnect}</button>
+                      </div> : recoveryMode ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label className="sync-card-desc-web">{t.syncRecoveryKeyLabel}
+                          <KeyboardInput type="text" value={recoveryKey} onChange={e=>setRecoveryKey(e.target.value)} autoComplete="off" placeholder={t.syncRecoveryKeyPlaceholder} />
+                        </label>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button type="button" className="sync-primary-btn-web" style={{ flex: 1 }} onClick={handleRecover} disabled={authBusy || !recoveryKey.trim()}>{authBusy ? 'Kurtarılıyor…' : t.syncRecoverBtn}</button>
+                          <button type="button" className="sync-secondary-btn-web" onClick={() => { setRecoveryMode(false); setRecoveryKey(''); }} disabled={authBusy}>Vazgeç</button>
+                        </div>
+                      </div> : <div>
+                        <div style={{ background: '#071b2e', padding: 12, borderRadius: 8, border: '1px solid #38bdf8', marginBottom: 12 }}>
+                          <div style={{ color: '#38bdf8', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>✨ İLK KURULUM (1. CİHAZ)</div>
+                          <p style={{ color: '#94a3b8', fontSize: 11, margin: '0 0 8px 0' }}>
+                            E-posta adresinizi girin ve yeni bir eşitleme kodu oluşturarak başlayın.
+                          </p>
+                          <div style={{ marginBottom: 8 }}>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: 10, marginBottom: 4 }}>{t.syncEmailLabel}</label>
+                            <KeyboardInput type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder={t.syncEmailPlaceholder} style={{ width: '100%', height: 32, fontSize: 11 }} />
+                          </div>
+                          <button type="button" className="sync-primary-btn-web" style={{ width: '100%' }} onClick={handleRegister} disabled={authBusy}>
+                            {authBusy ? 'Oluşturuluyor…' : '✨ Yeni Eşitleme Kodu Oluştur'}
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0' }}>
+                          <div style={{ flex: 1, height: 1, background: '#1e293b' }} />
+                          <span style={{ color: '#64748b', fontSize: 10, fontWeight: 700, margin: '0 8px' }}>VEYA 2. CİHAZI BAĞLA</span>
+                          <div style={{ flex: 1, height: 1, background: '#1e293b' }} />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <label className="sync-card-desc-web">{t.syncCodeLabel}
+                            <KeyboardInput type="password" value={syncCode} onChange={e=>setSyncCode(e.target.value)} autoComplete="off" placeholder="1. cihazdaki kodu girin" />
+                          </label>
+                          <button className="sync-primary-btn-web" onClick={handleLogin} disabled={authBusy || !syncCode.trim()}>{authBusy ? 'Bağlanıyor…' : t.syncConnectBtn}</button>
+                          <button type="button" style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: 12, cursor: 'pointer', padding: '4px 0', textAlign: 'left' }} onClick={() => setRecoveryMode(true)} disabled={authBusy}>🔑 {t.syncForgotCode}</button>
+                        </div>
+                      </div>}
+
+                      {recoveredCredentials && (
+                        <div style={{ background: '#0c2238', border: '1px solid #38bdf8', borderRadius: 8, padding: 12, marginTop: 12, color: '#e2e8f0', fontSize: 12 }}>
+                          <h4 style={{ margin: '0 0 6px 0', color: '#38bdf8', fontSize: 14 }}>{t.syncNewCredentialsTitle}</h4>
+                          <p style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: 11 }}>{t.syncNewCredentialsWarning}</p>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ color: '#a9dfca', fontWeight: 600, marginBottom: 2 }}>{t.syncNewSyncCode}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#071626', padding: '6px 8px', borderRadius: 4 }}>
+                              <code style={{ flex: 1, wordBreak: 'break-all', fontSize: 11, color: '#f1f5f9' }}>{recoveredCredentials.syncCode}</code>
+                              <button type="button" style={{ background: '#38bdf8', color: '#04101e', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600, fontSize: 11 }} onClick={() => { navigator.clipboard?.writeText(recoveredCredentials.syncCode); setToast({ text: t.syncCopied }); setTimeout(() => setToast(null), 2500); }}>{t.syncCopy}</button>
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ color: '#a9dfca', fontWeight: 600, marginBottom: 2 }}>{t.syncNewRecoveryKey}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#071626', padding: '6px 8px', borderRadius: 4 }}>
+                              <code style={{ flex: 1, wordBreak: 'break-all', fontSize: 11, color: '#f1f5f9', letterSpacing: 1 }}>{recoveredCredentials.recoveryKey}</code>
+                              <button type="button" style={{ background: '#38bdf8', color: '#04101e', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontWeight: 600, fontSize: 11 }} onClick={() => { navigator.clipboard?.writeText(recoveredCredentials.recoveryKey); setToast({ text: t.syncCopied }); setTimeout(() => setToast(null), 2500); }}>{t.syncCopy}</button>
+                            </div>
+                          </div>
+                          <button type="button" className="sync-primary-btn-web" style={{ width: '100%' }} onClick={() => setRecoveredCredentials(null)}>Tamam</button>
+                        </div>
+                      )}
 
                       {syncStatusMsg && (
                         <div className={`sync-status-badge-web ${syncStatus}`}>
@@ -2693,7 +2937,7 @@ function InnerPrototype() {
                           type="button"
                           className="sync-secondary-btn-web"
                           onClick={handleTestConnection}
-                          disabled={syncStatus === 'testing' || syncStatus === 'syncing'}
+                          disabled={authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                         >
                           <WifiHigh size={16} />
                           <span>{syncStatus === 'testing' ? 'Bağlanıyor...' : 'Bağlantıyı Test Et'}</span>
@@ -2703,7 +2947,7 @@ function InnerPrototype() {
                           type="button"
                           className="sync-primary-btn-web"
                           onClick={handleSyncNow}
-                          disabled={syncStatus === 'testing' || syncStatus === 'syncing'}
+                          disabled={!session || authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                         >
                           <ArrowsClockwise size={16} className={syncStatus === 'syncing' ? 'spin' : ''} />
                           <span>{syncStatus === 'syncing' ? 'Eşitleniyor...' : 'Şimdi Eşitle'}</span>
@@ -2712,8 +2956,8 @@ function InnerPrototype() {
                     </div>
 
                     <h3 className="settings-group-title"><SlidersHorizontal size={18} /> Otomatik Eşitleme</h3>
-                    <button className="setting-row" role="switch" aria-checked={autoSync} onClick={() => setAutoSync(!autoSync)}>
-                      <span><strong>Otomatik Senkronizasyon</strong><small>Uygulama açıldığında veya değişiklik yapıldığında sunucuyla eşitler</small></span>
+                    <button className="setting-row" role="switch" aria-checked={false} disabled>
+                      <span><strong>Otomatik Senkronizasyon</strong><small>Şimdilik Şimdi Eşitle düğmesini kullanın; otomatik eşitleme yakında</small></span>
                       <span className={`switch ${autoSync ? 'on' : ''}`}><span/></span>
                     </button>
                     {lastSyncAt && (

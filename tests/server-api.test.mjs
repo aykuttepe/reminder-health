@@ -1,133 +1,103 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { RutinDatabase } from '../server/dist/db.js';
+import { AuthService } from '../server/dist/auth.js';
 import { SyncService } from '../server/dist/syncService.js';
+import { createServer } from '../server/dist/app.js';
+import { randomUUID } from 'node:crypto';
+import { doseId } from '../server/dist/identity.js';
 
-test('Server API Integration Test: sync, backup and restore endpoints', async (t) => {
-  const testDbDir = path.resolve('scratch/test_db');
-  fs.mkdirSync(testDbDir, { recursive: true });
-  const testDbPath = path.join(testDbDir, `test_${Date.now()}.sqlite`);
-
-  const db = new RutinDatabase(testDbPath);
-  await db.initAsync(testDbPath);
-  const syncService = new SyncService(db);
-
-  const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url || '/', 'http://localhost');
-    const method = req.method?.toUpperCase() || 'GET';
-
-    if (url.pathname === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ status: 'ok', version: '1.0.0' }));
-    }
-
-    if (url.pathname === '/api/sync' && method === 'POST') {
-      let body = '';
-      req.on('data', c => { body += c; });
-      req.on('end', () => {
-        const payload = body ? JSON.parse(body) : {};
-        const result = syncService.processSync(payload);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
-      });
-      return;
-    }
-
-    if (url.pathname === '/api/backup' && method === 'GET') {
-      const backup = syncService.getFullBackup();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(backup));
-    }
-
-    if (url.pathname === '/api/restore' && method === 'POST') {
-      let body = '';
-      req.on('data', c => { body += c; });
-      req.on('end', () => {
-        const payload = JSON.parse(body);
-        const result = syncService.restoreFullBackup(payload);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
-      });
-      return;
-    }
-
-    res.writeHead(404);
-    res.end();
-  });
-
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-
-  t.after(() => {
-    server.close();
-    try {
-      fs.rmSync(testDbDir, { recursive: true, force: true });
-    } catch {}
-  });
-
-  // 1. GET /health
-  const healthRes = await fetch(`${baseUrl}/health`);
-  assert.equal(healthRes.status, 200);
-  const healthData = await healthRes.json();
-  assert.equal(healthData.status, 'ok');
-
-  // 2. POST /api/sync
-  const syncPayload = {
-    doses: [
-      { id: 101, name: 'Parol', amount: '500 mg', time: '09:00', status: 'pending', updatedAt: 1000 },
-      { id: 102, name: 'Coraspin', amount: '100 mg', time: '13:00', status: 'pending', updatedAt: 1000 },
-    ],
-    learnedMeds: {
-      '08699508010071': { gtin: '08699508010071', name: 'Parol', amount: '500 mg' },
-    },
-    settings: { userName: 'TestUser' },
-  };
-
-  const syncRes = await fetch(`${baseUrl}/api/sync`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(syncPayload),
-  });
-  assert.equal(syncRes.status, 200);
-  const syncData = await syncRes.json();
-  assert.equal(syncData.success, true);
-  assert.equal(syncData.doses.length, 2);
-  assert.equal(syncData.learnedMeds['08699508010071']?.name, 'Parol');
-
-  // 3. GET /api/backup
-  const backupRes = await fetch(`${baseUrl}/api/backup`);
-  assert.equal(backupRes.status, 200);
-  const backupData = await backupRes.json();
-  assert.equal(backupData.version, 1);
-  assert.equal(backupData.doses.length, 2);
-
-  // 4. POST /api/restore
-  const restorePayload = {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    doses: [
-      { id: 201, name: 'Arveles', amount: '25 mg', time: '14:00', status: 'pending', updatedAt: 2000 },
-    ],
-    learnedMeds: {},
-    settings: {},
-  };
-
-  const restoreRes = await fetch(`${baseUrl}/api/restore`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(restorePayload),
-  });
-  assert.equal(restoreRes.status, 200);
-  const restoreData = await restoreRes.json();
-  assert.equal(restoreData.success, true);
-
-  // Verify backup now only has the restored dose
-  const afterBackupRes = await fetch(`${baseUrl}/api/backup`);
-  const afterBackupData = await afterBackupRes.json();
-  assert.equal(afterBackupData.doses.length, 1);
-  assert.equal(afterBackupData.doses[0].name, 'Arveles');
+async function fixture(t) {
+  const dir=mkdtempSync(path.join(os.tmpdir(),'reminder-auth-test-'));
+  const db=new RutinDatabase(path.join(dir,'test.sqlite'));await db.initAsync();
+  const auth=new AuthService(db),service=new SyncService(db);
+  const a=auth.createUser('A'),b=auth.createUser('B');
+  const server=createServer(db,{publicUrl:'http://127.0.0.1:3051',allowedOrigins:['http://127.0.0.1:3051']});
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  t.after(async()=>{await new Promise(r=>server.close(r));db.close();rmSync(dir,{recursive:true,force:true});});
+  const call=async(route,body,headers={})=>{const r=await fetch(base+route,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});return {r,data:await r.json()};};
+  const login=async(user,kind='native')=>call('/auth/login',{code:user.syncCode,deviceId:randomUUID(),kind},kind==='web'?{Origin:'http://127.0.0.1:3051','X-CSRF-Token':'login'}:{});
+  return {db,auth,service,a,b,call,login};
+}
+const medicine=(patch={})=>({id:101,name:'Test medicine',time:'09:00',amount:'1',status:'pending',updatedAt:1000,...patch});
+test('tenant isolation covers sync, identical UUID/GTIN/setting keys, backup and restore',async t=>{
+  const {a,b,call,login}=await fixture(t);
+  const sa=(await login(a)).data,sb=(await login(b)).data;
+  const ha={Authorization:`Bearer ${sa.token}`},hb={Authorization:`Bearer ${sb.token}`};
+  const id=randomUUID();
+  for(const [h,name] of [[ha,'A'],[hb,'B']]){
+    const result=await call('/api/sync',{doses:[medicine({id,name})],learnedMeds:{'08699508010071':{name}},settings:{userName:name,apiToken:'must-not-persist'}},h);
+    assert.equal(result.r.status,200);assert.equal(result.data.doses[0].name,name);assert.equal(result.data.settings.apiToken,undefined);
+  }
+  const backup=(await call('/api/backup',undefined,ha)).data;
+  assert.equal(backup.ownerId,a.userId);assert.equal(backup.doses.length,1);
+  assert.equal((await call('/api/restore',backup,hb)).r.status,403);
+  assert.equal((await call('/api/restore',{...backup,doses:[]},ha)).r.status,200);
+  assert.equal((await call('/api/sync',undefined,hb)).data.doses[0].name,'B');
+  for(const route of ['/api/sync','/api/backup'])assert.equal((await call(route)).r.status,401);
+  for(const k of ['user_id','userId'])assert.equal((await call('/api/sync',{[k]:b.userId,doses:[]},ha)).r.status,400);
+  assert.equal((await call('/api/sync',{doses:[medicine({user_id:b.userId})]},ha)).r.status,400);
+});
+test('same-user devices share UUID conversion, deep dated history and deletion',async t=>{
+  const {a,b,service}=await fixture(t);
+  const x=service.processSync(a.userId,{doses:[medicine({dailyStatuses:{'2026-09-01':{'09:00':'taken'}}})]});
+  assert.equal(x.doses[0].id,doseId(a.userId,101));
+  assert.notEqual(x.doses[0].id,doseId(b.userId,101));
+  const y=service.processSync(a.userId,{doses:[medicine({updatedAt:2000,dailyStatuses:{'2026-09-01':{'20:00':'taken'}}})]});
+  assert.deepEqual(y.doses[0].dailyStatuses['2026-09-01'],{'09:00':'taken','20:00':'taken'});
+  service.processSync(a.userId,{doses:[medicine({updatedAt:3000,deletedAt:3000})]});
+  assert.equal(service.processSync(a.userId,{doses:[medicine()]}).doses[0].deletedAt,3000);
+});
+test('web cookie is HttpOnly, tokens stay out of JSON, CSRF and origin are mandatory',async t=>{
+  const {a,call,login}=await fixture(t);
+  const {r,data}=await login(a,'web');assert.equal(r.status,200);assert.equal(data.token,undefined);
+  assert.match(r.headers.get('set-cookie'),/HttpOnly/);assert.match(r.headers.get('set-cookie'),/SameSite=Strict/);
+  const Cookie=r.headers.get('set-cookie').split(';')[0],Origin='http://127.0.0.1:3051';
+  assert.equal((await call('/api/sync',{}, {Cookie,Origin})).r.status,403);
+  assert.equal((await call('/api/sync',{}, {Cookie,'X-CSRF-Token':data.csrf})).r.status,403);
+  assert.equal((await call('/api/sync',{}, {Cookie,Origin:'http://evil.invalid','X-CSRF-Token':data.csrf})).r.status,403);
+  assert.equal((await call('/api/sync',{}, {Cookie,Origin,'X-CSRF-Token':data.csrf})).r.status,200);
+  const refreshed=await call('/auth/session',undefined,{Cookie,Origin});assert.equal(refreshed.data.csrf,data.csrf);
+  assert.equal((await call('/auth/logout',{}, {Cookie,Origin,'X-CSRF-Token':data.csrf})).r.status,200);
+  assert.equal((await call('/api/backup',undefined,{Cookie,Origin})).r.status,401);
+});
+test('code reset revokes every device and retains data; codes only stored as hashes',async t=>{
+  const {a,db,auth,call,login,service}=await fixture(t);
+  const one=(await login(a)).data,two=(await login(a)).data;
+  service.processSync(a.userId,{doses:[medicine()]});
+  const row=db.sql.prepare('SELECT * FROM users WHERE id=?').get(a.userId);assert.ok(!JSON.stringify(row).includes(a.syncCode));
+  const reset=auth.rotateCode(a.userId);
+  for(const token of [one.token,two.token])assert.equal((await call('/api/sync',undefined,{Authorization:`Bearer ${token}`})).r.status,401);
+  assert.equal((await login(a)).r.status,401);
+  const next=(await login(reset)).data;
+  assert.equal((await call('/api/sync',undefined,{Authorization:`Bearer ${next.token}`})).data.doses.length,1);
+  db.sql.prepare('UPDATE devices SET expires_at=0 WHERE user_id=?').run(a.userId);
+  assert.equal((await call('/api/sync',undefined,{Authorization:`Bearer ${next.token}`})).r.status,401);
+});
+test('failed codes are rate limited and anonymous restore is rejected',async t=>{
+  const {call}=await fixture(t);
+  let result;
+  for(let i=0;i<16;i++)result=await call('/auth/login',{code:'x'.repeat(43),deviceId:randomUUID(),kind:'native'});
+  assert.equal(result.r.status,429);
+  assert.equal((await call('/api/restore',{version:2,doses:[]})).r.status,401);
+  assert.equal((await call('/health')).data.authRequired,true);
+});
+test('legacy migration backs up, assigns owner and atomically preserves old IDs and data',async t=>{
+  const dir=mkdtempSync(path.join(os.tmpdir(),'reminder-migration-test-')),file=path.join(dir,'old.sqlite');
+  t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const old=new DatabaseSync(file);
+  old.exec('CREATE TABLE doses(id INTEGER PRIMARY KEY,name TEXT,data TEXT,updated_at INTEGER,deleted_at INTEGER);CREATE TABLE learned_meds(gtin TEXT PRIMARY KEY,name TEXT,data TEXT,updated_at INTEGER);CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT,updated_at INTEGER);');
+  old.prepare('INSERT INTO doses VALUES(?,?,?,?,?)').run(101,'Medicine',JSON.stringify(medicine()),1000,null);old.close();
+  const db=new RutinDatabase(file);await db.initAsync();
+  assert.ok(existsSync(db.backupPath));
+  const owner=db.sql.prepare('SELECT id FROM users WHERE is_legacy_owner=1').get().id;
+  assert.equal(db.getAllDoses(owner)[0].id,doseId(owner,101));
+  assert.equal(db.sql.prepare('PRAGMA foreign_key_check').all().length,0);
+  const backup=new DatabaseSync(db.backupPath);assert.equal(backup.prepare('SELECT id FROM doses').get().id,101);backup.close();db.close();
+  const again=new RutinDatabase(file);await again.initAsync();assert.equal(again.getAllDoses(owner).length,1);assert.equal(again.backupPath,null);again.close();
 });

@@ -32,6 +32,7 @@ interface CameraScannerModalProps {
     raw: string;
   }) => void;
   learnedMeds?: Record<string, Partial<CatalogMedicine>>;
+  lang?: 'tr' | 'en';
 }
 
 export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
@@ -39,6 +40,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   onClose,
   onScanResult,
   learnedMeds,
+  lang = 'tr',
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash] = useState(false);
@@ -94,15 +96,23 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         {!permission?.granted ? (
           <View style={styles.permissionContainer}>
             <Ionicons name="camera-outline" size={54} color="#a9dfca" />
-            <Text style={styles.permissionTitle}>Kamera İzni Gerekli</Text>
+            <Text style={styles.permissionTitle}>
+              {lang === 'en' ? 'Camera Permission Required' : 'Kamera İzni Gerekli'}
+            </Text>
             <Text style={styles.permissionSub}>
-              İlaç kutusundaki karekodu ve son kullanma tarihini otomatik okumak için kameraya erişim izni vermeniz gerekmektedir.
+              {lang === 'en'
+                ? 'Camera access is required to automatically scan the barcode and expiry date on medication boxes.'
+                : 'İlaç kutusundaki karekodu ve son kullanma tarihini otomatik okumak için kameraya erişim izni vermeniz gerekmektedir.'}
             </Text>
             <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
-              <Text style={styles.permissionBtnText}>Kamera İzni Ver</Text>
+              <Text style={styles.permissionBtnText}>
+                {lang === 'en' ? 'Grant Camera Permission' : 'Kamera İzni Ver'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.permissionCancelBtn} onPress={onClose}>
-              <Text style={styles.permissionCancelText}>Vazgeç</Text>
+              <Text style={styles.permissionCancelText}>
+                {lang === 'en' ? 'Cancel' : 'Vazgeç'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -125,8 +135,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 </TouchableOpacity>
 
                 <View style={styles.headerTitleBox}>
-                  <Text style={styles.headerTitle}>KAREKOD / BARKOD TARA</Text>
-                  <Text style={styles.headerSub}>ITS DataMatrix & EAN Uyumlu</Text>
+                  <Text style={styles.headerTitle}>
+                    {lang === 'en' ? 'SCAN BARCODE / DATA MATRIX' : 'KAREKOD / BARKOD TARA'}
+                  </Text>
+                  <Text style={styles.headerSub}>
+                    {lang === 'en' ? 'ITS DataMatrix & EAN Compatible' : 'ITS DataMatrix & EAN Uyumlu'}
+                  </Text>
                 </View>
 
                 <TouchableOpacity
@@ -150,7 +164,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   <View style={styles.centerReticle} />
                 </View>
                 <Text style={styles.scanInstruction}>
-                  İlaç kutusundaki karekodu veya barkodu bu çerçevenin içine hizalayın
+                  {lang === 'en'
+                    ? 'Align the medication barcode or QR code inside this frame'
+                    : 'İlaç kutusundaki karekodu veya barkodu bu çerçevenin içine hizalayın'}
                 </Text>
               </View>
 
@@ -162,14 +178,18 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 >
                   <Ionicons name="flask-outline" size={16} color="#a9dfca" />
                   <Text style={styles.presetsToggleBtnText}>
-                    {showTestPresets ? 'Örnek Listeyi Gizle' : 'Kutu Bulunmuyorsa: Örnek İlaç Dene'}
+                    {showTestPresets
+                      ? (lang === 'en' ? 'Hide Sample List' : 'Örnek Listeyi Gizle')
+                      : (lang === 'en' ? 'No Box? Try Sample Medication' : 'Kutu Bulunmuyorsa: Örnek İlaç Dene')}
                   </Text>
                   <Ionicons name={showTestPresets ? 'chevron-down' : 'chevron-up'} size={14} color="#a9dfca" />
                 </TouchableOpacity>
 
                 {showTestPresets && (
                   <View style={styles.presetsCard}>
-                    <Text style={styles.presetsCardTitle}>Örnek Türkiye İlaç Karekodları:</Text>
+                    <Text style={styles.presetsCardTitle}>
+                      {lang === 'en' ? 'Sample Medication Barcodes:' : 'Örnek Türkiye İlaç Karekodları:'}
+                    </Text>
                     <View style={styles.presetsGrid}>
                       {[
                         { name: 'Coraspin 100 mg', gtin: '08699546011122' },

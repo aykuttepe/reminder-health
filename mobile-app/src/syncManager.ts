@@ -3,7 +3,7 @@
  */
 
 export interface SyncDose {
-  id: number;
+  id: string | number;
   name: string;
   amount: string;
   time: string;
@@ -36,7 +36,8 @@ export interface SyncDose {
 }
 
 export interface BackupPayload {
-  version: 1;
+  version: 1 | 2;
+  ownerId?: string;
   exportedAt: string;
   doses: SyncDose[];
   settings?: Record<string, any>;
@@ -68,7 +69,7 @@ export function smartMergeDoses(
   localDoses: SyncDose[],
   remoteDoses: SyncDose[]
 ): SyncDose[] {
-  const map = new Map<number, SyncDose>();
+  const map = new Map<string | number, SyncDose>();
 
   // 1. Önce yerel dozları haritaya ekle
   for (const dose of localDoses) {
@@ -131,7 +132,12 @@ export function smartMergeDoses(
       ...(base.dailyStatuses || {}),
     };
 
-    base.slotStatuses = mergedSlotStatuses;
+    base.slotStatuses = older.statusDate === base.statusDate ? mergedSlotStatuses : base.slotStatuses;
+    for (const day of Object.keys(older.dailyStatuses || {})) {
+      const merged = {...older.dailyStatuses?.[day], ...base.dailyStatuses?.[day]};
+      for (const [time, status] of Object.entries(older.dailyStatuses?.[day] || {})) if(status === 'taken') merged[time] = 'taken';
+      mergedDailyStatuses[day] = merged;
+    }
     base.dailyStatuses = mergedDailyStatuses;
     map.set(base.id, base);
   }
@@ -161,12 +167,14 @@ export function smartMergeLearnedMeds(
  * Tam yedekleme JSON objesi üretir.
  */
 export function createBackupPayload(params: {
+  ownerId?: string;
   doses: any[];
   settings?: Record<string, any>;
   learnedMeds?: Record<string, any>;
 }): BackupPayload {
   return {
-    version: 1,
+    version: params.ownerId ? 2 : 1,
+    ...(params.ownerId ? {ownerId: params.ownerId} : {}),
     exportedAt: new Date().toISOString(),
     doses: params.doses || [],
     settings: params.settings || {},
@@ -187,8 +195,8 @@ export function validateBackupJSON(jsonStr: string): {
     if (!parsed || typeof parsed !== 'object') {
       return { valid: false, error: 'Dosya geçerli bir JSON objesi değil.' };
     }
-    if (parsed.version !== 1) {
-      return { valid: false, error: `Desteklenmeyen yedek sürümü: ${parsed.version}. Yalnızca Sürüm 1 desteklenir.` };
+    if (![1, 2].includes(parsed.version)) {
+      return { valid: false, error: `Desteklenmeyen yedek sürümü: ${parsed.version}. Sürüm 1 ve 2 desteklenir.` };
     }
     if (!Array.isArray(parsed.doses)) {
       return { valid: false, error: 'Yedek dosyasında ilaç listesi ("doses") bulunamadı.' };
@@ -199,6 +207,31 @@ export function validateBackupJSON(jsonStr: string): {
   }
 }
 
+export const DEFAULT_SYNC_SERVER_URL = 'http://192.168.1.100:3050';
+
+// Migrate only known addresses from the original local installation.
+// Custom servers and ports must remain untouched.
+export function restoreServerUrl(savedUrl: unknown): string {
+  const normalized = typeof savedUrl === 'string' ? normalizeServerUrl(savedUrl) : '';
+  const legacyUrls = [
+    'http://localhost:3000',
+    'http://192.168.1.50:3000',
+    'http://192.168.1.100:3000',
+  ];
+  return !normalized || legacyUrls.includes(normalized)
+    ? DEFAULT_SYNC_SERVER_URL
+    : normalized;
+}
+
+export function normalizeServerUrl(rawUrl: string): string {
+  let clean = rawUrl.trim().replace(/\/+$/, '');
+  if (!clean) return '';
+  if (!/^https?:\/\//i.test(clean)) {
+    clean = `http://${clean}`;
+  }
+  return clean;
+}
+
 /**
  * Sunucu sağlık durumunu kontrol eder.
  */
@@ -206,7 +239,10 @@ export async function checkServerHealth(
   serverUrl: string,
   apiToken?: string
 ): Promise<{ ok: boolean; version?: string; latencyMs?: number; error?: string }> {
-  const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
+  const cleanUrl = normalizeServerUrl(serverUrl);
+  if (!cleanUrl) {
+    return { ok: false, error: 'Sunucu adresi boş olamaz.' };
+  }
   const start = Date.now();
   try {
     const headers: Record<string, string> = {};
@@ -243,7 +279,10 @@ export async function syncWithServer(
   apiToken: string | undefined,
   payload: SyncRequestPayload
 ): Promise<SyncResponsePayload> {
-  const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
+  const cleanUrl = normalizeServerUrl(serverUrl);
+  if (!cleanUrl) {
+    throw new Error('Sunucu adresi boş olamaz.');
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };

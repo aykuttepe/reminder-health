@@ -44,7 +44,8 @@
         {
           "cameraPermission": "İlaç kutusundaki karekodu taramak için kamera izni gerekiyor."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

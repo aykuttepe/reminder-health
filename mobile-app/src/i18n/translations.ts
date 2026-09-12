@@ -125,6 +125,26 @@ export interface Translations {
   settingsExperienceDesc: string;
   settingsSync: string;
   settingsSyncDesc: string;
+  syncServerUrl: string;
+  syncConnectedAccount: string;
+  syncDisconnect: string;
+  syncEmailLabel: string;
+  syncEmailPlaceholder: string;
+  syncUpdateEmail: string;
+  syncEmailSaved: string;
+  syncCodeLabel: string;
+  syncCodePlaceholder: string;
+  syncConnectBtn: string;
+  syncForgotCode: string;
+  syncRecoveryKeyLabel: string;
+  syncRecoveryKeyPlaceholder: string;
+  syncRecoverBtn: string;
+  syncNewCredentialsTitle: string;
+  syncNewSyncCode: string;
+  syncNewRecoveryKey: string;
+  syncCopy: string;
+  syncCopied: string;
+  syncNewCredentialsWarning: string;
   settingsDiagnostics: string;
   settingsDiagnosticsDesc: string;
   settingsLanguage: string;
@@ -303,6 +323,26 @@ export const translations: Record<Language, Translations> = {
     settingsExperienceDesc: 'Dozları daraltma, titreşim (haptics)',
     settingsSync: 'Senkronizasyon & Yedekleme',
     settingsSyncDesc: 'Ubuntu sunucu eşitleme & JSON yedek',
+    syncServerUrl: 'Sunucu Adresi (URL)',
+    syncConnectedAccount: 'Bağlı hesap',
+    syncDisconnect: 'Hesaptan ayrıl',
+    syncEmailLabel: 'E-posta Adresi',
+    syncEmailPlaceholder: 'ornek@mail.com',
+    syncUpdateEmail: 'E-postayı Kaydet',
+    syncEmailSaved: 'E-posta başarıyla kaydedildi',
+    syncCodeLabel: 'Kişisel Eşitleme Kodu',
+    syncCodePlaceholder: 'Size verilen kodu girin',
+    syncConnectBtn: 'Kodla Bağlan',
+    syncForgotCode: 'Kodumu Unuttum / Kurtarma Anahtarı',
+    syncRecoveryKeyLabel: 'Kurtarma Anahtarı',
+    syncRecoveryKeyPlaceholder: 'XXXX-XXXX-XXXX-XXXX',
+    syncRecoverBtn: 'Hesabı Kurtar',
+    syncNewCredentialsTitle: 'Hesap Kurtarıldı!',
+    syncNewSyncCode: 'Yeni Eşitleme Kodunuz:',
+    syncNewRecoveryKey: 'Yeni Kurtarma Anahtarınız:',
+    syncCopy: 'Kopyala',
+    syncCopied: 'Kopyalandı!',
+    syncNewCredentialsWarning: 'Bu bilgileri güvenli bir yere kaydedin. Diğer cihazlardaki oturumlar güvenlik sebebiyle sonlandırıldı.',
     settingsDiagnostics: 'Hata & Tanılama Günlüğü',
     settingsDiagnosticsDesc: 'Sistem logları, yakalanan hatalar ve kaza raporları',
     settingsLanguage: 'Dil / Language',
@@ -480,7 +520,27 @@ export const translations: Record<Language, Translations> = {
     settingsExperienceDesc: 'Compact dose views and haptic feedback',
     settingsSync: 'Synchronization & Backup',
     settingsSyncDesc: 'Ubuntu server sync and JSON backups',
-    settingsDiagnostics: 'Error & Diagnostics Log',
+    syncServerUrl: 'Server Address (URL)',
+    syncConnectedAccount: 'Connected account',
+    syncDisconnect: 'Disconnect account',
+    syncEmailLabel: 'Email Address',
+    syncEmailPlaceholder: 'user@example.com',
+    syncUpdateEmail: 'Save Email',
+    syncEmailSaved: 'Email saved successfully',
+    syncCodeLabel: 'Personal Sync Code',
+    syncCodePlaceholder: 'Enter your sync code',
+    syncConnectBtn: 'Connect with Code',
+    syncForgotCode: 'Forgot Code / Recovery Key',
+    syncRecoveryKeyLabel: 'Recovery Key',
+    syncRecoveryKeyPlaceholder: 'XXXX-XXXX-XXXX-XXXX',
+    syncRecoverBtn: 'Recover Account',
+    syncNewCredentialsTitle: 'Account Recovered!',
+    syncNewSyncCode: 'Your New Sync Code:',
+    syncNewRecoveryKey: 'Your New Recovery Key:',
+    syncCopy: 'Copy',
+    syncCopied: 'Copied!',
+    syncNewCredentialsWarning: 'Save these credentials safely. Sessions on all other devices have been revoked for security.',
+    settingsDiagnostics: 'Diagnostics & Error Log',
     settingsDiagnosticsDesc: 'System logs, captured errors, and crash reports',
     settingsLanguage: 'Language / Dil',
     settingsLanguageDesc: 'Select Turkish or English language',

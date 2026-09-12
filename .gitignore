@@ -40,6 +40,8 @@ mobile-app/ios/Pods/
 
 # Server Databases & Local Data
 server/data/
+data/
+*.sqlite
 server/*.db
 server/*.db-journal
 server/*.db-wal
