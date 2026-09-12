@@ -1180,5 +1180,300 @@
   border-color: var(--mint);
 }
 
+/* --- Meds Subtab Bar (Tedavi Planı | Stok & Envanter) --- */
+.meds-subtab-bar {
+  display: flex;
+  background: #101c28;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border: 1px solid #203244;
+  gap: 4px;
+}
+
+.meds-subtab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: transparent;
+  border: none;
+  color: #adb3bf;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.meds-subtab-btn.active {
+  background: var(--mint);
+  color: #081624;
+  font-weight: 700;
+}
+
+.subtab-crit-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 10px;
+  padding: 1px 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* --- Stock Inventory Web UI --- */
+.stock-inventory-view-web {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stock-triage-row-web {
+  display: flex;
+  gap: 8px;
+}
+
+.stock-triage-card-web {
+  flex: 1;
+  background: #152332;
+  border-radius: 12px;
+  padding: 10px 8px;
+  border: 1.5px solid #203244;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stock-triage-card-web.crit {
+  background: #1c171a;
+  border-color: #3d1f23;
+}
+.stock-triage-card-web.crit.active {
+  background: #2c1618;
+  border-color: #ef4444;
+}
+
+.stock-triage-card-web.low {
+  background: #1c1b18;
+  border-color: #3d301f;
+}
+.stock-triage-card-web.low.active {
+  background: #2c2314;
+  border-color: #f59e0b;
+}
+
+.stock-triage-card-web.good {
+  background: #13211f;
+  border-color: #193930;
+}
+.stock-triage-card-web.good.active {
+  background: #102622;
+  border-color: #10b981;
+}
+
+.triage-num {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.triage-num.crit { color: #ef4444; }
+.triage-num.low { color: #f59e0b; }
+.triage-num.good { color: #10b981; }
+
+.triage-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: #f5f3f0;
+}
+
+.stock-triage-card-web small {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.stock-chips-row-web {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.stock-filter-chip-web {
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #152332;
+  border: 1px solid #203244;
+  color: #adb3bf;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stock-filter-chip-web.active {
+  background: var(--mint);
+  border-color: var(--mint);
+  color: #081624;
+  font-weight: 700;
+}
+
+.stock-cards-list-web {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stock-card-web {
+  background: #152332;
+  border-radius: 14px;
+  border: 1px solid #203244;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-card-head {
+  padding: 12px 14px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.stock-med-name {
+  font-size: 16px;
+  color: #f5f3f0;
+  font-weight: 700;
+}
+
+.stock-med-meta {
+  font-size: 12px;
+  color: #adb3bf;
+  margin-top: 2px;
+}
+
+.stock-days-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid;
+}
+.stock-days-pill.crit {
+  background: #2c1618;
+  border-color: #5c2428;
+  color: #ef4444;
+}
+.stock-days-pill.low {
+  background: #2c2314;
+  border-color: #5c431d;
+  color: #f59e0b;
+}
+.stock-days-pill.good {
+  background: #102622;
+  border-color: #1d4a3e;
+  color: #10b981;
+}
+
+.stock-runout-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px 8px;
+  font-size: 12px;
+  color: #adb3bf;
+  cursor: pointer;
+}
+.runout-date.crit { color: #ef4444; }
+.runout-date.low { color: #f59e0b; }
+.runout-date.good { color: #10b981; }
+
+.stock-bar-track {
+  height: 6px;
+  background: #0d1822;
+  margin: 0 14px 10px;
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.stock-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+.stock-bar-fill.crit { background: #ef4444; }
+.stock-bar-fill.low { background: #f59e0b; }
+.stock-bar-fill.good { background: #10b981; }
+
+.stock-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #0d1a27;
+  border-top: 1px solid #1a2938;
+}
+
+.stock-stepper-web {
+  display: flex;
+  align-items: center;
+  background: #152332;
+  border-radius: 8px;
+  border: 1px solid #203244;
+  overflow: hidden;
+}
+
+.stock-stepper-web button {
+  background: transparent;
+  border: none;
+  color: #f5f3f0;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.stock-stepper-web button:disabled {
+  color: #4b5563;
+  cursor: not-allowed;
+}
+
+.stepper-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f5f3f0;
+  padding: 0 6px;
+}
+.stepper-val small {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.stock-add-box-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--mint);
+  color: #081624;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.stock-add-box-btn:hover {
+  opacity: 0.9;
+}
+
+
 
 

@@ -108,6 +108,23 @@ export interface Translations {
   scanBarcodeBanner: string;
   scanBarcodeDesc: string;
   itsMatched: string;
+  subTabPlan: string;
+  subTabStock: string;
+  stockTriageCritical: string;
+  stockTriageLow: string;
+  stockTriageGood: string;
+  stockDaysLeft: string;
+  stockRunOut: string;
+  stockRunOutDate: string;
+  stockAddBox: string;
+  stockDailyConsumption: string;
+  stockFilterAll: string;
+  stockFilterCritical: string;
+  stockFilterLow: string;
+  stockFilterGood: string;
+  stockEmptyTitle: string;
+  stockEmptyDesc: string;
+  stockUnitPiece: string;
 
   // Settings Menu
   settings: string;
@@ -355,6 +372,23 @@ export const translations: Record<Language, Translations> = {
     scanBarcodeBanner: 'Karekod / Kutu Tara (ITS)',
     scanBarcodeDesc: 'Kutudaki DataMatrix karekoddan adı ve SKT\'yi otomatik doldur',
     itsMatched: 'ITS Karekod Eşleşti',
+    subTabPlan: 'Tedavi Planı',
+    subTabStock: 'Stok & Envanter',
+    stockTriageCritical: 'Kritik / Tükendi',
+    stockTriageLow: 'Azalıyor',
+    stockTriageGood: 'Yeterli',
+    stockDaysLeft: 'gün kaldı',
+    stockRunOut: 'Tükendi',
+    stockRunOutDate: 'Tahmini bitiş',
+    stockAddBox: '+1 Kutu',
+    stockDailyConsumption: 'Günlük',
+    stockFilterAll: 'Tümü',
+    stockFilterCritical: 'Kritikler (≤7g)',
+    stockFilterLow: 'Azalanlar (≤14g)',
+    stockFilterGood: 'Yeterliler',
+    stockEmptyTitle: 'Kayıtlı İlaç Bulunamadı',
+    stockEmptyDesc: 'Stok takibi için önce bir ilaç ekleyin.',
+    stockUnitPiece: 'adet',
 
     // Settings Menu
     settings: 'Ayarlar',
@@ -601,6 +635,23 @@ export const translations: Record<Language, Translations> = {
     scanBarcodeBanner: 'Scan Barcode / Box (ITS)',
     scanBarcodeDesc: 'Auto-fill name & expiry from DataMatrix barcode',
     itsMatched: 'ITS Barcode Matched',
+    subTabPlan: 'Treatment Plan',
+    subTabStock: 'Stock & Inventory',
+    stockTriageCritical: 'Critical / Out',
+    stockTriageLow: 'Low Stock',
+    stockTriageGood: 'Sufficient',
+    stockDaysLeft: 'days left',
+    stockRunOut: 'Out of stock',
+    stockRunOutDate: 'Est. run-out',
+    stockAddBox: '+1 Box',
+    stockDailyConsumption: 'Daily',
+    stockFilterAll: 'All',
+    stockFilterCritical: 'Critical (≤7d)',
+    stockFilterLow: 'Low (≤14d)',
+    stockFilterGood: 'Sufficient',
+    stockEmptyTitle: 'No Medications Found',
+    stockEmptyDesc: 'Add a medication first to track inventory.',
+    stockUnitPiece: 'units',
 
     // Settings Menu
     settings: 'Settings',

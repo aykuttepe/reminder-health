@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import {
   MealCondition,
   CycleInfo,
   DurationInfo,
+  calculateStockProjection,
 } from '../medicationPlan';
 import { Translations } from '../i18n/translations';
+import { StockInventoryView } from './StockInventoryView';
 
 export interface MedicationListProps {
   doses: Dose[];
@@ -20,6 +22,7 @@ export interface MedicationListProps {
   language: 'tr' | 'en';
   t: Translations;
   openEditor: (dose?: Dose) => void;
+  onUpdateStock: (id: string | number, newStock: number) => void;
   getMealLabel: (cond?: MealCondition) => string;
   formatStock: (stock?: number) => string;
   getCycleInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => CycleInfo;
@@ -33,23 +36,85 @@ export const MedicationList: React.FC<MedicationListProps> = ({
   language,
   t,
   openEditor,
+  onUpdateStock,
   getMealLabel,
   formatStock,
   getCycleInfo,
   getDurationInfo,
   calculateEndDate,
 }) => {
+  const [subTab, setSubTab] = useState<'plan' | 'stock'>('plan');
   const activeDoses = doses.filter((d) => !d.deletedAt);
+
+  const criticalCount = useMemo(() => {
+    return activeDoses.filter(
+      (d) => calculateStockProjection(d, today, language).statusTier === 'critical'
+    ).length;
+  }, [activeDoses, today, language]);
 
   return (
     <View>
-      <View style={styles.medsHeader}>
-        <Text style={styles.sectionTitle}>
-          {language === 'en'
-            ? `DAILY PLAN (${activeDoses.length} Meds)`
-            : `GÜNLÜK PLAN (${activeDoses.length} İlaç)`}
-        </Text>
+      {/* Segmented Switch: Tedavi Planı / Stok & Envanter */}
+      <View style={styles.segmentContainer}>
+        <TouchableOpacity
+          style={[styles.segmentBtn, subTab === 'plan' && styles.segmentBtnActive]}
+          onPress={() => setSubTab('plan')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="calendar-outline"
+            size={15}
+            color={subTab === 'plan' ? '#081624' : '#adb3bf'}
+          />
+          <Text
+            style={[styles.segmentText, subTab === 'plan' && styles.segmentTextActive]}
+          >
+            {t.subTabPlan}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.segmentBtn, subTab === 'stock' && styles.segmentBtnActive]}
+          onPress={() => setSubTab('stock')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="cube-outline"
+            size={15}
+            color={subTab === 'stock' ? '#081624' : '#adb3bf'}
+          />
+          <Text
+            style={[styles.segmentText, subTab === 'stock' && styles.segmentTextActive]}
+          >
+            {t.subTabStock}
+          </Text>
+          {criticalCount > 0 && (
+            <View style={styles.segmentBadge}>
+              <Text style={styles.segmentBadgeText}>{criticalCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
+
+      {subTab === 'stock' ? (
+        <StockInventoryView
+          doses={doses}
+          today={today}
+          language={language}
+          t={t}
+          openEditor={(d) => openEditor(d)}
+          onUpdateStock={onUpdateStock}
+          getMealLabel={getMealLabel}
+        />
+      ) : (
+        <>
+          <View style={styles.medsHeader}>
+            <Text style={styles.sectionTitle}>
+              {language === 'en'
+                ? `DAILY PLAN (${activeDoses.length} Meds)`
+                : `GÜNLÜK PLAN (${activeDoses.length} İlaç)`}
+            </Text>
+          </View>
 
       {activeDoses.length === 0 ? (
         <View style={[styles.emptyCard, { marginHorizontal: 0, marginBottom: 16 }]}>
@@ -135,6 +200,8 @@ export const MedicationList: React.FC<MedicationListProps> = ({
         <Ionicons name="add" size={20} color="#f5f3f0" />
         <Text style={styles.fullAddBtnText}>{t.addMedicine}</Text>
       </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 };
@@ -282,5 +349,49 @@ const styles = StyleSheet.create({
     color: '#f5f3f0',
     fontSize: 14,
     fontWeight: '600',
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#101c28',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#203244',
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#a9dfca',
+  },
+  segmentText: {
+    color: '#adb3bf',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    color: '#081624',
+    fontWeight: '700',
+  },
+  segmentBadge: {
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

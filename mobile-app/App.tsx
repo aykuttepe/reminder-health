@@ -1256,6 +1256,16 @@ function MainApp() {
   const skipSlot = (slot: ScheduledSlot) => applySlot(slot, 'skipped');
   const revertSlot = (slot: ScheduledSlot) => applySlot(slot, 'pending');
 
+  const updateStock = (id: string | number, newStock: number) => {
+    triggerHaptic();
+    const clean = Math.max(0, newStock);
+    const target = doses.find(d => d.id === id);
+    if (target) {
+      logger.breadcrumb(`Stok güncellendi: ${target.name} -> ${clean}`);
+    }
+    setDoses(ds => ds.map(d => d.id === id ? { ...d, stock: clean, updatedAt: Date.now() } : d));
+  };
+
   const openEditor = (dose?: Dose) => {
     if (dose) {
       setEditingId(dose.id);
@@ -2080,6 +2090,7 @@ function MainApp() {
               language={language}
               t={t}
               openEditor={openEditor}
+              onUpdateStock={updateStock}
               getMealLabel={getMealLabel}
               formatStock={formatStock}
               getCycleInfo={getCycleInfo}

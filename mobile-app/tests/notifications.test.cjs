@@ -310,3 +310,50 @@ test('slotAmounts accurately deducts different amounts for morning and evening a
   assert.ok(morningReq.content.title.includes('2 tablet'), 'Morning notification title should state 2 tablet');
   assert.ok(eveningReq.content.title.includes('1 tablet'), 'Evening notification title should state 1 tablet');
 });
+
+test('calculateStockProjection correctly estimates daily consumption, remaining days, and triage tiers', () => {
+  const api = setup('2026-09-07T12:00:00');
+
+  // Case 1: Out of stock (0 tablets)
+  const zeroStock = dose({ stock: 0, amount: '1 tablet' });
+  const p0 = api.calculateStockProjection(zeroStock, '2026-09-07', 'tr');
+  assert.equal(p0.isOutOfStock, true);
+  assert.equal(p0.daysRemaining, 0);
+  assert.equal(p0.statusTier, 'critical');
+
+  // Case 2: Slot-specific dosages (Morning 2, Evening 1 = 3/day). Stock: 15 -> 5 days left (critical: <= 7)
+  const slotMed = dose({
+    amount: '1 tablet',
+    times: ['08:00', '20:00'],
+    slotAmounts: { '08:00': '2 tablet', '20:00': '1 tablet' },
+    stock: 15,
+  });
+  const pSlot = api.calculateStockProjection(slotMed, '2026-09-07', 'tr');
+  assert.equal(pSlot.dailyConsumption, 3);
+  assert.equal(pSlot.daysRemaining, 5);
+  assert.equal(pSlot.statusTier, 'critical');
+  assert.equal(pSlot.runOutDate, '2026-09-11');
+
+  // Case 3: Low stock (10 days remaining -> low: 8-14 days)
+  const lowMed = dose({
+    amount: '1 tablet',
+    times: ['09:00', '21:00'],
+    stock: 20, // 20 / 2 = 10 days
+  });
+  const pLow = api.calculateStockProjection(lowMed, '2026-09-07', 'tr');
+  assert.equal(pLow.dailyConsumption, 2);
+  assert.equal(pLow.daysRemaining, 10);
+  assert.equal(pLow.statusTier, 'low');
+
+  // Case 4: Good stock (30 days remaining -> good: > 14 days)
+  const goodMed = dose({
+    amount: '1 tablet',
+    times: ['09:00'],
+    stock: 30, // 30 / 1 = 30 days
+  });
+  const pGood = api.calculateStockProjection(goodMed, '2026-09-07', 'tr');
+  assert.equal(pGood.dailyConsumption, 1);
+  assert.equal(pGood.daysRemaining, 30);
+  assert.equal(pGood.statusTier, 'good');
+});
+

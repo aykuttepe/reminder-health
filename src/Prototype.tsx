@@ -52,6 +52,7 @@ type Dose = {
   instructions?: string;
   stock?: number;
   stockThreshold?: number;
+  defaultStock?: number;
   frequencyType?: FrequencyType;
   cyclePhase1Days?: number;
   cyclePhase1Amount?: string;
@@ -204,6 +205,108 @@ function getCycleInfo(dose: Dose, targetDateStr = '2026-09-06', lang: 'tr' | 'en
     phaseType: 'active',
     currentDayInPhase: 1,
     totalDaysInPhase: 1,
+  };
+}
+
+function calculateEndDate(startDateStr: string, days: number): string {
+  const parts = (startDateStr || '2026-09-06').split('-').map(Number);
+  const d = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+  d.setDate(d.getDate() + Math.max(0, days - 1));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export interface StockProjection {
+  currentStock: number;
+  dailyConsumption: number;
+  daysRemaining: number;
+  runOutDate: string;
+  runOutDateFormatted: string;
+  statusTier: 'critical' | 'low' | 'good';
+  isOutOfStock: boolean;
+  boxSize: number;
+  threshold: number;
+  progressPercent: number;
+}
+
+function calculateStockProjection(
+  dose: Dose,
+  today = '2026-09-06',
+  language: 'tr' | 'en' = 'tr'
+): StockProjection {
+  const stock = Math.max(0, dose.stock ?? 0);
+  const threshold = Math.max(1, dose.stockThreshold ?? 5);
+  const boxSize = Math.max(1, (dose as any).defaultStock ?? 30);
+  const isEn = language === 'en';
+
+  let baseDaily = 0;
+  const effectiveTimes = dose.times && dose.times.length > 0 ? dose.times : [dose.time || '09:00'];
+  for (const t of effectiveTimes) {
+    const amtStr = dose.slotAmounts?.[t]?.trim() || dose.amount;
+    baseDaily += parseDoseAmount(amtStr);
+  }
+
+  let dailyConsumption = baseDaily;
+  const freq = dose.frequencyType;
+  if (freq === 'alternate') {
+    dailyConsumption = baseDaily / 2;
+  } else if (freq === 'cycle') {
+    const p1Days = Math.max(1, dose.cyclePhase1Days || 3);
+    const p2Days = Math.max(1, dose.cyclePhase2Days || 4);
+    dailyConsumption = (baseDaily * p1Days) / (p1Days + p2Days);
+  } else if (freq === 'variable') {
+    const p1Days = Math.max(1, dose.cyclePhase1Days || 4);
+    const p1Amount = parseDoseAmount(dose.cyclePhase1Amount || dose.amount);
+    const p2Days = Math.max(1, dose.cyclePhase2Days || 3);
+    const p2Amount = parseDoseAmount(dose.cyclePhase2Amount);
+    dailyConsumption = (p1Amount * p1Days + p2Amount * p2Days) / (p1Days + p2Days);
+  }
+
+  if (dailyConsumption <= 0) dailyConsumption = 1;
+
+  const isOutOfStock = stock <= 0;
+  const daysRemaining = isOutOfStock ? 0 : Math.floor(stock / dailyConsumption);
+  const runOutDate = isOutOfStock ? today : calculateEndDate(today, daysRemaining);
+
+  let runOutDateFormatted = '';
+  if (isOutOfStock) {
+    runOutDateFormatted = isEn ? 'Out of stock' : 'Stok tükendi';
+  } else {
+    try {
+      const parts = runOutDate.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      runOutDateFormatted = d.toLocaleDateString(isEn ? 'en-US' : 'tr-TR', {
+        day: 'numeric',
+        month: 'short',
+        weekday: 'short',
+      });
+    } catch {
+      runOutDateFormatted = runOutDate;
+    }
+  }
+
+  let statusTier: 'critical' | 'low' | 'good' = 'good';
+  if (isOutOfStock || daysRemaining <= 7 || stock <= threshold) {
+    statusTier = 'critical';
+  } else if (daysRemaining <= 14 || stock <= threshold * 1.5) {
+    statusTier = 'low';
+  } else {
+    statusTier = 'good';
+  }
+
+  const maxRefDays = Math.max(30, Math.ceil(boxSize / dailyConsumption));
+  const progressPercent = Math.min(100, Math.max(0, Math.round((daysRemaining / maxRefDays) * 100)));
+
+  return {
+    currentStock: stock,
+    dailyConsumption: Math.round(dailyConsumption * 100) / 100,
+    daysRemaining,
+    runOutDate,
+    runOutDateFormatted,
+    statusTier,
+    isOutOfStock,
+    boxSize,
+    threshold,
+    progressPercent,
   };
 }
 
@@ -662,6 +765,8 @@ function InnerPrototype() {
   };
 
   const [tab, setTab] = useState<Tab>('Bugün');
+  const [medsSubTab, setMedsSubTab] = useState<'plan' | 'stock'>('plan');
+  const [stockFilter, setStockFilter] = useState<'all' | 'critical' | 'low' | 'good'>('all');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [doses, setDoses] = useState<Dose[]>(loadStoredDoses);
   const [storedSettings] = useState<PrototypeSettings>(loadStoredSettings);
@@ -2258,23 +2363,177 @@ function InnerPrototype() {
             </section>
           </>}
           {tab === 'İlaçlarım' && <section className="tab-content">
-            {(() => {
-              const lowStockMeds = doses.filter(d => !d.paused && (d.stock ?? 10) <= (d.stockThreshold ?? 5));
-              if (lowStockMeds.length === 0) return null;
-              return (
-                <div className="stock-alert-banner">
-                  <Warning size={22} weight="bold" />
-                  <div>
-                    <strong>{lowStockMeds.length} ilacın stoğu azalıyor!</strong>
-                    <small>{lowStockMeds.map(m => `${m.name} (${formatStock(m.stock)} kaldı)`).join(', ')} · Eczaneden yazdırmayı unutmayın.</small>
-                  </div>
-                </div>
-              );
-            })()}
-            <div className="section-label"><span>GÜNLÜK PLAN</span><span>{doses.filter(d => !d.deletedAt).length} ilaç</span></div>
-            <div className="medicine-list">{doses.filter(d => !d.deletedAt).map(d=>medicineRow(d))}</div>
-            <button className="secondary full" onClick={()=>openEditor()}><Plus size={22}/>Yeni ilaç ekle</button>
-            <p className="microcopy">Düzenlemek veya duraklatmak için ilaca dokun.</p>
+            <div className="meds-subtab-bar">
+              <button
+                type="button"
+                className={`meds-subtab-btn ${medsSubTab === 'plan' ? 'active' : ''}`}
+                onClick={() => setMedsSubTab('plan')}
+              >
+                <CalendarDots size={16} />
+                <span>{t.subTabPlan}</span>
+              </button>
+              <button
+                type="button"
+                className={`meds-subtab-btn ${medsSubTab === 'stock' ? 'active' : ''}`}
+                onClick={() => setMedsSubTab('stock')}
+              >
+                <Package size={16} />
+                <span>{t.subTabStock}</span>
+                {(() => {
+                  const crit = doses.filter(d => !d.deletedAt && calculateStockProjection(d, '2026-09-06', language).statusTier === 'critical').length;
+                  return crit > 0 ? <span className="subtab-crit-badge">{crit}</span> : null;
+                })()}
+              </button>
+            </div>
+
+            {medsSubTab === 'stock' ? (
+              <div className="stock-inventory-view-web">
+                {(() => {
+                  const activeDoses = doses.filter(d => !d.deletedAt);
+                  const projections = activeDoses.map(d => ({ dose: d, proj: calculateStockProjection(d, '2026-09-06', language) }));
+                  const critCount = projections.filter(p => p.proj.statusTier === 'critical').length;
+                  const lowCount = projections.filter(p => p.proj.statusTier === 'low').length;
+                  const goodCount = projections.filter(p => p.proj.statusTier === 'good').length;
+
+                  const filtered = stockFilter === 'all' ? projections : projections.filter(p => p.proj.statusTier === stockFilter);
+
+                  return (
+                    <>
+                      <div className="stock-triage-row-web">
+                        <button
+                          type="button"
+                          className={`stock-triage-card-web crit ${stockFilter === 'critical' ? 'active' : ''}`}
+                          onClick={() => setStockFilter(f => f === 'critical' ? 'all' : 'critical')}
+                        >
+                          <div className="triage-num crit">{critCount}</div>
+                          <div className="triage-lbl">{t.stockTriageCritical}</div>
+                          <small>≤ 7 {language === 'en' ? 'days' : 'gün'}</small>
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`stock-triage-card-web low ${stockFilter === 'low' ? 'active' : ''}`}
+                          onClick={() => setStockFilter(f => f === 'low' ? 'all' : 'low')}
+                        >
+                          <div className="triage-num low">{lowCount}</div>
+                          <div className="triage-lbl">{t.stockTriageLow}</div>
+                          <small>8-14 {language === 'en' ? 'days' : 'gün'}</small>
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`stock-triage-card-web good ${stockFilter === 'good' ? 'active' : ''}`}
+                          onClick={() => setStockFilter(f => f === 'good' ? 'all' : 'good')}
+                        >
+                          <div className="triage-num good">{goodCount}</div>
+                          <div className="triage-lbl">{t.stockTriageGood}</div>
+                          <small>&gt; 14 {language === 'en' ? 'days' : 'gün'}</small>
+                        </button>
+                      </div>
+
+                      <div className="stock-chips-row-web">
+                        {[
+                          { id: 'all', label: t.stockFilterAll },
+                          { id: 'critical', label: t.stockFilterCritical },
+                          { id: 'low', label: t.stockFilterLow },
+                          { id: 'good', label: t.stockFilterGood },
+                        ].map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className={`stock-filter-chip-web ${stockFilter === c.id ? 'active' : ''}`}
+                            onClick={() => setStockFilter(c.id as any)}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="stock-cards-list-web">
+                        {filtered.length === 0 ? (
+                          <div className="quiet-empty">{t.stockEmptyDesc}</div>
+                        ) : (
+                          filtered.map(({ dose, proj }) => {
+                            const isCrit = proj.statusTier === 'critical';
+                            const isL = proj.statusTier === 'low';
+                            const tierClass = isCrit ? 'crit' : isL ? 'low' : 'good';
+
+                            return (
+                              <div key={dose.id} className={`stock-card-web ${tierClass}`}>
+                                <div className="stock-card-head" onClick={() => openEditor(dose)}>
+                                  <div>
+                                    <strong className="stock-med-name">{dose.name}</strong>
+                                    <div className="stock-med-meta">{t.stockDailyConsumption}: {proj.dailyConsumption} {dose.form || t.stockUnitPiece}</div>
+                                  </div>
+                                  <span className={`stock-days-pill ${tierClass}`}>
+                                    {proj.isOutOfStock ? t.stockRunOut : `${proj.daysRemaining} ${t.stockDaysLeft}`}
+                                  </span>
+                                </div>
+
+                                <div className="stock-runout-row" onClick={() => openEditor(dose)}>
+                                  <CalendarDots size={13} />
+                                  <span>{t.stockRunOutDate}: <strong className={`runout-date ${tierClass}`}>{proj.runOutDateFormatted}</strong></span>
+                                </div>
+
+                                <div className="stock-bar-track" onClick={() => openEditor(dose)}>
+                                  <div className={`stock-bar-fill ${tierClass}`} style={{ width: `${Math.max(4, proj.progressPercent)}%` }} />
+                                </div>
+
+                                <div className="stock-card-actions">
+                                  <div className="stock-stepper-web">
+                                    <button
+                                      type="button"
+                                      disabled={proj.currentStock <= 0}
+                                      onClick={() => {
+                                        const cur = Math.max(0, dose.stock ?? 0);
+                                        const next = Math.max(0, cur - 1);
+                                        setDoses(ds => ds.map(d => d.id === dose.id ? { ...d, stock: next, updatedAt: Date.now() } : d));
+                                      }}
+                                    >
+                                      -
+                                    </button>
+                                    <span className="stepper-val">{proj.currentStock} <small>{t.stockUnitPiece}</small></span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const cur = Math.max(0, dose.stock ?? 0);
+                                        setDoses(ds => ds.map(d => d.id === dose.id ? { ...d, stock: cur + 1, updatedAt: Date.now() } : d));
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className="stock-add-box-btn"
+                                    onClick={() => {
+                                      const cur = Math.max(0, dose.stock ?? 0);
+                                      setDoses(ds => ds.map(d => d.id === dose.id ? { ...d, stock: cur + proj.boxSize, updatedAt: Date.now() } : d));
+                                      setToast({ text: `${dose.name}: +${proj.boxSize} ${t.stockUnitPiece} eklendi` });
+                                    }}
+                                  >
+                                    <Package size={14} />
+                                    <span>{t.stockAddBox} (+{proj.boxSize})</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <>
+                <div className="section-label"><span>GÜNLÜK PLAN</span><span>{doses.filter(d => !d.deletedAt).length} ilaç</span></div>
+                <div className="medicine-list">{doses.filter(d => !d.deletedAt).map(d=>medicineRow(d))}</div>
+                <button className="secondary full" onClick={()=>openEditor()}><Plus size={22}/>Yeni ilaç ekle</button>
+                <p className="microcopy">Düzenlemek veya duraklatmak için ilaca dokun.</p>
+              </>
+            )}
           </section>}
           {tab === 'Geçmiş' && <section className="tab-content">
             <div className="history-weekly-card">

@@ -26,6 +26,7 @@ export type Dose = {
   instructions?: string;
   stock?: number;
   stockThreshold?: number;
+  defaultStock?: number;
   frequencyType?: FrequencyType;
   cyclePhase1Days?: number;
   cyclePhase1Amount?: string;
@@ -325,3 +326,104 @@ export function updateDoseSlot(dose: Dose, time: string, date: string, status: D
   return { ...current, stock, slotStatuses: statuses, snooze: undefined,
     status: allTimes.every(t => (statuses[t] ?? slotStatus(current, t, date)) === 'taken') ? 'taken' : 'pending' };
 }
+
+export interface StockProjection {
+  currentStock: number;
+  dailyConsumption: number;
+  daysRemaining: number;
+  runOutDate: string;
+  runOutDateFormatted: string;
+  statusTier: 'critical' | 'low' | 'good';
+  isOutOfStock: boolean;
+  boxSize: number;
+  threshold: number;
+  progressPercent: number;
+}
+
+export function calculateStockProjection(
+  dose: Dose,
+  today = localDateKey(),
+  language: 'tr' | 'en' = 'tr'
+): StockProjection {
+  const stock = Math.max(0, dose.stock ?? 0);
+  const threshold = Math.max(1, dose.stockThreshold ?? 5);
+  const boxSize = Math.max(1, dose.defaultStock ?? 30);
+  const isEn = language === 'en';
+
+  // 1. Günlük tüketim hesaplaması
+  let baseDaily = 0;
+  const effectiveTimes = dose.times && dose.times.length > 0 ? dose.times : [dose.time || '09:00'];
+  for (const t of effectiveTimes) {
+    const amtStr = dose.slotAmounts?.[t]?.trim() || dose.amount;
+    baseDaily += parseDoseAmount(amtStr);
+  }
+
+  let dailyConsumption = baseDaily;
+  const freq = dose.frequencyType;
+  if (freq === 'alternate') {
+    dailyConsumption = baseDaily / 2;
+  } else if (freq === 'cycle') {
+    const p1Days = Math.max(1, dose.cyclePhase1Days || 3);
+    const p2Days = Math.max(1, dose.cyclePhase2Days || 4);
+    dailyConsumption = (baseDaily * p1Days) / (p1Days + p2Days);
+  } else if (freq === 'variable') {
+    const p1Days = Math.max(1, dose.cyclePhase1Days || 4);
+    const p1Amount = parseDoseAmount(dose.cyclePhase1Amount || dose.amount);
+    const p2Days = Math.max(1, dose.cyclePhase2Days || 3);
+    const p2Amount = parseDoseAmount(dose.cyclePhase2Amount);
+    dailyConsumption = (p1Amount * p1Days + p2Amount * p2Days) / (p1Days + p2Days);
+  }
+
+  if (dailyConsumption <= 0) dailyConsumption = 1;
+
+  // 2. Kalan gün ve tahmini bitiş tarihi
+  const isOutOfStock = stock <= 0;
+  const daysRemaining = isOutOfStock ? 0 : Math.floor(stock / dailyConsumption);
+  const runOutDate = isOutOfStock ? today : calculateEndDate(today, daysRemaining);
+
+  // 3. Formatlanmış tarih
+  let runOutDateFormatted = '';
+  if (isOutOfStock) {
+    runOutDateFormatted = isEn ? 'Out of stock' : 'Stok tükendi';
+  } else {
+    try {
+      const parts = runOutDate.split('-').map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      runOutDateFormatted = d.toLocaleDateString(isEn ? 'en-US' : 'tr-TR', {
+        day: 'numeric',
+        month: 'short',
+        weekday: 'short',
+      });
+    } catch {
+      runOutDateFormatted = runOutDate;
+    }
+  }
+
+  // 4. Durum seviyesi (Triage) - Kullanıcı tercihi: kritik <= 7 gün, azalıyor <= 14 gün
+  let statusTier: 'critical' | 'low' | 'good' = 'good';
+  if (isOutOfStock || daysRemaining <= 7 || stock <= threshold) {
+    statusTier = 'critical';
+  } else if (daysRemaining <= 14 || stock <= threshold * 1.5) {
+    statusTier = 'low';
+  } else {
+    statusTier = 'good';
+  }
+
+  // 5. Doluluk yüzdesi (referans: 30 gün veya 1 kutu süresi)
+  const maxRefDays = Math.max(30, Math.ceil(boxSize / dailyConsumption));
+  const progressPercent = Math.min(100, Math.max(0, Math.round((daysRemaining / maxRefDays) * 100)));
+
+  return {
+    currentStock: stock,
+    dailyConsumption: Math.round(dailyConsumption * 100) / 100,
+    daysRemaining,
+    runOutDate,
+    runOutDateFormatted,
+    statusTier,
+    isOutOfStock,
+    boxSize,
+    threshold,
+    progressPercent,
+  };
+}
+
