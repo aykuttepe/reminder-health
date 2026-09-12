@@ -430,19 +430,9 @@ export async function initNotifications(): Promise<void> {
 
       await Notifications.setNotificationCategoryAsync(NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS, [
         {
-          identifier: ACTION_APPT_SNOOZE_1H,
-          buttonTitle: '⏱️ 1 Saat Ertele',
-          options: { opensAppToForeground: true },
-        },
-        {
-          identifier: ACTION_APPT_SNOOZE_3H,
-          buttonTitle: '⏱️ 3 Saat Ertele',
-          options: { opensAppToForeground: true },
-        },
-        {
           identifier: ACTION_APPT_DONE,
-          buttonTitle: '✅ Tamam',
-          options: { opensAppToForeground: true },
+          buttonTitle: '✅ Anlaşıldı',
+          options: { opensAppToForeground: false },
         },
       ]);
     } catch (e) {
@@ -1106,7 +1096,12 @@ export function syncDoctorAppointmentNotifications(
         const [hour = 9, minute = 0] = appointmentTime.split(':').map(Number);
         const appointmentDateTime = new Date(year, month - 1, day, hour, minute, 0, 0);
 
-        for (const lead of leadOptions) {
+        const effectiveLeads = Array.isArray(leadOptions) ? [...leadOptions] : ['1d', '0d'];
+        if (!effectiveLeads.includes('0d') && !effectiveLeads.includes('same_day')) {
+          effectiveLeads.push('0d');
+        }
+
+        for (const lead of effectiveLeads) {
           let triggerDate: Date | null = null;
           let title = '';
           let body = '';
@@ -1129,18 +1124,13 @@ export function syncDoctorAppointmentNotifications(
             body = isEn
               ? `Tomorrow at ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}. Don't forget your med list and lab results!`
               : `Yarın saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var. İlaç listenizi ve tahlil sonuçlarınızı yanınıza almayı unutmayın!`;
-          } else if (lead === '2h') {
-            triggerDate = new Date(appointmentDateTime.getTime() - 2 * 60 * 60 * 1000);
-            title = isEn ? '🗓️ Doctor Appointment in 2 Hours!' : '🗓️ 2 Saat Sonra Doktor Randevunuz Var!';
+          } else if (lead === '0d' || lead === 'same_day') {
+            // Randevu sabahı saat 05:00'te son onay bildirimi
+            triggerDate = new Date(year, month - 1, day, 5, 0, 0, 0);
+            title = isEn ? '🗓️ Today: Doctor Appointment!' : '🗓️ Bugün Doktor Randevunuz Var!';
             body = isEn
-              ? `At ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}.`
-              : `Saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var.`;
-          } else if (lead === '1h') {
-            triggerDate = new Date(appointmentDateTime.getTime() - 1 * 60 * 60 * 1000);
-            title = isEn ? '🗓️ Doctor Appointment in 1 Hour!' : '🗓️ 1 Saat Sonra Doktor Randevunuz Var!';
-            body = isEn
-              ? `At ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}.`
-              : `Saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var.`;
+              ? `Today at ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}. Don't forget your med list and lab results!`
+              : `Bugün saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var. İlaç listenizi ve tahlil sonuçlarınızı yanınıza almayı unutmayın!`;
           }
 
           if (triggerDate && triggerDate.getTime() > Date.now() + 15000) {

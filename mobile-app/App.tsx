@@ -642,7 +642,7 @@ function MainApp() {
   const [doctorPhone, setDoctorPhone] = useState('');
   const [doctorNextAppointment, setDoctorNextAppointment] = useState('');
   const [doctorAppointmentTime, setDoctorAppointmentTime] = useState('09:00');
-  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(['1d']);
+  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(['1d', '0d']);
   const [doctorBloodTestDate, setDoctorBloodTestDate] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
   const [snoozeMinutes, setSnoozeMinutes] = useState(15);
@@ -779,13 +779,7 @@ function MainApp() {
     const removeListener = addNotificationResponseListener(res => {
       const { actionId, doseId, timeStr, date, isAppointment, title, body } = res;
       if (isAppointment) {
-        if (actionId === ACTION_APPT_SNOOZE_1H) {
-          void snoozeDoctorAppointmentNotification(60, title, body);
-          showToast(language === 'en' ? '⏱️ Appointment reminder snoozed 1 hour' : '⏱️ Randevu hatırlatıcısı 1 saat ertelendi');
-        } else if (actionId === ACTION_APPT_SNOOZE_3H) {
-          void snoozeDoctorAppointmentNotification(180, title, body);
-          showToast(language === 'en' ? '⏱️ Appointment reminder snoozed 3 hours' : '⏱️ Randevu hatırlatıcısı 3 saat ertelendi');
-        } else if (actionId === ACTION_APPT_DONE) {
+        if (actionId === ACTION_APPT_DONE || !actionId) {
           showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
         }
         return;
@@ -1915,33 +1909,7 @@ function MainApp() {
                   }}
                 >
                   <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                  <Text style={styles.pushBannerActionTakeText}>{language === 'en' ? 'OK' : 'Tamam'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.pushBannerActionSnooze}
-                  onPress={() => {
-                    triggerHaptic();
-                    void snoozeDoctorAppointmentNotification(60, activeBannerNotification.title, activeBannerNotification.body);
-                    setActiveBannerNotification(null);
-                    showToast(language === 'en' ? '⏱️ Snoozed 1 hour' : '⏱️ 1 saat ertelendi');
-                  }}
-                >
-                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
-                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 1h' : '1 Saat Ertele'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.pushBannerActionSnooze}
-                  onPress={() => {
-                    triggerHaptic();
-                    void snoozeDoctorAppointmentNotification(180, activeBannerNotification.title, activeBannerNotification.body);
-                    setActiveBannerNotification(null);
-                    showToast(language === 'en' ? '⏱️ Snoozed 3 hours' : '⏱️ 3 saat ertelendi');
-                  }}
-                >
-                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
-                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3h' : '3 Saat Ertele'}</Text>
+                  <Text style={styles.pushBannerActionTakeText}>{language === 'en' ? 'Tamam / Anlaşıldı' : 'Tamam / Anlaşıldı'}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -2680,8 +2648,7 @@ function MainApp() {
                                 { id: '3d', label: t.leadOpt3d },
                                 { id: '2d', label: t.leadOpt2d },
                                 { id: '1d', label: t.leadOpt1d },
-                                { id: '2h', label: t.leadOpt2h },
-                                { id: '1h', label: t.leadOpt1h },
+                                { id: '0d', label: t.leadOpt0d },
                               ].map(opt => {
                                 const active = doctorApptLeadOptions.includes(opt.id);
                                 return (
@@ -2714,13 +2681,13 @@ function MainApp() {
                             </View>
                           </View>
 
-                          {/* Kilit Ekranı Erteleme Bilgi Rozeti */}
+                          {/* Randevu Sabahı 05:00 Bilgi Rozeti */}
                           <View style={{ backgroundColor: '#101d29', padding: 10, borderRadius: 8, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#23374d' }}>
-                            <Ionicons name="time-outline" size={16} color="#a9dfca" />
+                            <Ionicons name="notifications-outline" size={16} color="#a9dfca" />
                             <Text style={{ color: '#adb3bf', fontSize: 11, flex: 1, lineHeight: 16 }}>
                               {language === 'en'
-                                ? 'When the reminder arrives, you can snooze 1 hour or 3 hours directly from the lock screen.'
-                                : 'Hatırlatıcı geldiğinde kilit ekranındaki butonlarla 1 saat veya 3 saat erteleyebilirsiniz.'}
+                                ? 'A final reminder notification is sent at 05:00 AM on the appointment morning and can be confirmed with one tap.'
+                                : 'Randevu günü sabah saat 05:00\'te son bir hatırlatma bildirimi gönderilir ve tek dokunuşla onaylanır.'}
                             </Text>
                           </View>
 

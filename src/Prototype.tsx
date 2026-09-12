@@ -491,7 +491,7 @@ const DEFAULT_SETTINGS: PrototypeSettings = {
   doctorPhone: '',
   doctorNextAppointment: '',
   doctorAppointmentTime: '09:00',
-  doctorApptLeadOptions: ['1d'],
+  doctorApptLeadOptions: ['1d', '0d'],
   doctorBloodTestDate: '',
   doctorNotes: '',
   notifications: true,
@@ -715,7 +715,7 @@ function InnerPrototype() {
   const [doctorPhone, setDoctorPhone] = useState<string>(storedSettings.doctorPhone || '');
   const [doctorNextAppointment, setDoctorNextAppointment] = useState<string>(storedSettings.doctorNextAppointment || '');
   const [doctorAppointmentTime, setDoctorAppointmentTime] = useState<string>(storedSettings.doctorAppointmentTime || '09:00');
-  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(storedSettings.doctorApptLeadOptions || ['1d']);
+  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(storedSettings.doctorApptLeadOptions || ['1d', '0d']);
   const [doctorBloodTestDate, setDoctorBloodTestDate] = useState<string>(storedSettings.doctorBloodTestDate || '');
   const [doctorNotes, setDoctorNotes] = useState<string>(storedSettings.doctorNotes || '');
   const [privateMode, setPrivateMode] = useState<boolean>(storedSettings.privateMode);
@@ -2683,8 +2683,7 @@ function InnerPrototype() {
                                   { id: '3d', label: t.leadOpt3d },
                                   { id: '2d', label: t.leadOpt2d },
                                   { id: '1d', label: t.leadOpt1d },
-                                  { id: '2h', label: t.leadOpt2h },
-                                  { id: '1h', label: t.leadOpt1h },
+                                  { id: '0d', label: t.leadOpt0d },
                                 ].map(opt => {
                                   const active = doctorApptLeadOptions.includes(opt.id);
                                   return (
@@ -2705,6 +2704,10 @@ function InnerPrototype() {
                                     </button>
                                   );
                                 })}
+                              </div>
+                              <div style={{ marginTop: '10px', fontSize: '11px', color: '#8899a8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Bell size={13} color="#a9dfca" />
+                                <span>{language === 'en' ? 'A final reminder notification is sent at 05:00 AM on appointment morning and can be confirmed with one tap.' : 'Randevu günü sabah saat 05:00\'te son bir hatırlatma bildirimi gönderilir ve tek dokunuşla onaylanır.'}</span>
                               </div>
                             </div>
                           </>

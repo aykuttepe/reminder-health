@@ -139,6 +139,7 @@ export interface Translations {
   leadOpt3d: string;
   leadOpt2d: string;
   leadOpt1d: string;
+  leadOpt0d: string;
   leadOpt2h: string;
   leadOpt1h: string;
   doctorBloodTestSection: string;
@@ -383,6 +384,7 @@ export const translations: Record<Language, Translations> = {
     leadOpt3d: '3 Gün Önce',
     leadOpt2d: '2 Gün Önce',
     leadOpt1d: '1 Gün Önce',
+    leadOpt0d: 'Randevu Sabahı (05:00)',
     leadOpt2h: '2 Saat Önce',
     leadOpt1h: '1 Saat Önce',
     doctorBloodTestSection: 'KAN TAHLİLİ / TETKİK HAZIRLIĞI',
@@ -626,6 +628,7 @@ export const translations: Record<Language, Translations> = {
     leadOpt3d: '3 Days Before',
     leadOpt2d: '2 Days Before',
     leadOpt1d: '1 Day Before',
+    leadOpt0d: 'Appointment Morning (05:00)',
     leadOpt2h: '2 Hours Before',
     leadOpt1h: '1 Hour Before',
     doctorBloodTestSection: 'BLOOD TEST / LAB PREP',
