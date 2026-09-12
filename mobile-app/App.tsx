@@ -656,7 +656,7 @@ function MainApp() {
   const [doctorHospital, setDoctorHospital] = useState('');
   const [doctorPhone, setDoctorPhone] = useState('');
   const [doctorNextAppointment, setDoctorNextAppointment] = useState('');
-  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState('09:00');
+  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState('13:00');
   const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(['1d', '0d']);
   const [doctorBloodTestDate, setDoctorBloodTestDate] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
@@ -880,7 +880,9 @@ function MainApp() {
           if (parsed.doctorHospital !== undefined) setDoctorHospital(parsed.doctorHospital);
           if (parsed.doctorPhone !== undefined) setDoctorPhone(parsed.doctorPhone);
           if (parsed.doctorNextAppointment !== undefined) setDoctorNextAppointment(parsed.doctorNextAppointment);
-          if (parsed.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(parsed.doctorAppointmentTime);
+          if (parsed.doctorAppointmentTime !== undefined) {
+            setDoctorAppointmentTime(parsed.doctorAppointmentTime === '09:00' ? '13:00' : parsed.doctorAppointmentTime);
+          }
           if (parsed.doctorApptLeadOptions !== undefined && Array.isArray(parsed.doctorApptLeadOptions)) setDoctorApptLeadOptions(parsed.doctorApptLeadOptions);
           if (parsed.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(parsed.doctorBloodTestDate);
           if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
@@ -1486,7 +1488,7 @@ function MainApp() {
       setDoctorHospital(snapshot.settings.doctorHospital || '');
       setDoctorPhone(snapshot.settings.doctorPhone || '');
       setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
-      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '09:00');
+      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '13:00');
       if (snapshot.settings.doctorApptLeadOptions) {
         try {
           const opts = typeof snapshot.settings.doctorApptLeadOptions === 'string'
@@ -2091,6 +2093,15 @@ function MainApp() {
               triggerHaptic={triggerHaptic}
               openEditor={openEditor}
               onNavigateSettings={() => setTab('Ayarlar')}
+              onNavigateDoctorProfile={() => {
+                setTab('Ayarlar');
+                setSettingsSubPage('profile');
+              }}
+              doctorNextAppointment={doctorNextAppointment}
+              doctorAppointmentTime={doctorAppointmentTime}
+              doctorName={doctorName}
+              doctorHospital={doctorHospital}
+              doctorSpecialty={doctorSpecialty}
               today={today}
               snoozeMinutes={snoozeMinutes}
               language={language}
@@ -2551,7 +2562,7 @@ function MainApp() {
                           placeholder={t.userNamePlaceholder}
                           placeholderTextColor="#5c6e80"
                           maxLength={32}
-                          onBlur={syncProfileSettings}
+                          onBlur={() => syncProfileSettings()}
                         />
                         {userName.trim().length > 0 && (
                           <TouchableOpacity onPress={() => {
@@ -2581,7 +2592,7 @@ function MainApp() {
                           placeholder={t.doctorNamePlaceholder}
                           placeholderTextColor="#5c6e80"
                           maxLength={60}
-                          onBlur={syncProfileSettings}
+                          onBlur={() => syncProfileSettings()}
                         />
                       </View>
 
@@ -2596,7 +2607,7 @@ function MainApp() {
                           placeholder={t.doctorSpecialtyPlaceholder}
                           placeholderTextColor="#5c6e80"
                           maxLength={60}
-                          onBlur={syncProfileSettings}
+                          onBlur={() => syncProfileSettings()}
                         />
                       </View>
 
@@ -2611,7 +2622,7 @@ function MainApp() {
                           placeholder={t.doctorHospitalPlaceholder}
                           placeholderTextColor="#5c6e80"
                           maxLength={80}
-                          onBlur={syncProfileSettings}
+                          onBlur={() => syncProfileSettings()}
                         />
                       </View>
 
@@ -2627,7 +2638,7 @@ function MainApp() {
                           placeholderTextColor="#5c6e80"
                           keyboardType="phone-pad"
                           maxLength={25}
-                          onBlur={syncProfileSettings}
+                          onBlur={() => syncProfileSettings()}
                         />
                       </View>
 
@@ -2790,7 +2801,7 @@ function MainApp() {
                           : 'Randevu öncesi tahlil gününüzü seçin; o sabah aç karnına kan verme uyarısı alırsınız.'}
                       </Text>
                       <TouchableOpacity
-                        style={styles.appointmentDateBox}
+                        style={[styles.appointmentCard, { flexDirection: 'row', alignItems: 'center' }]}
                         onPress={() => openCalendarPicker('doctorBloodTestDate', t.doctorSelectBloodTest)}
                         activeOpacity={0.8}
                       >
@@ -2838,7 +2849,7 @@ function MainApp() {
                           placeholderTextColor="#5c6e80"
                           multiline
                           numberOfLines={4}
-                          onBlur={syncProfileSettings}
+                          onBlur={() => syncProfileSettings()}
                         />
                       </View>
                     </View>

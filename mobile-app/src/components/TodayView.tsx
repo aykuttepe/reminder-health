@@ -14,9 +14,11 @@ import {
   MedicineForm,
   CycleInfo,
   DurationInfo,
+  getCalendarDayDiff,
 } from '../medicationPlan';
 import { Translations } from '../i18n/translations';
 import { TodayCarousel } from './TodayCarousel';
+import { formatLocalizedDate } from './CalendarModal';
 
 export interface TodayViewProps {
   carouselSlots: ScheduledSlot[];
@@ -49,6 +51,12 @@ export interface TodayViewProps {
   getDurationInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => DurationInfo;
   CAROUSEL_CARD_WIDTH: number;
   CAROUSEL_SPACING: number;
+  doctorNextAppointment?: string;
+  doctorAppointmentTime?: string;
+  doctorName?: string;
+  doctorHospital?: string;
+  doctorSpecialty?: string;
+  onNavigateDoctorProfile?: () => void;
 }
 
 export const TodayView: React.FC<TodayViewProps> = ({
@@ -67,6 +75,12 @@ export const TodayView: React.FC<TodayViewProps> = ({
   triggerHaptic,
   openEditor,
   onNavigateSettings,
+  doctorNextAppointment,
+  doctorAppointmentTime,
+  doctorName,
+  doctorHospital,
+  doctorSpecialty,
+  onNavigateDoctorProfile,
   today,
   snoozeMinutes,
   language,
@@ -110,6 +124,81 @@ export const TodayView: React.FC<TodayViewProps> = ({
           <Ionicons name="chevron-forward" size={12} color="#a9dfca" />
         </View>
       </TouchableOpacity>
+
+      {/* Yaklaşan Doktor Randevusu Kartı */}
+      {doctorNextAppointment ? (() => {
+        const diff = getCalendarDayDiff(today, doctorNextAppointment);
+        let badgeText = '';
+        let badgeBg = 'rgba(52, 211, 153, 0.18)';
+        let badgeColor = '#34d399';
+        const timeText = doctorAppointmentTime || '13:00';
+
+        if (diff === 0) {
+          badgeText = language === 'en' ? 'Today' : 'Bugün';
+          badgeBg = 'rgba(251, 191, 36, 0.2)';
+          badgeColor = '#fbbf24';
+        } else if (diff === 1) {
+          badgeText = language === 'en' ? 'Tomorrow' : 'Yarın';
+          badgeBg = 'rgba(52, 211, 153, 0.2)';
+          badgeColor = '#34d399';
+        } else if (diff > 1) {
+          badgeText = language === 'en' ? `in ${diff} days` : `${diff} gün kaldı`;
+          badgeBg = 'rgba(56, 189, 248, 0.18)';
+          badgeColor = '#38bdf8';
+        } else {
+          badgeText = language === 'en' ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`;
+          badgeBg = 'rgba(148, 163, 184, 0.15)';
+          badgeColor = '#94a3b8';
+        }
+
+        const docTitle = doctorName && doctorName.trim()
+          ? doctorName.trim()
+          : (language === 'en' ? 'Doctor Appointment' : 'Doktor Randevusu');
+        const hospitalText = doctorHospital && doctorHospital.trim()
+          ? ` • ${doctorHospital.trim()}`
+          : (doctorSpecialty && doctorSpecialty.trim() ? ` • ${doctorSpecialty.trim()}` : '');
+
+        return (
+          <TouchableOpacity
+            style={styles.appointmentBanner}
+            onPress={() => {
+              triggerHaptic();
+              onNavigateDoctorProfile?.();
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.appointmentBannerLeft}>
+              <View style={styles.appointmentBannerIconWrap}>
+                <Ionicons name="calendar" size={18} color="#a9dfca" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  <Text style={styles.appointmentBannerTitle} numberOfLines={1}>
+                    {docTitle}
+                  </Text>
+                  {hospitalText ? (
+                    <Text style={styles.appointmentBannerSub} numberOfLines={1}>
+                      {hospitalText}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <Text style={styles.appointmentBannerDate}>
+                    {formatLocalizedDate(doctorNextAppointment, language)}
+                  </Text>
+                  <View style={styles.appointmentBannerTimeBadge}>
+                    <Text style={styles.appointmentBannerTimeText}>⏰ {timeText}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+            <View style={[styles.appointmentBannerDaysBadge, { backgroundColor: badgeBg }]}>
+              <Text style={[styles.appointmentBannerDaysText, { color: badgeColor }]}>{badgeText}</Text>
+              <Ionicons name="chevron-forward" size={12} color={badgeColor} style={{ marginLeft: 3 }} />
+            </View>
+          </TouchableOpacity>
+        );
+      })() : null}
 
       {/* Next Dose Hero Carousel */}
       {carouselSlots.length > 0 ? (
@@ -540,5 +629,69 @@ const styles = StyleSheet.create({
     backgroundColor: '#101d29',
     borderRadius: 10,
     paddingHorizontal: 12,
+  },
+  appointmentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#101d29',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(169, 223, 202, 0.25)',
+  },
+  appointmentBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  appointmentBannerIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(169, 223, 202, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appointmentBannerTitle: {
+    color: '#f5f3f0',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  appointmentBannerSub: {
+    color: '#a9dfca',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  appointmentBannerDate: {
+    color: '#adb3bf',
+    fontSize: 12,
+  },
+  appointmentBannerTimeBadge: {
+    backgroundColor: 'rgba(169, 223, 202, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(169, 223, 202, 0.3)',
+  },
+  appointmentBannerTimeText: {
+    color: '#a9dfca',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  appointmentBannerDaysBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  appointmentBannerDaysText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

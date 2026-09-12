@@ -594,7 +594,7 @@ const DEFAULT_SETTINGS: PrototypeSettings = {
   doctorHospital: '',
   doctorPhone: '',
   doctorNextAppointment: '',
-  doctorAppointmentTime: '09:00',
+  doctorAppointmentTime: '13:00',
   doctorApptLeadOptions: ['1d', '0d'],
   doctorBloodTestDate: '',
   doctorNotes: '',
@@ -821,7 +821,7 @@ function InnerPrototype() {
   const [doctorHospital, setDoctorHospital] = useState<string>(storedSettings.doctorHospital || '');
   const [doctorPhone, setDoctorPhone] = useState<string>(storedSettings.doctorPhone || '');
   const [doctorNextAppointment, setDoctorNextAppointment] = useState<string>(storedSettings.doctorNextAppointment || '');
-  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState<string>(storedSettings.doctorAppointmentTime || '09:00');
+  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState<string>(storedSettings.doctorAppointmentTime === '09:00' ? '13:00' : (storedSettings.doctorAppointmentTime || '13:00'));
   const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(storedSettings.doctorApptLeadOptions || ['1d', '0d']);
   const [doctorBloodTestDate, setDoctorBloodTestDate] = useState<string>(storedSettings.doctorBloodTestDate || '');
   const [doctorNotes, setDoctorNotes] = useState<string>(storedSettings.doctorNotes || '');
@@ -1318,7 +1318,7 @@ function InnerPrototype() {
       setDoctorHospital(snapshot.settings.doctorHospital || '');
       setDoctorPhone(snapshot.settings.doctorPhone || '');
       setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
-      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '09:00');
+      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '13:00');
       if (snapshot.settings.doctorApptLeadOptions) {
         try {
           const opts = typeof snapshot.settings.doctorApptLeadOptions === 'string'
@@ -2294,6 +2294,61 @@ function InnerPrototype() {
               </div>
               <span className="status-pill-action">{language === 'en' ? 'Battery / Permissions →' : 'Pil / İzinler →'}</span>
             </div>
+
+            {doctorNextAppointment && (() => {
+              const diff = Math.round((new Date(doctorNextAppointment).getTime() - new Date(today).getTime()) / 86400000);
+              let badgeText = '';
+              if (diff === 0) { badgeText = language === 'en' ? 'Today' : 'Bugün'; }
+              else if (diff === 1) { badgeText = language === 'en' ? 'Tomorrow' : 'Yarın'; }
+              else if (diff > 1) { badgeText = language === 'en' ? `in ${diff} days` : `${diff} gün kaldı`; }
+              else { badgeText = language === 'en' ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`; }
+
+              const docTitle = doctorName && doctorName.trim() ? doctorName.trim() : (language === 'en' ? 'Doctor Appointment' : 'Doktor Randevusu');
+              const hospText = doctorHospital && doctorHospital.trim() ? ` • ${doctorHospital.trim()}` : (doctorSpecialty ? ` • ${doctorSpecialty.trim()}` : '');
+
+              return (
+                <div
+                  className="proto-appointment-banner"
+                  onClick={() => {
+                    setTab('Ayarlar');
+                    setSettingsSubPage('profile');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#101d29',
+                    border: '1px solid rgba(169, 223, 202, 0.25)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    marginBottom: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, marginRight: '8px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '18px', background: 'rgba(169, 223, 202, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9dfca' }}>
+                      <CalendarDots size={20} weight="bold" />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 700 }}>{docTitle}</span>
+                        {hospText && <span style={{ color: '#a9dfca', fontSize: '12px', fontWeight: 500 }}>{hospText}</span>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <span style={{ color: '#adb3bf', fontSize: '12px' }}>{doctorNextAppointment}</span>
+                        <span style={{ background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(169, 223, 202, 0.3)' }}>
+                          ⏰ {doctorAppointmentTime || '13:00'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '8px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '11px', fontWeight: 700 }}>
+                    <span>{badgeText}</span>
+                    <CaretRight size={12} weight="bold" />
+                  </div>
+                </div>
+              );
+            })()}
 
             {nextSlot ? <section className="next-dose" aria-label="Sıradaki ilaç">
               <p className="eyebrow">{t.nextDose.toUpperCase()}</p>

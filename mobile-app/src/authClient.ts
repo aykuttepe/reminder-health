@@ -8,7 +8,11 @@ function base(url:string){return new URL(url).origin;}
 export async function authRequest(url:string,endpoint:string,body?:any,session?:Session):Promise<any>{
   const origin=base(url),stored=await SecureStore.getItemAsync(key);
   const saved=stored?JSON.parse(stored):null;
-  const token=session?.token||(saved?.origin===origin?saved.session.token:undefined);
+  const token=session?.token||(saved?.origin===origin?saved.session.token:(saved?.session?.token?saved.session.token:undefined));
+  if(saved&&saved.origin!==origin&&saved.session?.token){
+    saved.origin=origin;
+    SecureStore.setItemAsync(key,JSON.stringify(saved),{keychainAccessible:SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY}).catch(()=>{});
+  }
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
   try{
     const res=await fetch(`${origin}${endpoint}`,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});

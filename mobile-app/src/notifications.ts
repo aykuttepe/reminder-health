@@ -1077,7 +1077,7 @@ export function syncDoctorAppointmentNotifications(
 
       const {
         appointmentDate,
-        appointmentTime = '09:00',
+        appointmentTime = '13:00',
         leadOptions = ['1d'],
         bloodTestDate,
         doctorName = '',
