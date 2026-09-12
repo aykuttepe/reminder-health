@@ -2485,22 +2485,23 @@ function MainApp() {
                 let badgeText = '';
                 let badgeTextColor = '#34d399';
                 let badgeBg = 'rgba(52, 211, 153, 0.15)';
+                const timeSuffix = doctorAppointmentTime ? ` • ⏰ ${doctorAppointmentTime}` : '';
 
                 if (appointmentDiff !== null) {
                   if (appointmentDiff === 0) {
-                    badgeText = t.doctorAppointmentToday;
+                    badgeText = `${t.doctorAppointmentToday}${timeSuffix}`;
                     badgeTextColor = '#fbbf24';
                     badgeBg = 'rgba(251, 191, 36, 0.2)';
                   } else if (appointmentDiff === 1) {
-                    badgeText = `${t.doctorAppointmentTomorrow} (${formatLocalizedDate(doctorNextAppointment, language)})`;
+                    badgeText = `${t.doctorAppointmentTomorrow} (${formatLocalizedDate(doctorNextAppointment, language)})${timeSuffix}`;
                     badgeTextColor = '#34d399';
                     badgeBg = 'rgba(52, 211, 153, 0.18)';
                   } else if (appointmentDiff > 1) {
-                    badgeText = `${appointmentDiff} ${t.doctorAppointmentDaysLeft} (${formatLocalizedDate(doctorNextAppointment, language)})`;
+                    badgeText = `${appointmentDiff} ${t.doctorAppointmentDaysLeft} (${formatLocalizedDate(doctorNextAppointment, language)})${timeSuffix}`;
                     badgeTextColor = '#38bdf8';
                     badgeBg = 'rgba(56, 189, 248, 0.18)';
                   } else {
-                    badgeText = `${Math.abs(appointmentDiff)} ${t.doctorAppointmentDaysAgo} (${formatLocalizedDate(doctorNextAppointment, language)})`;
+                    badgeText = `${Math.abs(appointmentDiff)} ${t.doctorAppointmentDaysAgo} (${formatLocalizedDate(doctorNextAppointment, language)})${timeSuffix}`;
                     badgeTextColor = '#94a3b8';
                     badgeBg = 'rgba(148, 163, 184, 0.15)';
                   }
@@ -2657,12 +2658,19 @@ function MainApp() {
                         activeOpacity={0.7}
                       >
                         <View style={styles.appointmentRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                             <Ionicons name="calendar" size={18} color="#a9dfca" />
                             <Text style={doctorNextAppointment ? styles.appointmentDateText : styles.appointmentPlaceholder}>
                               {doctorNextAppointment ? formatLocalizedDate(doctorNextAppointment, language) : t.doctorSelectAppointment}
                             </Text>
                           </View>
+                          {doctorNextAppointment && doctorAppointmentTime ? (
+                            <View style={{ backgroundColor: 'rgba(169, 223, 202, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 6, borderWidth: 1, borderColor: 'rgba(169, 223, 202, 0.3)' }}>
+                              <Text style={{ color: '#a9dfca', fontSize: 13, fontWeight: '700' }}>
+                                ⏰ {doctorAppointmentTime}
+                              </Text>
+                            </View>
+                          ) : null}
                           <Ionicons name="chevron-forward" size={16} color="#5c6e80" />
                         </View>
 
@@ -2679,7 +2687,7 @@ function MainApp() {
                         <>
                           {/* Randevu Saati Seçimi */}
                           <View style={{ marginTop: 14 }}>
-                            <Text style={styles.profileFieldLabel}>{t.doctorAppointmentTimeLabel}</Text>
+                            <Text style={styles.profileFieldLabel}>{t.doctorAppointmentTimeLabel} ({doctorAppointmentTime})</Text>
                             <TimeSlotPicker
                               slotTime={doctorAppointmentTime}
                               onChange={val => {

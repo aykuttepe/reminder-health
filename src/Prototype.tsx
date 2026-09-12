@@ -2784,16 +2784,17 @@ function InnerPrototype() {
                 {settingsSubPage === 'profile' && (() => {
                   let badgeText = '';
                   let badgeClass = 'mint';
+                  const timeSuffix = doctorAppointmentTime ? ` • ⏰ ${doctorAppointmentTime}` : '';
                   if (doctorNextAppointment) {
                     const diff = Math.round((new Date(doctorNextAppointment).getTime() - new Date(today).getTime()) / 86400000);
                     if (diff === 0) {
-                      badgeText = t.doctorAppointmentToday;
+                      badgeText = `${t.doctorAppointmentToday}${timeSuffix}`;
                       badgeClass = 'warning';
                     } else if (diff === 1) {
-                      badgeText = `${t.doctorAppointmentTomorrow} (${doctorNextAppointment})`;
+                      badgeText = `${t.doctorAppointmentTomorrow} (${doctorNextAppointment})${timeSuffix}`;
                       badgeClass = 'mint';
                     } else if (diff > 1) {
-                      badgeText = `${diff} ${t.doctorAppointmentDaysLeft} (${doctorNextAppointment})`;
+                      badgeText = `${diff} ${t.doctorAppointmentDaysLeft} (${doctorNextAppointment})${timeSuffix}`;
                       badgeClass = 'info';
                     }
                   }
@@ -2961,7 +2962,7 @@ function InnerPrototype() {
                         {doctorNextAppointment && (
                           <>
                             <div style={{ marginTop: '12px' }}>
-                              <label className="field-sub-label">{t.doctorAppointmentTimeLabel}</label>
+                              <label className="field-sub-label">{t.doctorAppointmentTimeLabel} ({doctorAppointmentTime})</label>
                               <input
                                 type="time"
                                 className="appointment-date-input"
