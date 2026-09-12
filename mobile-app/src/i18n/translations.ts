@@ -111,6 +111,35 @@ export interface Translations {
   settings: string;
   settingsProfile: string;
   settingsProfileDesc: string;
+  profileUserSection: string;
+  userNameLabel: string;
+  userNameDesc: string;
+  userNamePlaceholder: string;
+  profileDoctorSection: string;
+  doctorNameLabel: string;
+  doctorNamePlaceholder: string;
+  doctorSpecialtyLabel: string;
+  doctorSpecialtyPlaceholder: string;
+  doctorHospitalLabel: string;
+  doctorHospitalPlaceholder: string;
+  doctorPhoneLabel: string;
+  doctorPhonePlaceholder: string;
+  doctorCallButton: string;
+  doctorAppointmentSection: string;
+  doctorAppointmentLabel: string;
+  doctorSelectAppointment: string;
+  doctorClearAppointment: string;
+  doctorAppointmentToday: string;
+  doctorAppointmentTomorrow: string;
+  doctorAppointmentDaysLeft: string;
+  doctorAppointmentDaysAgo: string;
+  doctorNotesSection: string;
+  doctorNotesPlaceholder: string;
+  doctorShareMedList: string;
+  doctorShareSubject: string;
+  doctorShareActiveMeds: string;
+  doctorShareNoMeds: string;
+  profileSavedToast: string;
   settingsNotifications: string;
   settingsNotificationsDesc: string;
   settingsReminders: string;
@@ -308,7 +337,36 @@ export const translations: Record<Language, Translations> = {
     // Settings Menu
     settings: 'Ayarlar',
     settingsProfile: 'Kullanıcı Profili',
-    settingsProfileDesc: 'İsim ve hitap tercihlerini düzenleyin',
+    settingsProfileDesc: 'Profil, hekim ve hastane bilgileri',
+    profileUserSection: 'KULLANICI BİLGİSİ',
+    userNameLabel: 'Kullanıcı İsmi / Hitap',
+    userNameDesc: 'Ana ekranda ve bildirimlerde size nasıl hitap edileceğini belirleyin',
+    userNamePlaceholder: 'Adınızı giriniz...',
+    profileDoctorSection: 'TAKİP EDEN HEKİM & KLİNİK',
+    doctorNameLabel: 'Doktor Adı / Ünvanı',
+    doctorNamePlaceholder: 'Örn. Prof. Dr. Ahmet Yılmaz',
+    doctorSpecialtyLabel: 'Uzmanlık / Branş',
+    doctorSpecialtyPlaceholder: 'Örn. Nefroloji / Organ Nakli',
+    doctorHospitalLabel: 'Hastane / Klinik',
+    doctorHospitalPlaceholder: 'Örn. Şehir Hastanesi, Acıbadem',
+    doctorPhoneLabel: 'İletişim / Telefon',
+    doctorPhonePlaceholder: 'Örn. 0532 123 45 67',
+    doctorCallButton: 'Doktoru Ara',
+    doctorAppointmentSection: 'RANDEVU & KONTROL',
+    doctorAppointmentLabel: 'Sonraki Randevu Tarihi',
+    doctorSelectAppointment: 'Randevu Tarihi Seçin',
+    doctorClearAppointment: 'Randevuyu Temizle',
+    doctorAppointmentToday: 'Bugün randevunuz var!',
+    doctorAppointmentTomorrow: 'Yarın',
+    doctorAppointmentDaysLeft: 'gün kaldı',
+    doctorAppointmentDaysAgo: 'gün önceydi',
+    doctorNotesSection: 'DOKTOR NOTU & TALİMATLAR',
+    doctorNotesPlaceholder: 'Örn. Tansiyon 14\'ü geçerse haber ver, tuzsuz diyet, kan tahlili aç karnına...',
+    doctorShareMedList: 'İlaç Listesini Hekimle Paylaş',
+    doctorShareSubject: 'İlaç ve Tedavi Listesi',
+    doctorShareActiveMeds: 'Kullanılan İlaçlar',
+    doctorShareNoMeds: 'Kayıtlı aktif ilaç bulunmuyor.',
+    profileSavedToast: 'Profil ve hekim bilgileri güncellendi',
     settingsNotifications: 'Bildirim ve Ses Ayarları',
     settingsNotificationsDesc: 'Zil sesleri, kilit ekranı ve tekrar alarmları',
     settingsReminders: 'Hatırlatıcı & Erteleme',
@@ -505,7 +563,36 @@ export const translations: Record<Language, Translations> = {
     // Settings Menu
     settings: 'Settings',
     settingsProfile: 'User Profile',
-    settingsProfileDesc: 'Manage your name and greetings',
+    settingsProfileDesc: 'Manage profile, doctor and clinic details',
+    profileUserSection: 'USER INFO',
+    userNameLabel: 'User Name / Greeting',
+    userNameDesc: 'Set how you are greeted on the home screen and in notifications',
+    userNamePlaceholder: 'Enter your name...',
+    profileDoctorSection: 'PRIMARY DOCTOR & CLINIC',
+    doctorNameLabel: 'Doctor Name & Title',
+    doctorNamePlaceholder: 'e.g. Prof. Dr. John Smith',
+    doctorSpecialtyLabel: 'Specialty / Department',
+    doctorSpecialtyPlaceholder: 'e.g. Nephrology / Transplant',
+    doctorHospitalLabel: 'Hospital / Clinic',
+    doctorHospitalPlaceholder: 'e.g. City Hospital, Mayo Clinic',
+    doctorPhoneLabel: 'Contact Phone',
+    doctorPhonePlaceholder: 'e.g. +1 555 123 4567',
+    doctorCallButton: 'Call Doctor',
+    doctorAppointmentSection: 'APPOINTMENT & CHECKUP',
+    doctorAppointmentLabel: 'Next Appointment Date',
+    doctorSelectAppointment: 'Select Appointment Date',
+    doctorClearAppointment: 'Clear Appointment',
+    doctorAppointmentToday: 'You have an appointment today!',
+    doctorAppointmentTomorrow: 'Tomorrow',
+    doctorAppointmentDaysLeft: 'days left',
+    doctorAppointmentDaysAgo: 'days ago',
+    doctorNotesSection: 'DOCTOR NOTES & INSTRUCTIONS',
+    doctorNotesPlaceholder: 'e.g. Report if BP > 140, low salt diet, fasting blood test...',
+    doctorShareMedList: 'Share Medication List with Doctor',
+    doctorShareSubject: 'Medication & Treatment List',
+    doctorShareActiveMeds: 'Active Medications',
+    doctorShareNoMeds: 'No active medications recorded.',
+    profileSavedToast: 'Profile and doctor details updated',
     settingsNotifications: 'Notification & Sound Settings',
     settingsNotificationsDesc: 'Ringtones, lock screen, and repeat alarms',
     settingsReminders: 'Reminders & Snooze',

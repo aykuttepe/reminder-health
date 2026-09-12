@@ -1,7 +1,7 @@
 import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, type Session, type Snapshot} from './account';
 import {login, recover, registerAccount, updateUserEmail, getStoredSyncCode, getSession, logout, authRequest, localStore, isSameServer} from './authClient';
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple, Bug, Globe } from '@phosphor-icons/react';
+import { Bell, CalendarDots, Pill, ClockCounterClockwise, GearSix, Check, CheckCircle, Clock, Prohibit, CaretRight, ClipboardText, Plus, ArrowLeft, PencilSimple, X, Moon, ShieldCheck, ArrowCounterClockwise, Trash, TrendUp, ForkKnife, Drop, Flask, Package, Warning, ArrowsClockwise, SpeakerHigh, SpeakerSlash, User, Eye, EyeSlash, Play, Shield, SlidersHorizontal, Barcode, Camera, CloudArrowUp, WifiHigh, DownloadSimple, UploadSimple, Bug, Globe, Phone, FirstAid, ShareNetwork, Buildings } from '@phosphor-icons/react';
 import { BottomSheet, KeyboardInput, MobileScroll, useKeyboard, useKeyboardInsets } from './mobile';
 import { parseITSKarekod } from './itsParser';
 import { findMedicineByGTIN, type CatalogMedicine } from './data/medCatalog';
@@ -472,10 +472,22 @@ export type PrototypeSettings = {
   exactAlarmEnabled: boolean;
   autoRescheduleOnBoot: boolean;
   wakeScreenOnAlarm: boolean;
+  doctorName?: string;
+  doctorSpecialty?: string;
+  doctorHospital?: string;
+  doctorPhone?: string;
+  doctorNextAppointment?: string;
+  doctorNotes?: string;
 };
 
 const DEFAULT_SETTINGS: PrototypeSettings = {
   userName: '',
+  doctorName: '',
+  doctorSpecialty: '',
+  doctorHospital: '',
+  doctorPhone: '',
+  doctorNextAppointment: '',
+  doctorNotes: '',
   notifications: true,
   soundEnabled: true,
   soundType: 'default',
@@ -597,6 +609,7 @@ function loadStoredSettings(): PrototypeSettings {
 }
 
 function InnerPrototype() {
+  const today = new Date().toISOString().slice(0, 10);
   const [language, setLanguage] = useState<Language>(loadStoredLanguage);
   const t = getTranslations(language);
 
@@ -690,6 +703,12 @@ function InnerPrototype() {
   // Settings states
   const [userName, setUserName] = useState<string>(storedSettings.userName);
   const [isEditingUserName, setIsEditingUserName] = useState(false);
+  const [doctorName, setDoctorName] = useState<string>(storedSettings.doctorName || '');
+  const [doctorSpecialty, setDoctorSpecialty] = useState<string>(storedSettings.doctorSpecialty || '');
+  const [doctorHospital, setDoctorHospital] = useState<string>(storedSettings.doctorHospital || '');
+  const [doctorPhone, setDoctorPhone] = useState<string>(storedSettings.doctorPhone || '');
+  const [doctorNextAppointment, setDoctorNextAppointment] = useState<string>(storedSettings.doctorNextAppointment || '');
+  const [doctorNotes, setDoctorNotes] = useState<string>(storedSettings.doctorNotes || '');
   const [privateMode, setPrivateMode] = useState<boolean>(storedSettings.privateMode);
   const [largeText, setLargeText] = useState<boolean>(storedSettings.largeText);
   const [notifications, setNotifications] = useState<boolean>(storedSettings.notifications);
@@ -791,6 +810,12 @@ function InnerPrototype() {
     try {
       const currentSettings: PrototypeSettings = {
         userName,
+        doctorName,
+        doctorSpecialty,
+        doctorHospital,
+        doctorPhone,
+        doctorNextAppointment,
+        doctorNotes,
         notifications,
         soundEnabled,
         soundType,
@@ -816,6 +841,12 @@ function InnerPrototype() {
     }
   }, [
     userName,
+    doctorName,
+    doctorSpecialty,
+    doctorHospital,
+    doctorPhone,
+    doctorNextAppointment,
+    doctorNotes,
     notifications,
     soundEnabled,
     soundType,
@@ -1139,7 +1170,7 @@ function InnerPrototype() {
 
   // Sync Action Handlers
 
-  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, notifications, soundEnabled, soundType, snoozeMinutes}});
+  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, doctorName, doctorSpecialty, doctorHospital, doctorPhone, doctorNextAppointment, doctorNotes, notifications, soundEnabled, soundType, snoozeMinutes}});
   const bindAccount = async (next: Session) => {
     switchingAccount.current = true;
     try {
@@ -1150,6 +1181,12 @@ function InnerPrototype() {
       setDoses(snapshot.doses);
       setLearnedMeds(snapshot.learnedMeds);
       setUserName(snapshot.settings.userName || '');
+      setDoctorName(snapshot.settings.doctorName || '');
+      setDoctorSpecialty(snapshot.settings.doctorSpecialty || '');
+      setDoctorHospital(snapshot.settings.doctorHospital || '');
+      setDoctorPhone(snapshot.settings.doctorPhone || '');
+      setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
+      setDoctorNotes(snapshot.settings.doctorNotes || '');
       setNotifications(snapshot.settings.notifications ?? true);
       setSoundEnabled(snapshot.settings.soundEnabled ?? true);
       setSoundType(snapshot.settings.soundType || 'default');
@@ -1284,6 +1321,12 @@ function InnerPrototype() {
         learnedMeds,
         settings: {
           userName,
+          doctorName,
+          doctorSpecialty,
+          doctorHospital,
+          doctorPhone,
+          doctorNextAppointment,
+          doctorNotes,
           notifications,
           soundEnabled,
           soundType,
@@ -1296,6 +1339,15 @@ function InnerPrototype() {
         setDoses(merged);
         if (response.learnedMeds) {
           setLearnedMeds(prev => ({ ...prev, ...response.learnedMeds }));
+        }
+        if (response.settings) {
+          if (response.settings.userName) setUserName(response.settings.userName);
+          if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
+          if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
+          if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
+          if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
+          if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
+          if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
         }
         const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncAt(nowStr);
@@ -1317,6 +1369,64 @@ function InnerPrototype() {
     }
   };
 
+  const syncProfileSettings = () => {
+    if (session) {
+      authRequest(serverUrl, '/api/sync', {
+        settings: {
+          userName: userName.trim(),
+          doctorName: doctorName.trim(),
+          doctorSpecialty: doctorSpecialty.trim(),
+          doctorHospital: doctorHospital.trim(),
+          doctorPhone: doctorPhone.trim(),
+          doctorNextAppointment,
+          doctorNotes: doctorNotes.trim(),
+        }
+      }, session).catch(() => {});
+    }
+  };
+
+  const handleShareMedList = () => {
+    const activeMeds = doses.filter(d => !d.paused);
+    let text = `📋 ${t.doctorShareSubject}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    if (userName.trim()) text += `👤 ${language === 'en' ? 'Patient' : 'Hasta'}: ${userName.trim()}\n`;
+    if (doctorName.trim()) text += `👨‍⚕️ ${t.doctorNameLabel}: ${doctorName.trim()}\n`;
+    if (doctorSpecialty.trim()) text += `🩺 ${t.doctorSpecialtyLabel}: ${doctorSpecialty.trim()}\n`;
+    if (doctorHospital.trim()) text += `🏥 ${t.doctorHospitalLabel}: ${doctorHospital.trim()}\n`;
+    text += `📅 ${language === 'en' ? 'Date' : 'Tarih'}: ${today}\n\n`;
+
+    text += `💊 ${t.doctorShareActiveMeds} (${activeMeds.length}):\n`;
+    if (activeMeds.length === 0) {
+      text += `  • ${t.doctorShareNoMeds}\n`;
+    } else {
+      activeMeds.forEach((m, idx) => {
+        const times = Array.isArray(m.times) && m.times.length > 0 ? m.times.join(', ') : (m.time || '-');
+        const meal = mealLabels[m.mealCondition ?? 'tok'];
+        const stockInfo = m.stock !== undefined ? ` [${language === 'en' ? 'Stock' : 'Stok'}: ${m.stock}]` : '';
+        text += `${idx + 1}. ${m.name} (${m.amount || '1 doz'})\n`;
+        text += `   ⏰ ${times} · ${meal}${stockInfo}\n`;
+        if (m.instructions) text += `   ℹ️ ${m.instructions}\n`;
+      });
+    }
+
+    if (doctorNextAppointment) {
+      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${doctorNextAppointment}\n`;
+    }
+    if (doctorNotes.trim()) {
+      text += `\n📝 ${t.doctorNotesSection}:\n${doctorNotes.trim()}\n`;
+    }
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setToast({ text: t.doctorShareSubject + ' panoya kopyalandı' });
+      }).catch(() => {
+        setToast({ text: 'Paylaşım panoya kopyalanamadı' });
+      });
+    } else {
+      setToast({ text: t.doctorShareSubject + ' hazırlandı' });
+    }
+  };
+
   const handleExportBackup = () => {
     keyboard.hide();
     const backup = createBackupPayload({
@@ -1324,6 +1434,12 @@ function InnerPrototype() {
       doses,
       settings: {
         userName,
+        doctorName,
+        doctorSpecialty,
+        doctorHospital,
+        doctorPhone,
+        doctorNextAppointment,
+        doctorNotes,
         notifications,
         soundEnabled,
         soundType,
@@ -1456,6 +1572,12 @@ function InnerPrototype() {
     setDoses(initial);
     setLearnedMeds({});
     setUserName(DEFAULT_SETTINGS.userName);
+    setDoctorName(DEFAULT_SETTINGS.doctorName || '');
+    setDoctorSpecialty(DEFAULT_SETTINGS.doctorSpecialty || '');
+    setDoctorHospital(DEFAULT_SETTINGS.doctorHospital || '');
+    setDoctorPhone(DEFAULT_SETTINGS.doctorPhone || '');
+    setDoctorNextAppointment(DEFAULT_SETTINGS.doctorNextAppointment || '');
+    setDoctorNotes(DEFAULT_SETTINGS.doctorNotes || '');
     setPrivateMode(DEFAULT_SETTINGS.privateMode);
     setLargeText(DEFAULT_SETTINGS.largeText);
     setNotifications(DEFAULT_SETTINGS.notifications);
@@ -2171,7 +2293,7 @@ function InnerPrototype() {
                         </div>
                         <div className="settings-menu-text">
                           <span className="settings-menu-title">{t.settingsProfile}</span>
-                          <span className="settings-menu-desc">{userName ? `${language === 'en' ? 'Name:' : 'Hitap:'} ${userName}` : (language === 'en' ? 'Configure name & greeting preferences' : 'İsim ve hitap tercihlerini düzenleyin')}</span>
+                          <span className="settings-menu-desc">{userName ? (doctorName ? `${userName} • ${doctorName}` : `${language === 'en' ? 'Name:' : 'Hitap:'} ${userName}`) : (doctorName ? doctorName : t.settingsProfileDesc)}</span>
                         </div>
                         <CaretRight size={18} className="settings-menu-arrow" />
                       </button>
@@ -2315,35 +2437,211 @@ function InnerPrototype() {
                   </>
                 )}
 
-                {/* SUB PAGE 1: KULLANICI PROFİLİ */}
-                {settingsSubPage === 'profile' && (
-                  <div className="profile-setting-card">
-                    <div className="profile-icon"><User size={24} weight="bold" /></div>
-                    <div className="profile-info">
-                      {isEditingUserName ? (
-                        <form onSubmit={(e) => { e.preventDefault(); setIsEditingUserName(false); }} className="profile-edit-form">
-                          <KeyboardInput
-                            value={userName}
-                            onChange={(e) => setUserName(e.target.value)}
-                            placeholder="Adınız"
-                            autoFocus
-                          />
-                          <button type="submit" className="profile-save-btn" aria-label="Kaydet"><Check size={16} /></button>
-                        </form>
-                      ) : (
-                        <div className="profile-display" onClick={() => setIsEditingUserName(true)}>
-                          <strong>{userName || 'Kullanıcı'}</strong>
-                          <small>Hitap adınızı düzenlemek için dokunun</small>
+                {/* SUB PAGE 1: KULLANICI & HEKİM PROFİLİ */}
+                {settingsSubPage === 'profile' && (() => {
+                  let badgeText = '';
+                  let badgeClass = 'mint';
+                  if (doctorNextAppointment) {
+                    const diff = Math.round((new Date(doctorNextAppointment).getTime() - new Date(today).getTime()) / 86400000);
+                    if (diff === 0) {
+                      badgeText = t.doctorAppointmentToday;
+                      badgeClass = 'warning';
+                    } else if (diff === 1) {
+                      badgeText = `${t.doctorAppointmentTomorrow} (${doctorNextAppointment})`;
+                      badgeClass = 'mint';
+                    } else if (diff > 1) {
+                      badgeText = `${diff} ${t.doctorAppointmentDaysLeft} (${doctorNextAppointment})`;
+                      badgeClass = 'info';
+                    } else {
+                      badgeText = `${Math.abs(diff)} ${t.doctorAppointmentDaysAgo} (${doctorNextAppointment})`;
+                      badgeClass = 'muted';
+                    }
+                  }
+
+                  return (
+                    <div className="profile-detail-view">
+                      {/* 1. Kullanıcı Bilgisi */}
+                      <div className="settings-section-head">
+                        <User size={18} weight="bold" className="settings-section-icon" />
+                        <h4>{t.profileUserSection}</h4>
+                      </div>
+                      <div className="settings-detail-card">
+                        <div className="profile-edit-field">
+                          <label>{t.userNameLabel}</label>
+                          <small>{t.userNameDesc}</small>
+                          <div className="profile-input-box">
+                            <User size={18} className="field-icon" />
+                            <KeyboardInput
+                              value={userName}
+                              onChange={(e) => setUserName(e.target.value)}
+                              placeholder={t.userNamePlaceholder}
+                              onBlur={syncProfileSettings}
+                            />
+                            {userName.trim() && (
+                              <button
+                                type="button"
+                                className="profile-mini-save"
+                                onClick={() => {
+                                  syncProfileSettings();
+                                  setToast({ text: `İsim "${userName}" olarak güncellendi` });
+                                }}
+                              >
+                                <Check size={16} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      </div>
+
+                      {/* 2. Takip Eden Hekim & Klinik */}
+                      <div className="settings-section-head" style={{ marginTop: '20px' }}>
+                        <FirstAid size={18} weight="bold" className="settings-section-icon" />
+                        <h4>{t.profileDoctorSection}</h4>
+                      </div>
+                      <div className="settings-detail-card">
+                        <div className="profile-edit-field">
+                          <label>{t.doctorNameLabel}</label>
+                          <div className="profile-input-box">
+                            <User size={18} className="field-icon" />
+                            <KeyboardInput
+                              value={doctorName}
+                              onChange={(e) => setDoctorName(e.target.value)}
+                              placeholder={t.doctorNamePlaceholder}
+                              onBlur={syncProfileSettings}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="profile-edit-field" style={{ marginTop: '12px' }}>
+                          <label>{t.doctorSpecialtyLabel}</label>
+                          <div className="profile-input-box">
+                            <Pill size={18} className="field-icon" />
+                            <KeyboardInput
+                              value={doctorSpecialty}
+                              onChange={(e) => setDoctorSpecialty(e.target.value)}
+                              placeholder={t.doctorSpecialtyPlaceholder}
+                              onBlur={syncProfileSettings}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="profile-edit-field" style={{ marginTop: '12px' }}>
+                          <label>{t.doctorHospitalLabel}</label>
+                          <div className="profile-input-box">
+                            <Buildings size={18} className="field-icon" />
+                            <KeyboardInput
+                              value={doctorHospital}
+                              onChange={(e) => setDoctorHospital(e.target.value)}
+                              placeholder={t.doctorHospitalPlaceholder}
+                              onBlur={syncProfileSettings}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="profile-edit-field" style={{ marginTop: '12px' }}>
+                          <label>{t.doctorPhoneLabel}</label>
+                          <div className="profile-input-box">
+                            <Phone size={18} className="field-icon" />
+                            <KeyboardInput
+                              value={doctorPhone}
+                              onChange={(e) => setDoctorPhone(e.target.value)}
+                              placeholder={t.doctorPhonePlaceholder}
+                              type="tel"
+                              onBlur={syncProfileSettings}
+                            />
+                          </div>
+                          {doctorPhone.trim() && (
+                            <a
+                              href={`tel:${doctorPhone.replace(/[^0-9+]/g, '')}`}
+                              className="doctor-call-button"
+                            >
+                              <Phone size={16} weight="fill" />
+                              <span>{language === 'en' ? `Call ${doctorName || 'Doctor'}` : `${doctorName || 'Doktor'}'u Ara`}</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. Randevu & Kontrol */}
+                      <div className="settings-section-head" style={{ marginTop: '20px' }}>
+                        <CalendarDots size={18} weight="bold" className="settings-section-icon" />
+                        <h4>{t.doctorAppointmentSection}</h4>
+                      </div>
+                      <div className="settings-detail-card">
+                        <label className="field-sub-label">{t.doctorAppointmentLabel}</label>
+                        <div className="appointment-picker-row">
+                          <input
+                            type="date"
+                            className="appointment-date-input"
+                            value={doctorNextAppointment}
+                            onChange={(e) => {
+                              setDoctorNextAppointment(e.target.value);
+                              syncProfileSettings();
+                            }}
+                          />
+                          {doctorNextAppointment && (
+                            <button
+                              type="button"
+                              className="appointment-clear-btn"
+                              onClick={() => {
+                                setDoctorNextAppointment('');
+                                syncProfileSettings();
+                              }}
+                              title={t.doctorClearAppointment}
+                            >
+                              <Trash size={16} />
+                            </button>
+                          )}
+                        </div>
+                        {badgeText && (
+                          <div className={`appointment-badge ${badgeClass}`}>
+                            <span>{badgeText}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4. Doktor Notları */}
+                      <div className="settings-section-head" style={{ marginTop: '20px' }}>
+                        <ClipboardText size={18} weight="bold" className="settings-section-icon" />
+                        <h4>{t.doctorNotesSection}</h4>
+                      </div>
+                      <div className="settings-detail-card">
+                        <textarea
+                          className="profile-notes-textarea"
+                          rows={3}
+                          value={doctorNotes}
+                          onChange={(e) => setDoctorNotes(e.target.value)}
+                          placeholder={t.doctorNotesPlaceholder}
+                          onBlur={syncProfileSettings}
+                        />
+                      </div>
+
+                      {/* 5. Butonlar */}
+                      <div className="profile-action-group">
+                        <button
+                          type="button"
+                          className="profile-action-btn share-btn"
+                          onClick={handleShareMedList}
+                        >
+                          <ShareNetwork size={18} weight="bold" />
+                          <span>{t.doctorShareMedList}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="profile-action-btn save-btn"
+                          onClick={() => {
+                            syncProfileSettings();
+                            setToast({ text: t.profileSavedToast });
+                          }}
+                        >
+                          <CheckCircle size={18} weight="bold" />
+                          <span>{language === 'en' ? 'Save Profile Details' : 'Bilgileri Kaydet'}</span>
+                        </button>
+                      </div>
                     </div>
-                    {!isEditingUserName && (
-                      <button className="icon-button" onClick={() => setIsEditingUserName(true)} aria-label="Adı düzenle">
-                        <PencilSimple size={18} />
-                      </button>
-                    )}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* SUB PAGE: DİL / LANGUAGE */}
                 {settingsSubPage === 'language' && (

@@ -99,7 +99,7 @@ import { getTranslations, type Language } from './src/i18n/translations';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
-  formatStock, getCycleInfo,
+  formatStock, getCycleInfo, getCalendarDayDiff,
   type MealCondition, type MedicineForm, type FrequencyType, type Dose, type ScheduledSlot,
 } from './src/medicationPlan';
 export * from './src/medicationPlan';
@@ -420,10 +420,10 @@ function MainApp() {
 
   // Modern Calendar Modal State
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate'>('startDate');
+  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate' | 'doctorNextAppointment'>('startDate');
   const [calendarTitle, setCalendarTitle] = useState('Tarih Seçin');
 
-  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate', title: string) => {
+  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate' | 'doctorNextAppointment', title: string) => {
     setCalendarTarget(target);
     setCalendarTitle(title);
     setCalendarOpen(true);
@@ -432,8 +432,10 @@ function MainApp() {
   const handleDateSelected = (selectedDateStr: string) => {
     if (calendarTarget === 'startDate') {
       setStartDate(selectedDateStr);
-    } else {
+    } else if (calendarTarget === 'cycleStartDate') {
       setCycleStartDate(selectedDateStr);
+    } else if (calendarTarget === 'doctorNextAppointment') {
+      setDoctorNextAppointment(selectedDateStr);
     }
   };
 
@@ -626,6 +628,12 @@ function MainApp() {
 
   // Customizable Feature States
   const [userName, setUserName] = useState('');
+  const [doctorName, setDoctorName] = useState('');
+  const [doctorSpecialty, setDoctorSpecialty] = useState('');
+  const [doctorHospital, setDoctorHospital] = useState('');
+  const [doctorPhone, setDoctorPhone] = useState('');
+  const [doctorNextAppointment, setDoctorNextAppointment] = useState('');
+  const [doctorNotes, setDoctorNotes] = useState('');
   const [snoozeMinutes, setSnoozeMinutes] = useState(15);
   const [leadTimeMinutes, setLeadTimeMinutes] = useState(0);
   const [defaultStockThreshold, setDefaultStockThreshold] = useState(5);
@@ -834,6 +842,12 @@ function MainApp() {
           if (parsed.soundEnabled !== undefined) setSoundEnabled(parsed.soundEnabled);
           if (parsed.soundType !== undefined) setSoundType(parsed.soundType);
           if (parsed.userName !== undefined) setUserName(parsed.userName);
+          if (parsed.doctorName !== undefined) setDoctorName(parsed.doctorName);
+          if (parsed.doctorSpecialty !== undefined) setDoctorSpecialty(parsed.doctorSpecialty);
+          if (parsed.doctorHospital !== undefined) setDoctorHospital(parsed.doctorHospital);
+          if (parsed.doctorPhone !== undefined) setDoctorPhone(parsed.doctorPhone);
+          if (parsed.doctorNextAppointment !== undefined) setDoctorNextAppointment(parsed.doctorNextAppointment);
+          if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
           if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
           if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
           if (parsed.defaultStockThreshold !== undefined) setDefaultStockThreshold(parsed.defaultStockThreshold);
@@ -904,6 +918,12 @@ function MainApp() {
         soundEnabled,
         soundType,
         userName,
+        doctorName,
+        doctorSpecialty,
+        doctorHospital,
+        doctorPhone,
+        doctorNextAppointment,
+        doctorNotes,
         snoozeMinutes,
         leadTimeMinutes,
         defaultStockThreshold,
@@ -927,6 +947,12 @@ function MainApp() {
     soundEnabled,
     soundType,
     userName,
+    doctorName,
+    doctorSpecialty,
+    doctorHospital,
+    doctorPhone,
+    doctorNextAppointment,
+    doctorNotes,
     snoozeMinutes,
     leadTimeMinutes,
     defaultStockThreshold,
@@ -1329,6 +1355,12 @@ function MainApp() {
     learnedMeds,
     settings: {
       userName,
+      doctorName,
+      doctorSpecialty,
+      doctorHospital,
+      doctorPhone,
+      doctorNextAppointment,
+      doctorNotes,
       notifications,
       soundEnabled,
       soundType,
@@ -1359,6 +1391,12 @@ function MainApp() {
       setLearnedMeds(snapshot.learnedMeds);
       const effectiveUserName = snapshot.settings.userName || (next.user?.name && next.user.name !== 'Kullanıcı' ? next.user.name : '');
       setUserName(effectiveUserName);
+      setDoctorName(snapshot.settings.doctorName || '');
+      setDoctorSpecialty(snapshot.settings.doctorSpecialty || '');
+      setDoctorHospital(snapshot.settings.doctorHospital || '');
+      setDoctorPhone(snapshot.settings.doctorPhone || '');
+      setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
+      setDoctorNotes(snapshot.settings.doctorNotes || '');
       if (snapshot.settings.notifications !== undefined) setNotifications(snapshot.settings.notifications);
       if (snapshot.settings.soundEnabled !== undefined) setSoundEnabled(snapshot.settings.soundEnabled);
       if (snapshot.settings.soundType !== undefined) setSoundType(snapshot.settings.soundType);
@@ -1404,6 +1442,12 @@ function MainApp() {
       if (userName && userName.trim()) {
         payloadSettings.userName = userName.trim();
       }
+      if (doctorName !== undefined) payloadSettings.doctorName = doctorName;
+      if (doctorSpecialty !== undefined) payloadSettings.doctorSpecialty = doctorSpecialty;
+      if (doctorHospital !== undefined) payloadSettings.doctorHospital = doctorHospital;
+      if (doctorPhone !== undefined) payloadSettings.doctorPhone = doctorPhone;
+      if (doctorNextAppointment !== undefined) payloadSettings.doctorNextAppointment = doctorNextAppointment;
+      if (doctorNotes !== undefined) payloadSettings.doctorNotes = doctorNotes;
 
       const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
@@ -1423,6 +1467,12 @@ function MainApp() {
           } else if (currentSession.user?.name && (!userName || !userName.trim())) {
             setUserName(currentSession.user.name);
           }
+          if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
+          if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
+          if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
+          if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
+          if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
+          if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
           if (response.settings.notifications !== undefined) setNotifications(response.settings.notifications);
           if (response.settings.soundEnabled !== undefined) setSoundEnabled(response.settings.soundEnabled);
           if (response.settings.soundType !== undefined) setSoundType(response.settings.soundType);
@@ -1588,6 +1638,85 @@ function MainApp() {
     await syncWithServer(session, true);
   };
 
+  const syncProfileSettings = () => {
+    if (session) {
+      authRequest(serverUrl, '/api/sync', {
+        settings: {
+          userName: userName.trim(),
+          doctorName: doctorName.trim(),
+          doctorSpecialty: doctorSpecialty.trim(),
+          doctorHospital: doctorHospital.trim(),
+          doctorPhone: doctorPhone.trim(),
+          doctorNextAppointment,
+          doctorNotes: doctorNotes.trim(),
+        }
+      }, session).catch(() => {});
+    }
+  };
+
+  const handleCallDoctor = () => {
+    triggerHaptic();
+    if (!doctorPhone.trim()) return;
+    const cleanPhone = doctorPhone.replace(/[^0-9+]/g, '');
+    if (!cleanPhone) {
+      Alert.alert(
+        language === 'en' ? 'Invalid Phone' : 'Geçersiz Numara',
+        language === 'en' ? 'Please enter a valid phone number.' : 'Lütfen geçerli bir telefon numarası girin.'
+      );
+      return;
+    }
+    Linking.openURL(`tel:${cleanPhone}`).catch(() => {
+      Alert.alert(
+        language === 'en' ? 'Error' : 'Hata',
+        language === 'en' ? 'Could not launch phone dialer.' : 'Arama başlatılamadı.'
+      );
+    });
+  };
+
+  const handleShareMedList = async () => {
+    triggerHaptic();
+    const activeMeds = doses.filter(d => !d.paused);
+    const dateStr = formatLocalizedDate(today, language);
+
+    let text = `📋 ${t.doctorShareSubject}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    if (userName.trim()) text += `👤 ${language === 'en' ? 'Patient' : 'Hasta'}: ${userName.trim()}\n`;
+    if (doctorName.trim()) text += `👨‍⚕️ ${t.doctorNameLabel}: ${doctorName.trim()}\n`;
+    if (doctorSpecialty.trim()) text += `🩺 ${t.doctorSpecialtyLabel}: ${doctorSpecialty.trim()}\n`;
+    if (doctorHospital.trim()) text += `🏥 ${t.doctorHospitalLabel}: ${doctorHospital.trim()}\n`;
+    text += `📅 ${language === 'en' ? 'Date' : 'Tarih'}: ${dateStr}\n\n`;
+
+    text += `💊 ${t.doctorShareActiveMeds} (${activeMeds.length}):\n`;
+    if (activeMeds.length === 0) {
+      text += `  • ${t.doctorShareNoMeds}\n`;
+    } else {
+      activeMeds.forEach((m, idx) => {
+        const times = Array.isArray(m.times) && m.times.length > 0 ? m.times.join(', ') : (m.time || '-');
+        const meal = getMealLabel(m.mealCondition);
+        const stockInfo = m.stock !== undefined ? ` [${language === 'en' ? 'Stock' : 'Stok'}: ${m.stock}]` : '';
+        text += `${idx + 1}. ${m.name} (${m.amount || '1 doz'})\n`;
+        text += `   ⏰ ${times} • ${meal}${stockInfo}\n`;
+        if (m.instructions) text += `   ℹ️ ${m.instructions}\n`;
+      });
+    }
+
+    if (doctorNextAppointment) {
+      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${formatLocalizedDate(doctorNextAppointment, language)}\n`;
+    }
+    if (doctorNotes.trim()) {
+      text += `\n📝 ${t.doctorNotesSection}:\n${doctorNotes.trim()}\n`;
+    }
+
+    try {
+      await Share.share({
+        title: t.doctorShareSubject,
+        message: text,
+      });
+    } catch (err) {
+      console.error('Failed to share medication list', err);
+    }
+  };
+
   const handleExportBackup = async () => {
     triggerHaptic();
     const backup = createBackupPayload({
@@ -1595,6 +1724,12 @@ function MainApp() {
       doses,
       settings: {
         userName,
+        doctorName,
+        doctorSpecialty,
+        doctorHospital,
+        doctorPhone,
+        doctorNextAppointment,
+        doctorNotes,
         notifications,
         soundEnabled,
         soundType,
@@ -1636,6 +1771,12 @@ function MainApp() {
             setSoundEnabled(true);
             setSoundType('default');
             setUserName('');
+            setDoctorName('');
+            setDoctorSpecialty('');
+            setDoctorHospital('');
+            setDoctorPhone('');
+            setDoctorNextAppointment('');
+            setDoctorNotes('');
             setSnoozeMinutes(15);
             setLeadTimeMinutes(0);
             setDefaultStockThreshold(5);
@@ -1910,7 +2051,11 @@ function MainApp() {
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsProfile}</Text>
-                        <Text style={styles.menuItemSub}>{userName ? (language === 'en' ? `Name: ${userName}` : `Hitap: ${userName}`) : t.settingsProfileDesc}</Text>
+                        <Text style={styles.menuItemSub}>
+                          {userName
+                            ? (doctorName ? `${userName} • ${doctorName}` : (language === 'en' ? `Name: ${userName}` : `Hitap: ${userName}`))
+                            : (doctorName ? doctorName : t.settingsProfileDesc)}
+                        </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -2172,55 +2317,242 @@ function MainApp() {
                 </>
               )}
 
-              {/* SUB PAGE 1: KULLANICI PROFİLİ */}
-              {settingsSubPage === 'profile' && (
-                <>
-                  <View style={styles.settingGroupHeader}>
-                    <Ionicons name="person-circle-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>{t.settingsProfile.toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.settingCard}>
-                    <View>
-                      <Text style={styles.settingTitle}>{language === 'en' ? 'User Name / Greeting' : 'Kullanıcı İsmi / Hitap'}</Text>
-                      <Text style={styles.settingSub}>
-                        {language === 'en'
-                          ? 'Set how you are greeted on the home screen and in notifications'
-                          : 'Ana ekranda ve bildirimlerde size nasıl hitap edileceğini belirleyin'}
-                      </Text>
+              {/* SUB PAGE 1: KULLANICI & HEKİM PROFİLİ */}
+              {settingsSubPage === 'profile' && (() => {
+                const appointmentDiff = doctorNextAppointment ? getCalendarDayDiff(today, doctorNextAppointment) : null;
+                let badgeText = '';
+                let badgeTextColor = '#34d399';
+                let badgeBg = 'rgba(52, 211, 153, 0.15)';
+
+                if (appointmentDiff !== null) {
+                  if (appointmentDiff === 0) {
+                    badgeText = t.doctorAppointmentToday;
+                    badgeTextColor = '#fbbf24';
+                    badgeBg = 'rgba(251, 191, 36, 0.2)';
+                  } else if (appointmentDiff === 1) {
+                    badgeText = `${t.doctorAppointmentTomorrow} (${formatLocalizedDate(doctorNextAppointment, language)})`;
+                    badgeTextColor = '#34d399';
+                    badgeBg = 'rgba(52, 211, 153, 0.18)';
+                  } else if (appointmentDiff > 1) {
+                    badgeText = `${appointmentDiff} ${t.doctorAppointmentDaysLeft} (${formatLocalizedDate(doctorNextAppointment, language)})`;
+                    badgeTextColor = '#38bdf8';
+                    badgeBg = 'rgba(56, 189, 248, 0.18)';
+                  } else {
+                    badgeText = `${Math.abs(appointmentDiff)} ${t.doctorAppointmentDaysAgo} (${formatLocalizedDate(doctorNextAppointment, language)})`;
+                    badgeTextColor = '#94a3b8';
+                    badgeBg = 'rgba(148, 163, 184, 0.15)';
+                  }
+                }
+
+                return (
+                  <>
+                    {/* KULLANICI BİLGİSİ */}
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="person-circle-outline" size={16} color="#a9dfca" />
+                      <Text style={styles.settingGroupTitle}>{t.profileUserSection}</Text>
+                    </View>
+                    <View style={styles.settingCard}>
+                      <Text style={styles.settingTitle}>{t.userNameLabel}</Text>
+                      <Text style={styles.settingSub}>{t.userNameDesc}</Text>
                       <View style={styles.profileInputRow}>
                         <Ionicons name="person-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
                         <TextInput
                           style={styles.profileInput}
                           value={userName}
                           onChangeText={setUserName}
-                          placeholder={language === 'en' ? 'Enter your name...' : 'Adınızı giriniz...'}
+                          placeholder={t.userNamePlaceholder}
                           placeholderTextColor="#5c6e80"
-                          maxLength={24}
-                          onBlur={() => {
-                            if (session && userName.trim()) {
-                              authRequest(serverUrl, '/api/sync', {
-                                settings: { userName: userName.trim() }
-                              }, session).catch(() => {});
-                            }
-                          }}
+                          maxLength={32}
+                          onBlur={syncProfileSettings}
                         />
                         {userName.trim().length > 0 && (
                           <TouchableOpacity onPress={() => {
                             showToast(language === 'en' ? `Name updated to "${userName}"` : `İsim "${userName}" olarak güncellendi`);
-                            if (session && userName.trim()) {
-                              authRequest(serverUrl, '/api/sync', {
-                                settings: { userName: userName.trim() }
-                              }, session).catch(() => {});
-                            }
+                            syncProfileSettings();
                           }}>
                             <Ionicons name="checkmark-circle" size={18} color="#a9dfca" />
                           </TouchableOpacity>
                         )}
                       </View>
                     </View>
-                  </View>
-                </>
-              )}
+
+                    {/* TAKİP EDEN HEKİM & KLİNİK */}
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="medkit-outline" size={16} color="#a9dfca" />
+                      <Text style={styles.settingGroupTitle}>{t.profileDoctorSection}</Text>
+                    </View>
+                    <View style={styles.settingCard}>
+                      {/* Doktor Adı */}
+                      <Text style={styles.profileFieldLabel}>{t.doctorNameLabel}</Text>
+                      <View style={styles.profileInputRow}>
+                        <Ionicons name="person-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={styles.profileInput}
+                          value={doctorName}
+                          onChangeText={setDoctorName}
+                          placeholder={t.doctorNamePlaceholder}
+                          placeholderTextColor="#5c6e80"
+                          maxLength={60}
+                          onBlur={syncProfileSettings}
+                        />
+                      </View>
+
+                      {/* Branş / Uzmanlık */}
+                      <Text style={styles.profileFieldLabel}>{t.doctorSpecialtyLabel}</Text>
+                      <View style={styles.profileInputRow}>
+                        <Ionicons name="fitness-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={styles.profileInput}
+                          value={doctorSpecialty}
+                          onChangeText={setDoctorSpecialty}
+                          placeholder={t.doctorSpecialtyPlaceholder}
+                          placeholderTextColor="#5c6e80"
+                          maxLength={60}
+                          onBlur={syncProfileSettings}
+                        />
+                      </View>
+
+                      {/* Hastane / Klinik */}
+                      <Text style={styles.profileFieldLabel}>{t.doctorHospitalLabel}</Text>
+                      <View style={styles.profileInputRow}>
+                        <Ionicons name="business-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={styles.profileInput}
+                          value={doctorHospital}
+                          onChangeText={setDoctorHospital}
+                          placeholder={t.doctorHospitalPlaceholder}
+                          placeholderTextColor="#5c6e80"
+                          maxLength={80}
+                          onBlur={syncProfileSettings}
+                        />
+                      </View>
+
+                      {/* Telefon & Ara Butonu */}
+                      <Text style={styles.profileFieldLabel}>{t.doctorPhoneLabel}</Text>
+                      <View style={styles.profileInputRow}>
+                        <Ionicons name="call-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
+                        <TextInput
+                          style={styles.profileInput}
+                          value={doctorPhone}
+                          onChangeText={setDoctorPhone}
+                          placeholder={t.doctorPhonePlaceholder}
+                          placeholderTextColor="#5c6e80"
+                          keyboardType="phone-pad"
+                          maxLength={25}
+                          onBlur={syncProfileSettings}
+                        />
+                      </View>
+
+                      {doctorPhone.trim().length > 0 && (
+                        <TouchableOpacity
+                          style={styles.doctorCallBtn}
+                          onPress={handleCallDoctor}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="call" size={16} color="#081624" />
+                          <Text style={styles.doctorCallBtnText}>
+                            {language === 'en' ? `Call ${doctorName ? doctorName : 'Doctor'}` : `${doctorName ? doctorName : 'Doktor'}'u Ara`}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* RANDEVU & KONTROL */}
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
+                      <Text style={styles.settingGroupTitle}>{t.doctorAppointmentSection}</Text>
+                    </View>
+                    <View style={styles.settingCard}>
+                      <Text style={styles.settingTitle}>{t.doctorAppointmentLabel}</Text>
+                      <TouchableOpacity
+                        style={styles.appointmentCard}
+                        onPress={() => openCalendarPicker('doctorNextAppointment', t.doctorSelectAppointment)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.appointmentRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="calendar" size={18} color="#a9dfca" />
+                            <Text style={doctorNextAppointment ? styles.appointmentDateText : styles.appointmentPlaceholder}>
+                              {doctorNextAppointment ? formatLocalizedDate(doctorNextAppointment, language) : t.doctorSelectAppointment}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color="#5c6e80" />
+                        </View>
+
+                        {badgeText.length > 0 && (
+                          <View style={[styles.appointmentBadge, { backgroundColor: badgeBg }]}>
+                            <Text style={[styles.appointmentBadgeText, { color: badgeTextColor }]}>
+                              {badgeText}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      {doctorNextAppointment ? (
+                        <TouchableOpacity
+                          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 6 }}
+                          onPress={() => {
+                            triggerHaptic();
+                            setDoctorNextAppointment('');
+                            syncProfileSettings();
+                          }}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#ff9696" />
+                          <Text style={{ color: '#ff9696', fontSize: 12, fontWeight: '600' }}>{t.doctorClearAppointment}</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    {/* DOKTOR NOTLARI & TALİMATLAR */}
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="document-text-outline" size={16} color="#a9dfca" />
+                      <Text style={styles.settingGroupTitle}>{t.doctorNotesSection}</Text>
+                    </View>
+                    <View style={styles.settingCard}>
+                      <View style={[styles.profileInputRow, { height: 'auto', minHeight: 90, alignItems: 'flex-start', paddingVertical: 10 }]}>
+                        <Ionicons name="reader-outline" size={16} color="#a9dfca" style={{ marginRight: 8, marginTop: 4 }} />
+                        <TextInput
+                          style={[styles.profileInput, { textAlignVertical: 'top', minHeight: 80 }]}
+                          value={doctorNotes}
+                          onChangeText={setDoctorNotes}
+                          placeholder={t.doctorNotesPlaceholder}
+                          placeholderTextColor="#5c6e80"
+                          multiline
+                          numberOfLines={4}
+                          onBlur={syncProfileSettings}
+                        />
+                      </View>
+                    </View>
+
+                    {/* EYLEMLER: PAYLAŞ & KAYDET */}
+                    <View style={{ marginBottom: 30, gap: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.profileActionBtn, styles.profileShareBtn]}
+                        onPress={handleShareMedList}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="share-social-outline" size={18} color="#38bdf8" />
+                        <Text style={styles.profileShareBtnText}>{t.doctorShareMedList}</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.profileActionBtn, styles.profileSaveBtn]}
+                        onPress={() => {
+                          triggerHaptic();
+                          showToast(t.profileSavedToast);
+                          syncProfileSettings();
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={18} color="#34d399" />
+                        <Text style={styles.profileSaveBtnText}>
+                          {language === 'en' ? 'Save Profile Details' : 'Bilgileri Kaydet'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                );
+              })()}
 
               {/* SUB PAGE: DİL / LANGUAGE */}
               {settingsSubPage === 'language' && (
@@ -4234,7 +4566,7 @@ function MainApp() {
         {/* Modern Calendar Picker Modal */}
         <CalendarModal
           visible={calendarOpen}
-          selectedDate={calendarTarget === 'startDate' ? startDate : cycleStartDate}
+          selectedDate={calendarTarget === 'startDate' ? startDate : (calendarTarget === 'cycleStartDate' ? cycleStartDate : (doctorNextAppointment || today))}
           title={calendarTitle}
           onSelect={handleDateSelected}
           onClose={() => setCalendarOpen(false)}
@@ -4445,6 +4777,20 @@ const styles = StyleSheet.create({
   settingDivider: { height: 1, backgroundColor: '#203244', marginVertical: 14 },
   profileInputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#101d29', borderRadius: 8, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: '#203244', marginTop: 10 },
   profileInput: { flex: 1, color: '#f5f3f0', fontSize: 14, fontWeight: '600' },
+  profileFieldLabel: { color: '#adb3bf', fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 2 },
+  doctorCallBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#34d399', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14, marginTop: 12 },
+  doctorCallBtnText: { color: '#081624', fontSize: 13, fontWeight: '700' },
+  appointmentCard: { backgroundColor: '#101d29', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#203244', marginTop: 10 },
+  appointmentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  appointmentDateText: { color: '#f5f3f0', fontSize: 14, fontWeight: '700' },
+  appointmentPlaceholder: { color: '#5c6e80', fontSize: 14 },
+  appointmentBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginTop: 10 },
+  appointmentBadgeText: { fontSize: 12, fontWeight: '700' },
+  profileActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 13, marginTop: 10 },
+  profileSaveBtn: { backgroundColor: '#183832', borderWidth: 1, borderColor: '#34d399' },
+  profileSaveBtnText: { color: '#34d399', fontSize: 14, fontWeight: '700' },
+  profileShareBtn: { backgroundColor: '#182b3a', borderWidth: 1, borderColor: '#38bdf8' },
+  profileShareBtnText: { color: '#38bdf8', fontSize: 14, fontWeight: '700' },
   selectedPillBadge: { backgroundColor: '#143532', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#215c52' },
   selectedPillBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '700' },
   chipSelector: { flexDirection: 'row', gap: 6, marginTop: 10 },

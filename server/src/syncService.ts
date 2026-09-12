@@ -1,6 +1,6 @@
 import { RutinDatabase } from './db.js';
 import { doseId, HttpError } from './identity.js';
-const settingKeys = new Set(['userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language']);
+const settingKeys = new Set(['userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language','doctorName','doctorSpecialty','doctorHospital','doctorPhone','doctorNextAppointment','doctorNotes']);
 const doseKeys = new Set(['id','name','amount','time','times','status','paused','snooze','mealCondition','form','instructions','stock','stockThreshold','frequencyType','cyclePhase1Days','cyclePhase1Amount','cyclePhase2Days','cyclePhase2Amount','cycleStartDate','durationMode','durationDays','startDate','endDate','statusDate','slotStatuses','dailyStatuses','gtin','expiryDate','updatedAt','deletedAt']);
 function record(value: any) { return !!value && typeof value === 'object' && !Array.isArray(value); }
 export class SyncService {

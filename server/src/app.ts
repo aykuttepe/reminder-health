@@ -25,7 +25,7 @@ export function createServer(db: RutinDatabase, options: {publicUrl?:string;allo
       if (url.pathname === '/health' && method === 'GET') return send(200, { status: 'ok', version: '2.0.0', authRequired: true });
       if (url.pathname === '/api/version' && method === 'GET') {
         return send(200, {
-          version: '0.2.2',
+          version: '0.2.3',
           apkUrl: '/app-release.apk',
           appName: 'Rutin',
           publishedAt: new Date().toISOString(),
