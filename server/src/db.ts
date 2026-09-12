@@ -15,24 +15,27 @@ export class RutinDatabase {
     this.sql.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version = Number((this.sql.prepare('PRAGMA user_version').get() as any).user_version);
     if (version > 4) throw new Error('Veritabanı sürümü bu uygulamadan yeni.');
-    if (version >= 2 && version <= 3) {
-      const cols = (this.sql.prepare('PRAGMA table_info(users)').all() as any[]).map(c => c.name);
-      if (!cols.includes('recovery_hash')) {
-        this.sql.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT UNIQUE;');
-      }
-      if (!cols.includes('email')) {
-        this.sql.exec('ALTER TABLE users ADD COLUMN email TEXT;');
-        this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;');
-      }
-      this.sql.exec('PRAGMA user_version=4;');
-      return;
-    }
     if (version === 4) return;
-    const legacy = (this.sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='doses'").get());
-    if (legacy && dbPath !== ':memory:') {
+    const legacy = this.sql.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='doses'").get();
+    if ((legacy || version >= 2) && dbPath !== ':memory:') {
       this.backupPath = `${dbPath}.pre-users-${Date.now()}.backup`;
       await backup(this.sql, this.backupPath);
       fs.chmodSync(this.backupPath, 0o600);
+    }
+    if (version >= 2 && version <= 3) {
+      this.transaction(() => {
+        const cols = (this.sql.prepare('PRAGMA table_info(users)').all() as any[]).map(c => c.name);
+        if (!cols.includes('recovery_hash')) {
+          this.sql.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT;');
+        }
+        this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_recovery_hash ON users(recovery_hash) WHERE recovery_hash IS NOT NULL;');
+        if (!cols.includes('email')) {
+          this.sql.exec('ALTER TABLE users ADD COLUMN email TEXT;');
+        }
+        this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;');
+        this.sql.exec('PRAGMA user_version=4;');
+      });
+      return;
     }
     this.transaction(() => {
       if (legacy) this.sql.exec('ALTER TABLE doses RENAME TO legacy_doses; ALTER TABLE learned_meds RENAME TO legacy_learned_meds; ALTER TABLE settings RENAME TO legacy_settings; DROP INDEX IF EXISTS idx_doses_updated;');

@@ -45,8 +45,8 @@ export interface TodayViewProps {
   getFormLabel: (form?: MedicineForm) => string;
   getOverdueGuidance: (slot: ScheduledSlot) => { type: string; icon: string; title: string; message: string } | null;
   formatStock: (stock?: number) => string;
-  getCycleInfo: (dose: Dose, date: string, lang?: string) => CycleInfo;
-  getDurationInfo: (dose: Dose, date: string, lang?: string) => DurationInfo;
+  getCycleInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => CycleInfo;
+  getDurationInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => DurationInfo;
   CAROUSEL_CARD_WIDTH: number;
   CAROUSEL_SPACING: number;
 }

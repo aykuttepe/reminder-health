@@ -673,7 +673,7 @@ export interface SyncNotificationOptions {
   lang?: 'tr' | 'en';
 }
 
-export type ScheduleSummary = { count: number; refreshAfter: string | null };
+export type ScheduleSummary = { count: number; incompleteCount: number; refreshAfter: string | null };
 
 /** Date-based plans cover the next 30 days, bounded by the pending request budget.
  * Refilled at launch, foreground, midnight and whenever the plan changes. */
@@ -789,15 +789,20 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
         } catch {}
       }
     }
+    // Count unchanged requests too, including those after a failed scheduling attempt.
+    const confirmed = new Set(desired.filter(request =>
+      owned.some(item => item.identifier === request.identifier &&
+        item.content.data?.planSignature === JSON.stringify(request.content))
+    ).map(request => request.identifier));
     for (const request of desired) {
       // Compare our own signature: native APIs may normalize returned content/trigger values.
       const signature = JSON.stringify(request.content);
-      const previous = owned.find(item => item.identifier === request.identifier);
-      if (previous?.content.data?.planSignature === signature) continue;
+      if (confirmed.has(request.identifier)) continue;
       try {
         await Notifications.scheduleNotificationAsync({ ...request,
           content: { ...request.content, data: { ...request.content.data, planSignature: signature } },
         });
+        confirmed.add(request.identifier);
       } catch (scheduleError) {
         console.warn('Notifications: Failed to schedule single alarm, quota or OS restriction:', scheduleError);
         break; // Stop scheduling further alarms to prevent cascade errors if system cap is reached
@@ -805,8 +810,9 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
     }
     const horizon = dateFromKey(localDateKey(now));
     horizon.setDate(horizon.getDate() + 30);
-    return { count: desired.length,
-      refreshAfter: options.enabled && planned.length ? new Date(Number(planned[budget]?.content.data?.fireAt ?? horizon.getTime())).toISOString() : null };
+    const incompleteCount = desired.length - confirmed.size;
+    return { count: confirmed.size, incompleteCount,
+      refreshAfter: !incompleteCount && options.enabled && planned.length ? new Date(Number(planned[budget]?.content.data?.fireAt ?? horizon.getTime())).toISOString() : null };
   });
 }
 

@@ -47,13 +47,60 @@ function setup(now = '2026-09-07T12:00:00', platform = 'android') {
     }, { filename });
     return exports;
   }
-  return { ...load('notifications.ts'), ...load('medicationPlan.ts'), pending, operations,
+  return { ...load('notifications.ts'), ...load('medicationPlan.ts'), pending, operations, native,
     setClock(value) { clock = new Date(value).getTime(); }, now: () => new Clock() };
 }
 const dose = (patch = {}) => ({ id: 1, name: 'İlaç A', amount: '1 tablet', time: '14:00',
   status: 'pending', statusDate: '2026-09-07', stock: 20, ...patch });
 const options = { enabled: true, privateMode: false, repeatNagEnabled: true, repeatNagCount: 3 };
 const dayRequests = (requests, day) => requests.filter(r => r.content.data.date === day);
+
+test('partial scheduling reports only confirmed alarms and retries missing requests', async () => {
+  const api = setup();
+  const schedule = api.native.scheduleNotificationAsync;
+  let attempts = 0;
+  api.native.scheduleNotificationAsync = async request => {
+    if (++attempts === 3) throw new Error('Simulated OS quota');
+    return schedule(request);
+  };
+  const expected = api.buildMedicationSchedule([dose()], options, api.now()).length;
+  const partial = await api.syncMedicationNotifications([dose()], options);
+  assert.equal(partial.count, 2);
+  assert.equal(api.pending.size, 2);
+  assert.equal(partial.incompleteCount, expected - 2);
+  assert.equal(partial.refreshAfter, null);
+  assert.equal(attempts, 3);
+
+  api.native.scheduleNotificationAsync = schedule;
+  api.operations.length = 0;
+  const complete = await api.syncMedicationNotifications([dose()], options);
+  assert.equal(complete.count, expected);
+  assert.equal(complete.incompleteCount, 0);
+  assert.ok(complete.refreshAfter);
+  assert.equal(api.operations.filter(([op]) => op === 'schedule').length, expected - 2);
+});
+
+test('a failed first alarm never reports a ready plan', async () => {
+  const api = setup();
+  api.native.scheduleNotificationAsync = async () => { throw new Error('Simulated permission failure'); };
+  const summary = await api.syncMedicationNotifications([dose()], options);
+  assert.equal(summary.count, 0);
+  assert.ok(summary.incompleteCount > 0);
+  assert.equal(summary.refreshAfter, null);
+  assert.equal(api.pending.size, 0);
+});
+
+test('unchanged alarms after a failure remain counted and are not rescheduled', async () => {
+  const api = setup();
+  const complete = await api.syncMedicationNotifications([dose()], options);
+  api.pending.delete(api.pending.keys().next().value);
+  api.native.scheduleNotificationAsync = async () => { throw new Error('Simulated OS quota'); };
+  const summary = await api.syncMedicationNotifications([dose()], options);
+  assert.equal(summary.count, complete.count - 1);
+  assert.equal(summary.count, api.pending.size);
+  assert.equal(summary.incompleteCount, 1);
+  assert.equal(summary.refreshAfter, null);
+});
 
 test('expired and paused medicines produce no alarms', () => {
   const api = setup();

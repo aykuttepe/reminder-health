@@ -894,12 +894,19 @@ function MainApp() {
       repeatNagCount,
       lang: language,
     }).then(summary => {
+      if (summary.incompleteCount > 0) {
+        if (current) setScheduleInfo(language === 'en'
+          ? `${summary.incompleteCount} reminders could not be scheduled (${summary.count} ready). Check notification and alarm permissions, then reopen the app to retry.`
+          : `${summary.incompleteCount} hatırlatma planlanamadı (${summary.count} hazır). Bildirim ve alarm izinlerini kontrol edip yeniden denemek için uygulamayı tekrar açın.`);
+        logger.warn('Notifications', 'Bildirim planı eksik kaldı', summary);
+        return;
+      }
       if (current) setScheduleInfo(summary.refreshAfter
         ? (language === 'en'
             ? `Reminder schedule ready until ${new Date(summary.refreshAfter).toLocaleString('en-US')}. Open the app before this date to automatically refresh.`
             : `Hatırlatma planı ${new Date(summary.refreshAfter).toLocaleString('tr-TR')} tarihine kadar hazır. Uygulamayı bu tarihten önce açın; plan otomatik yenilenir.`)
         : null);
-      logger.info('Notifications', `Bildirim planı senkronize edildi (${doses.length} ilaç)`);
+      logger.info('Notifications', `Bildirim planı senkronize edildi (${summary.count} hatırlatma)`);
     }).catch(error => {
       logger.error('Notifications', 'Bildirim senkronizasyon hatası', error);
       if (current) setScheduleInfo(language === 'en' ? 'Could not update reminders. Check permissions and restart app.' : 'Hatırlatmalar güncellenemedi. İzinleri kontrol edip uygulamayı yeniden açın.');

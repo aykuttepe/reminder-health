@@ -13,14 +13,13 @@ export interface HistoryDay {
   label: string;
   dayNum: number;
   isToday: boolean;
-  adherence: number;
 }
 
 export interface HistoryViewProps {
   pastWeekHistory: HistoryDay[];
   selectedHistoryDate: string;
   setSelectedHistoryDate: (date: string) => void;
-  historySlots: ScheduledSlot[];
+  historySlots: Pick<ScheduledSlot, 'dose' | 'time' | 'status' | 'todayAmount' | 'slotId'>[];
   takenSlots: ScheduledSlot[];
   todaySlots: ScheduledSlot[];
   today: string;

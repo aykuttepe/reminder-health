@@ -22,8 +22,8 @@ export interface MedicationListProps {
   openEditor: (dose?: Dose) => void;
   getMealLabel: (cond?: MealCondition) => string;
   formatStock: (stock?: number) => string;
-  getCycleInfo: (dose: Dose, date: string, lang?: string) => CycleInfo;
-  getDurationInfo: (dose: Dose, date: string, lang?: string) => DurationInfo;
+  getCycleInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => CycleInfo;
+  getDurationInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => DurationInfo;
   calculateEndDate: (start: string, days: number) => string;
 }
 
