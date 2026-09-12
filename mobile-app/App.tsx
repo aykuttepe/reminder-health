@@ -443,8 +443,10 @@ function MainApp() {
       setCycleStartDate(selectedDateStr);
     } else if (calendarTarget === 'doctorNextAppointment') {
       setDoctorNextAppointment(selectedDateStr);
+      syncProfileSettings({ doctorNextAppointment: selectedDateStr });
     } else if (calendarTarget === 'doctorBloodTestDate') {
       setDoctorBloodTestDate(selectedDateStr);
+      syncProfileSettings({ doctorBloodTestDate: selectedDateStr });
     }
   };
 
@@ -1749,21 +1751,45 @@ function MainApp() {
     await syncWithServer(session, true);
   };
 
-  const syncProfileSettings = () => {
+  const syncProfileSettings = (overrides?: Partial<{
+    userName: string;
+    doctorName: string;
+    doctorSpecialty: string;
+    doctorHospital: string;
+    doctorPhone: string;
+    doctorNextAppointment: string;
+    doctorAppointmentTime: string;
+    doctorApptLeadOptions: string[];
+    doctorBloodTestDate: string;
+    doctorNotes: string;
+  }>) => {
     if (session) {
+      const activeUserName = (overrides?.userName !== undefined ? overrides.userName : userName).trim();
+      const activeDocName = (overrides?.doctorName !== undefined ? overrides.doctorName : doctorName).trim();
+      const activeDocSpecialty = (overrides?.doctorSpecialty !== undefined ? overrides.doctorSpecialty : doctorSpecialty).trim();
+      const activeDocHospital = (overrides?.doctorHospital !== undefined ? overrides.doctorHospital : doctorHospital).trim();
+      const activeDocPhone = (overrides?.doctorPhone !== undefined ? overrides.doctorPhone : doctorPhone).trim();
+      const activeNextAppt = overrides?.doctorNextAppointment !== undefined ? overrides.doctorNextAppointment : doctorNextAppointment;
+      const activeApptTime = overrides?.doctorAppointmentTime !== undefined ? overrides.doctorAppointmentTime : doctorAppointmentTime;
+      const activeLeadOpts = overrides?.doctorApptLeadOptions !== undefined ? overrides.doctorApptLeadOptions : doctorApptLeadOptions;
+      const activeBloodDate = overrides?.doctorBloodTestDate !== undefined ? overrides.doctorBloodTestDate : doctorBloodTestDate;
+      const activeNotes = (overrides?.doctorNotes !== undefined ? overrides.doctorNotes : doctorNotes).trim();
+
+      const payload: Record<string, any> = {
+        userName: activeUserName,
+        doctorName: activeDocName,
+        doctorSpecialty: activeDocSpecialty,
+        doctorHospital: activeDocHospital,
+        doctorPhone: activeDocPhone,
+        doctorNextAppointment: activeNextAppt,
+        doctorAppointmentTime: activeApptTime,
+        doctorApptLeadOptions: JSON.stringify(activeLeadOpts),
+        doctorBloodTestDate: activeBloodDate,
+        doctorNotes: activeNotes,
+      };
+
       authRequest(serverUrl, '/api/sync', {
-        settings: {
-          userName: userName.trim(),
-          doctorName: doctorName.trim(),
-          doctorSpecialty: doctorSpecialty.trim(),
-          doctorHospital: doctorHospital.trim(),
-          doctorPhone: doctorPhone.trim(),
-          doctorNextAppointment,
-          doctorAppointmentTime,
-          doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
-          doctorBloodTestDate,
-          doctorNotes: doctorNotes.trim(),
-        }
+        settings: payload
       }, session).catch(() => {});
     }
   };
@@ -2658,7 +2684,7 @@ function MainApp() {
                               slotTime={doctorAppointmentTime}
                               onChange={val => {
                                 setDoctorAppointmentTime(val);
-                                syncProfileSettings();
+                                syncProfileSettings({ doctorAppointmentTime: val });
                               }}
                               onStep={delta => {
                                 const [h = 9, m = 0] = doctorAppointmentTime.split(':').map(Number);
@@ -2666,8 +2692,9 @@ function MainApp() {
                                 const next = Math.max(0, Math.min(23 * 60 + 45, cur + delta));
                                 const nextH = String(Math.floor(next / 60)).padStart(2, '0');
                                 const nextM = String(next % 60).padStart(2, '0');
-                                setDoctorAppointmentTime(`${nextH}:${nextM}`);
-                                syncProfileSettings();
+                                const nextTime = `${nextH}:${nextM}`;
+                                setDoctorAppointmentTime(nextTime);
+                                syncProfileSettings({ doctorAppointmentTime: nextTime });
                               }}
                               lang={language}
                             />
@@ -2704,7 +2731,7 @@ function MainApp() {
                                         nextOpts = [...doctorApptLeadOptions, opt.id];
                                       }
                                       setDoctorApptLeadOptions(nextOpts);
-                                      syncProfileSettings();
+                                      syncProfileSettings({ doctorApptLeadOptions: nextOpts });
                                     }}
                                     activeOpacity={0.7}
                                   >
@@ -2732,7 +2759,7 @@ function MainApp() {
                             onPress={() => {
                               triggerHaptic();
                               setDoctorNextAppointment('');
-                              syncProfileSettings();
+                              syncProfileSettings({ doctorNextAppointment: '' });
                             }}
                           >
                             <Ionicons name="trash-outline" size={14} color="#ff9696" />
@@ -2748,28 +2775,22 @@ function MainApp() {
                       <Text style={styles.settingGroupTitle}>{t.doctorBloodTestSection}</Text>
                     </View>
                     <View style={styles.settingCard}>
-                      <Text style={styles.settingTitle}>{t.doctorBloodTestLabel}</Text>
-                      <Text style={{ color: '#adb3bf', fontSize: 11, marginBottom: 10, marginTop: 2 }}>
+                      <Text style={styles.profileFieldLabel}>{t.doctorBloodTestLabel}</Text>
+                      <Text style={{ color: '#adb3bf', fontSize: 11, marginBottom: 8, marginTop: 2 }}>
                         {language === 'en'
-                          ? 'Select blood test date before visit; you will be reminded to go fasting that morning.'
+                          ? 'Select lab test date; you will be reminded to go fasting that morning.'
                           : 'Randevu öncesi tahlil gününüzü seçin; o sabah aç karnına kan verme uyarısı alırsınız.'}
                       </Text>
                       <TouchableOpacity
-                        style={[styles.appointmentCard, { borderColor: doctorBloodTestDate ? '#7c3aed' : '#203244' }]}
+                        style={styles.appointmentDateBox}
                         onPress={() => openCalendarPicker('doctorBloodTestDate', t.doctorSelectBloodTest)}
-                        activeOpacity={0.7}
+                        activeOpacity={0.8}
                       >
-                        <View style={styles.appointmentRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="flask" size={18} color="#a78bfa" />
-                            <Text style={doctorBloodTestDate ? styles.appointmentDateText : styles.appointmentPlaceholder}>
-                              {doctorBloodTestDate ? formatLocalizedDate(doctorBloodTestDate, language) : t.doctorSelectBloodTest}
-                            </Text>
-                          </View>
-                          <Ionicons name="chevron-forward" size={16} color="#5c6e80" />
-                        </View>
-
-                        {bloodBadgeText.length > 0 && (
+                        <Ionicons name="flask-outline" size={18} color="#a78bfa" style={{ marginRight: 8 }} />
+                        <Text style={doctorBloodTestDate ? styles.appointmentDateText : styles.appointmentPlaceholder}>
+                          {doctorBloodTestDate ? formatLocalizedDate(doctorBloodTestDate, language) : t.doctorSelectBloodTest}
+                        </Text>
+                        {bloodBadgeText && (
                           <View style={[styles.appointmentBadge, { backgroundColor: bloodBadgeBg }]}>
                             <Text style={[styles.appointmentBadgeText, { color: bloodBadgeTextColor }]}>
                               {bloodBadgeText}
@@ -2784,7 +2805,7 @@ function MainApp() {
                           onPress={() => {
                             triggerHaptic();
                             setDoctorBloodTestDate('');
-                            syncProfileSettings();
+                            syncProfileSettings({ doctorBloodTestDate: '' });
                           }}
                         >
                           <Ionicons name="trash-outline" size={14} color="#ff9696" />
