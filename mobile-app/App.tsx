@@ -1540,15 +1540,15 @@ function MainApp() {
       if (userName && userName.trim()) {
         payloadSettings.userName = userName.trim();
       }
-      if (doctorName !== undefined) payloadSettings.doctorName = doctorName;
-      if (doctorSpecialty !== undefined) payloadSettings.doctorSpecialty = doctorSpecialty;
-      if (doctorHospital !== undefined) payloadSettings.doctorHospital = doctorHospital;
-      if (doctorPhone !== undefined) payloadSettings.doctorPhone = doctorPhone;
-      if (doctorNextAppointment !== undefined) payloadSettings.doctorNextAppointment = doctorNextAppointment;
-      if (doctorAppointmentTime !== undefined) payloadSettings.doctorAppointmentTime = doctorAppointmentTime;
-      if (doctorApptLeadOptions !== undefined) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
-      if (doctorBloodTestDate !== undefined) payloadSettings.doctorBloodTestDate = doctorBloodTestDate;
-      if (doctorNotes !== undefined) payloadSettings.doctorNotes = doctorNotes;
+      if (doctorName && doctorName.trim()) payloadSettings.doctorName = doctorName.trim();
+      if (doctorSpecialty && doctorSpecialty.trim()) payloadSettings.doctorSpecialty = doctorSpecialty.trim();
+      if (doctorHospital && doctorHospital.trim()) payloadSettings.doctorHospital = doctorHospital.trim();
+      if (doctorPhone && doctorPhone.trim()) payloadSettings.doctorPhone = doctorPhone.trim();
+      if (doctorNextAppointment && doctorNextAppointment.trim()) payloadSettings.doctorNextAppointment = doctorNextAppointment.trim();
+      if (doctorAppointmentTime && doctorAppointmentTime.trim()) payloadSettings.doctorAppointmentTime = doctorAppointmentTime.trim();
+      if (doctorApptLeadOptions && doctorApptLeadOptions.length > 0) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
+      if (doctorBloodTestDate && doctorBloodTestDate.trim()) payloadSettings.doctorBloodTestDate = doctorBloodTestDate.trim();
+      if (doctorNotes && doctorNotes.trim()) payloadSettings.doctorNotes = doctorNotes.trim();
 
       const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
@@ -1568,22 +1568,22 @@ function MainApp() {
           } else if (currentSession.user?.name && (!userName || !userName.trim())) {
             setUserName(currentSession.user.name);
           }
-          if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
-          if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
-          if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
-          if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
-          if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
-          if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
+          if (response.settings.doctorName !== undefined && response.settings.doctorName !== '') setDoctorName(response.settings.doctorName);
+          if (response.settings.doctorSpecialty !== undefined && response.settings.doctorSpecialty !== '') setDoctorSpecialty(response.settings.doctorSpecialty);
+          if (response.settings.doctorHospital !== undefined && response.settings.doctorHospital !== '') setDoctorHospital(response.settings.doctorHospital);
+          if (response.settings.doctorPhone !== undefined && response.settings.doctorPhone !== '') setDoctorPhone(response.settings.doctorPhone);
+          if (response.settings.doctorNextAppointment !== undefined && response.settings.doctorNextAppointment !== '') setDoctorNextAppointment(response.settings.doctorNextAppointment);
+          if (response.settings.doctorAppointmentTime !== undefined && response.settings.doctorAppointmentTime !== '') setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
           if (response.settings.doctorApptLeadOptions !== undefined) {
             try {
               const opts = typeof response.settings.doctorApptLeadOptions === 'string'
                 ? JSON.parse(response.settings.doctorApptLeadOptions)
                 : response.settings.doctorApptLeadOptions;
-              if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
+              if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
             } catch {}
           }
-          if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
-          if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
+          if (response.settings.doctorBloodTestDate !== undefined && response.settings.doctorBloodTestDate !== '') setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
+          if (response.settings.doctorNotes !== undefined && response.settings.doctorNotes !== '') setDoctorNotes(response.settings.doctorNotes);
           if (response.settings.notifications !== undefined) setNotifications(response.settings.notifications);
           if (response.settings.soundEnabled !== undefined) setSoundEnabled(response.settings.soundEnabled);
           if (response.settings.soundType !== undefined) setSoundType(response.settings.soundType);

@@ -1458,25 +1458,27 @@ function InnerPrototype() {
       await assertAccount(localStore, serverUrl, session.user);
       const currentSession = await getSession(serverUrl);
       if (currentSession.user.id !== session.user.id) throw new Error('Hesap değişti; yeniden bağlanın.');
+      const payloadSettings: Record<string, any> = {
+        notifications,
+        soundEnabled,
+        soundType,
+        snoozeMinutes,
+      };
+      if (userName && userName.trim()) payloadSettings.userName = userName.trim();
+      if (doctorName && doctorName.trim()) payloadSettings.doctorName = doctorName.trim();
+      if (doctorSpecialty && doctorSpecialty.trim()) payloadSettings.doctorSpecialty = doctorSpecialty.trim();
+      if (doctorHospital && doctorHospital.trim()) payloadSettings.doctorHospital = doctorHospital.trim();
+      if (doctorPhone && doctorPhone.trim()) payloadSettings.doctorPhone = doctorPhone.trim();
+      if (doctorNextAppointment && doctorNextAppointment.trim()) payloadSettings.doctorNextAppointment = doctorNextAppointment.trim();
+      if (doctorAppointmentTime && doctorAppointmentTime.trim()) payloadSettings.doctorAppointmentTime = doctorAppointmentTime.trim();
+      if (doctorApptLeadOptions && doctorApptLeadOptions.length > 0) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
+      if (doctorBloodTestDate && doctorBloodTestDate.trim()) payloadSettings.doctorBloodTestDate = doctorBloodTestDate.trim();
+      if (doctorNotes && doctorNotes.trim()) payloadSettings.doctorNotes = doctorNotes.trim();
+
       const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: d.updatedAt || Date.now() })),
         learnedMeds,
-        settings: {
-          userName,
-          doctorName,
-          doctorSpecialty,
-          doctorHospital,
-          doctorPhone,
-          doctorNextAppointment,
-          doctorAppointmentTime,
-          doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
-          doctorBloodTestDate,
-          doctorNotes,
-          notifications,
-          soundEnabled,
-          soundType,
-          snoozeMinutes,
-        },
+        settings: payloadSettings,
       }, currentSession);
 
       if (response.success) {
@@ -1487,22 +1489,22 @@ function InnerPrototype() {
         }
         if (response.settings) {
           if (response.settings.userName) setUserName(response.settings.userName);
-          if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
-          if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
-          if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
-          if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
-          if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
-          if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
+          if (response.settings.doctorName !== undefined && response.settings.doctorName !== '') setDoctorName(response.settings.doctorName);
+          if (response.settings.doctorSpecialty !== undefined && response.settings.doctorSpecialty !== '') setDoctorSpecialty(response.settings.doctorSpecialty);
+          if (response.settings.doctorHospital !== undefined && response.settings.doctorHospital !== '') setDoctorHospital(response.settings.doctorHospital);
+          if (response.settings.doctorPhone !== undefined && response.settings.doctorPhone !== '') setDoctorPhone(response.settings.doctorPhone);
+          if (response.settings.doctorNextAppointment !== undefined && response.settings.doctorNextAppointment !== '') setDoctorNextAppointment(response.settings.doctorNextAppointment);
+          if (response.settings.doctorAppointmentTime !== undefined && response.settings.doctorAppointmentTime !== '') setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
           if (response.settings.doctorApptLeadOptions !== undefined) {
             try {
               const opts = typeof response.settings.doctorApptLeadOptions === 'string'
                 ? JSON.parse(response.settings.doctorApptLeadOptions)
                 : response.settings.doctorApptLeadOptions;
-              if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
+              if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
             } catch {}
           }
-          if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
-          if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
+          if (response.settings.doctorBloodTestDate !== undefined && response.settings.doctorBloodTestDate !== '') setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
+          if (response.settings.doctorNotes !== undefined && response.settings.doctorNotes !== '') setDoctorNotes(response.settings.doctorNotes);
         }
         const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncAt(nowStr);
