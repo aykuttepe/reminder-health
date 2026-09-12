@@ -127,12 +127,29 @@ export interface Translations {
   doctorCallButton: string;
   doctorAppointmentSection: string;
   doctorAppointmentLabel: string;
+  doctorAppointmentTimeLabel: string;
   doctorSelectAppointment: string;
   doctorClearAppointment: string;
   doctorAppointmentToday: string;
   doctorAppointmentTomorrow: string;
   doctorAppointmentDaysLeft: string;
   doctorAppointmentDaysAgo: string;
+  doctorLeadReminderLabel: string;
+  doctorLeadReminderSub: string;
+  leadOpt3d: string;
+  leadOpt2d: string;
+  leadOpt1d: string;
+  leadOpt2h: string;
+  leadOpt1h: string;
+  doctorBloodTestSection: string;
+  doctorBloodTestLabel: string;
+  doctorSelectBloodTest: string;
+  doctorClearBloodTest: string;
+  doctorBloodTestToday: string;
+  doctorBloodTestTomorrow: string;
+  doctorBloodTestDaysLeft: string;
+  doctorBloodTestDaysAgo: string;
+  doctorSnoozedToast: string;
   doctorNotesSection: string;
   doctorNotesPlaceholder: string;
   doctorShareMedList: string;
@@ -354,12 +371,29 @@ export const translations: Record<Language, Translations> = {
     doctorCallButton: 'Doktoru Ara',
     doctorAppointmentSection: 'RANDEVU & KONTROL',
     doctorAppointmentLabel: 'Sonraki Randevu Tarihi',
+    doctorAppointmentTimeLabel: 'Randevu Saati',
     doctorSelectAppointment: 'Randevu Tarihi Seçin',
     doctorClearAppointment: 'Randevuyu Temizle',
     doctorAppointmentToday: 'Bugün randevunuz var!',
     doctorAppointmentTomorrow: 'Yarın',
     doctorAppointmentDaysLeft: 'gün kaldı',
     doctorAppointmentDaysAgo: 'gün önceydi',
+    doctorLeadReminderLabel: 'Önceden Hatırlatıcılar (Çoklu Seçim)',
+    doctorLeadReminderSub: 'Randevu öncesinde istediğiniz zaman dilimlerini seçebilirsiniz',
+    leadOpt3d: '3 Gün Önce',
+    leadOpt2d: '2 Gün Önce',
+    leadOpt1d: '1 Gün Önce',
+    leadOpt2h: '2 Saat Önce',
+    leadOpt1h: '1 Saat Önce',
+    doctorBloodTestSection: 'KAN TAHLİLİ / TETKİK HAZIRLIĞI',
+    doctorBloodTestLabel: 'Kan Verme / Tahlil Tarihi',
+    doctorSelectBloodTest: 'Kan Tahlili Tarihi Seçin',
+    doctorClearBloodTest: 'Tahlil Tarihini Temizle',
+    doctorBloodTestToday: 'Bugün tahlil gününüz! Aç karnına kan veriniz.',
+    doctorBloodTestTomorrow: 'Yarın tahlil gününüz (Aç karnına)',
+    doctorBloodTestDaysLeft: 'gün sonra kan tahlili',
+    doctorBloodTestDaysAgo: 'gün önceydi',
+    doctorSnoozedToast: 'Randevu hatırlatıcısı ertelendi',
     doctorNotesSection: 'DOKTOR NOTU & TALİMATLAR',
     doctorNotesPlaceholder: 'Örn. Tansiyon 14\'ü geçerse haber ver, tuzsuz diyet, kan tahlili aç karnına...',
     doctorShareMedList: 'İlaç Listesini Hekimle Paylaş',
@@ -580,12 +614,29 @@ export const translations: Record<Language, Translations> = {
     doctorCallButton: 'Call Doctor',
     doctorAppointmentSection: 'APPOINTMENT & CHECKUP',
     doctorAppointmentLabel: 'Next Appointment Date',
+    doctorAppointmentTimeLabel: 'Appointment Time',
     doctorSelectAppointment: 'Select Appointment Date',
     doctorClearAppointment: 'Clear Appointment',
     doctorAppointmentToday: 'You have an appointment today!',
     doctorAppointmentTomorrow: 'Tomorrow',
     doctorAppointmentDaysLeft: 'days left',
     doctorAppointmentDaysAgo: 'days ago',
+    doctorLeadReminderLabel: 'Advance Reminders (Multi-Select)',
+    doctorLeadReminderSub: 'Select whichever reminder windows you need before the visit',
+    leadOpt3d: '3 Days Before',
+    leadOpt2d: '2 Days Before',
+    leadOpt1d: '1 Day Before',
+    leadOpt2h: '2 Hours Before',
+    leadOpt1h: '1 Hour Before',
+    doctorBloodTestSection: 'BLOOD TEST / LAB PREP',
+    doctorBloodTestLabel: 'Blood Test / Lab Date',
+    doctorSelectBloodTest: 'Select Blood Test Date',
+    doctorClearBloodTest: 'Clear Lab Date',
+    doctorBloodTestToday: 'Today is your lab test day! Remember to go fasting.',
+    doctorBloodTestTomorrow: 'Tomorrow is lab test day (Fasting)',
+    doctorBloodTestDaysLeft: 'days until blood test',
+    doctorBloodTestDaysAgo: 'days ago',
+    doctorSnoozedToast: 'Appointment reminder snoozed',
     doctorNotesSection: 'DOCTOR NOTES & INSTRUCTIONS',
     doctorNotesPlaceholder: 'e.g. Report if BP > 140, low salt diet, fasting blood test...',
     doctorShareMedList: 'Share Medication List with Doctor',

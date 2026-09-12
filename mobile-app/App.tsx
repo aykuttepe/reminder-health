@@ -53,6 +53,12 @@ import {
   ACTION_TAKEN,
   ACTION_SNOOZE,
   ACTION_SKIP,
+  ACTION_APPT_SNOOZE_1H,
+  ACTION_APPT_SNOOZE_3H,
+  ACTION_APPT_DONE,
+  syncDoctorAppointmentNotifications,
+  snoozeDoctorAppointmentNotification,
+  cancelDoctorAppointmentNotifications,
   NotificationSoundType,
   ActiveNotificationPayload,
 } from './src/notifications';
@@ -420,10 +426,10 @@ function MainApp() {
 
   // Modern Calendar Modal State
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate' | 'doctorNextAppointment'>('startDate');
+  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate' | 'doctorNextAppointment' | 'doctorBloodTestDate'>('startDate');
   const [calendarTitle, setCalendarTitle] = useState('Tarih Seçin');
 
-  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate' | 'doctorNextAppointment', title: string) => {
+  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate' | 'doctorNextAppointment' | 'doctorBloodTestDate', title: string) => {
     setCalendarTarget(target);
     setCalendarTitle(title);
     setCalendarOpen(true);
@@ -436,6 +442,8 @@ function MainApp() {
       setCycleStartDate(selectedDateStr);
     } else if (calendarTarget === 'doctorNextAppointment') {
       setDoctorNextAppointment(selectedDateStr);
+    } else if (calendarTarget === 'doctorBloodTestDate') {
+      setDoctorBloodTestDate(selectedDateStr);
     }
   };
 
@@ -633,6 +641,9 @@ function MainApp() {
   const [doctorHospital, setDoctorHospital] = useState('');
   const [doctorPhone, setDoctorPhone] = useState('');
   const [doctorNextAppointment, setDoctorNextAppointment] = useState('');
+  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState('09:00');
+  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(['1d']);
+  const [doctorBloodTestDate, setDoctorBloodTestDate] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
   const [snoozeMinutes, setSnoozeMinutes] = useState(15);
   const [leadTimeMinutes, setLeadTimeMinutes] = useState(0);
@@ -765,7 +776,20 @@ function MainApp() {
       return status === 'taken' || status === 'skipped';
     });
 
-    const removeListener = addNotificationResponseListener(({ actionId, doseId, timeStr, date }) => {
+    const removeListener = addNotificationResponseListener(res => {
+      const { actionId, doseId, timeStr, date, isAppointment, title, body } = res;
+      if (isAppointment) {
+        if (actionId === ACTION_APPT_SNOOZE_1H) {
+          void snoozeDoctorAppointmentNotification(60, title, body);
+          showToast(language === 'en' ? '⏱️ Appointment reminder snoozed 1 hour' : '⏱️ Randevu hatırlatıcısı 1 saat ertelendi');
+        } else if (actionId === ACTION_APPT_SNOOZE_3H) {
+          void snoozeDoctorAppointmentNotification(180, title, body);
+          showToast(language === 'en' ? '⏱️ Appointment reminder snoozed 3 hours' : '⏱️ Randevu hatırlatıcısı 3 saat ertelendi');
+        } else if (actionId === ACTION_APPT_DONE) {
+          showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
+        }
+        return;
+      }
       const dose = dosesRef.current.find(d => d.id === doseId);
       if (!dose) return;
       const time = timeStr || dose.time;
@@ -847,6 +871,9 @@ function MainApp() {
           if (parsed.doctorHospital !== undefined) setDoctorHospital(parsed.doctorHospital);
           if (parsed.doctorPhone !== undefined) setDoctorPhone(parsed.doctorPhone);
           if (parsed.doctorNextAppointment !== undefined) setDoctorNextAppointment(parsed.doctorNextAppointment);
+          if (parsed.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(parsed.doctorAppointmentTime);
+          if (parsed.doctorApptLeadOptions !== undefined && Array.isArray(parsed.doctorApptLeadOptions)) setDoctorApptLeadOptions(parsed.doctorApptLeadOptions);
+          if (parsed.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(parsed.doctorBloodTestDate);
           if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
           if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
           if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
@@ -923,6 +950,9 @@ function MainApp() {
         doctorHospital,
         doctorPhone,
         doctorNextAppointment,
+        doctorAppointmentTime,
+        doctorApptLeadOptions,
+        doctorBloodTestDate,
         doctorNotes,
         snoozeMinutes,
         leadTimeMinutes,
@@ -952,6 +982,9 @@ function MainApp() {
     doctorHospital,
     doctorPhone,
     doctorNextAppointment,
+    doctorAppointmentTime,
+    doctorApptLeadOptions,
+    doctorBloodTestDate,
     doctorNotes,
     snoozeMinutes,
     leadTimeMinutes,
@@ -966,6 +999,30 @@ function MainApp() {
     exactAlarmEnabled,
     autoRescheduleOnBoot,
     wakeScreenOnAlarm,
+  ]);
+
+  // Sync doctor appointment and lab test notifications
+  useEffect(() => {
+    if (!hydrated || hasNotificationPermission === null) return;
+    void syncDoctorAppointmentNotifications({
+      appointmentDate: doctorNextAppointment,
+      appointmentTime: doctorAppointmentTime,
+      leadOptions: doctorApptLeadOptions,
+      bloodTestDate: doctorBloodTestDate,
+      doctorName,
+      hospital: doctorHospital,
+      lang: language,
+    });
+  }, [
+    hydrated,
+    hasNotificationPermission,
+    doctorNextAppointment,
+    doctorAppointmentTime,
+    doctorApptLeadOptions,
+    doctorBloodTestDate,
+    doctorName,
+    doctorHospital,
+    language,
   ]);
 
 
@@ -1360,6 +1417,9 @@ function MainApp() {
       doctorHospital,
       doctorPhone,
       doctorNextAppointment,
+      doctorAppointmentTime,
+      doctorApptLeadOptions,
+      doctorBloodTestDate,
       doctorNotes,
       notifications,
       soundEnabled,
@@ -1396,6 +1456,16 @@ function MainApp() {
       setDoctorHospital(snapshot.settings.doctorHospital || '');
       setDoctorPhone(snapshot.settings.doctorPhone || '');
       setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
+      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '09:00');
+      if (snapshot.settings.doctorApptLeadOptions) {
+        try {
+          const opts = typeof snapshot.settings.doctorApptLeadOptions === 'string'
+            ? JSON.parse(snapshot.settings.doctorApptLeadOptions)
+            : snapshot.settings.doctorApptLeadOptions;
+          if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
+        } catch {}
+      }
+      setDoctorBloodTestDate(snapshot.settings.doctorBloodTestDate || '');
       setDoctorNotes(snapshot.settings.doctorNotes || '');
       if (snapshot.settings.notifications !== undefined) setNotifications(snapshot.settings.notifications);
       if (snapshot.settings.soundEnabled !== undefined) setSoundEnabled(snapshot.settings.soundEnabled);
@@ -1447,6 +1517,9 @@ function MainApp() {
       if (doctorHospital !== undefined) payloadSettings.doctorHospital = doctorHospital;
       if (doctorPhone !== undefined) payloadSettings.doctorPhone = doctorPhone;
       if (doctorNextAppointment !== undefined) payloadSettings.doctorNextAppointment = doctorNextAppointment;
+      if (doctorAppointmentTime !== undefined) payloadSettings.doctorAppointmentTime = doctorAppointmentTime;
+      if (doctorApptLeadOptions !== undefined) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
+      if (doctorBloodTestDate !== undefined) payloadSettings.doctorBloodTestDate = doctorBloodTestDate;
       if (doctorNotes !== undefined) payloadSettings.doctorNotes = doctorNotes;
 
       const response = await authRequest(serverUrl, '/api/sync', {
@@ -1472,6 +1545,16 @@ function MainApp() {
           if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
           if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
           if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
+          if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
+          if (response.settings.doctorApptLeadOptions !== undefined) {
+            try {
+              const opts = typeof response.settings.doctorApptLeadOptions === 'string'
+                ? JSON.parse(response.settings.doctorApptLeadOptions)
+                : response.settings.doctorApptLeadOptions;
+              if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
+            } catch {}
+          }
+          if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
           if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
           if (response.settings.notifications !== undefined) setNotifications(response.settings.notifications);
           if (response.settings.soundEnabled !== undefined) setSoundEnabled(response.settings.soundEnabled);
@@ -1648,6 +1731,9 @@ function MainApp() {
           doctorHospital: doctorHospital.trim(),
           doctorPhone: doctorPhone.trim(),
           doctorNextAppointment,
+          doctorAppointmentTime,
+          doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
+          doctorBloodTestDate,
           doctorNotes: doctorNotes.trim(),
         }
       }, session).catch(() => {});
@@ -1701,7 +1787,11 @@ function MainApp() {
     }
 
     if (doctorNextAppointment) {
-      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${formatLocalizedDate(doctorNextAppointment, language)}\n`;
+      const timePart = doctorAppointmentTime ? ` (${doctorAppointmentTime})` : '';
+      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${formatLocalizedDate(doctorNextAppointment, language)}${timePart}\n`;
+    }
+    if (doctorBloodTestDate) {
+      text += `🧪 ${t.doctorBloodTestLabel}: ${formatLocalizedDate(doctorBloodTestDate, language)}\n`;
     }
     if (doctorNotes.trim()) {
       text += `\n📝 ${t.doctorNotesSection}:\n${doctorNotes.trim()}\n`;
@@ -1814,61 +1904,103 @@ function MainApp() {
             </View>
             <Text style={styles.pushBannerTitle}>{activeBannerNotification.title}</Text>
             <Text style={styles.pushBannerBody}>{activeBannerNotification.body}</Text>
-            <View style={styles.pushBannerActions}>
-              <TouchableOpacity
-                style={styles.pushBannerActionTake}
-                onPress={() => {
-                  triggerHaptic();
-                  const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                  const targetTime = activeBannerNotification.time || targetDose?.time;
-                  if (targetDose) {
-                    cancelDoseRepeatNotifications(targetDose.id, targetTime, activeBannerNotification.date).catch(console.error);
-                    setDoses(previous => previous.map(d => d.id === targetDose.id
-                      ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'taken') : d));
-                  }
-                  setActiveBannerNotification(null);
-                  showToast(language === 'en' ? '✅ Dose confirmed as taken' : '✅ İlaç alındı olarak onaylandı');
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                <Text style={styles.pushBannerActionTakeText}>{t.take}</Text>
-              </TouchableOpacity>
+            {activeBannerNotification.isAppointment ? (
+              <View style={styles.pushBannerActions}>
+                <TouchableOpacity
+                  style={styles.pushBannerActionTake}
+                  onPress={() => {
+                    triggerHaptic();
+                    setActiveBannerNotification(null);
+                    showToast(language === 'en' ? '✅ Appointment confirmed' : '✅ Randevu bildirimi onaylandı');
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={15} color="#081624" />
+                  <Text style={styles.pushBannerActionTakeText}>{language === 'en' ? 'OK' : 'Tamam'}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.pushBannerActionSnooze}
-                onPress={() => {
-                  triggerHaptic();
-                  const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                  const targetTime = activeBannerNotification.time || targetDose?.time;
-                  if (targetDose) {
-                    void snoozeDose(targetDose, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey());
-                  }
-                  setActiveBannerNotification(null);
-                }}
-              >
-                <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
-                <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3m' : '3 Dk Ertele'}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.pushBannerActionSnooze}
+                  onPress={() => {
+                    triggerHaptic();
+                    void snoozeDoctorAppointmentNotification(60, activeBannerNotification.title, activeBannerNotification.body);
+                    setActiveBannerNotification(null);
+                    showToast(language === 'en' ? '⏱️ Snoozed 1 hour' : '⏱️ 1 saat ertelendi');
+                  }}
+                >
+                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
+                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 1h' : '1 Saat Ertele'}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.pushBannerActionSkip}
-                onPress={() => {
-                  triggerHaptic();
-                  const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                  const targetTime = activeBannerNotification.time || targetDose?.time;
-                  if (targetDose) {
-                    cancelDoseRepeatNotifications(targetDose.id, targetTime, activeBannerNotification.date).catch(console.error);
-                    setDoses(previous => previous.map(d => d.id === targetDose.id
-                      ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'skipped') : d));
-                  }
-                  setActiveBannerNotification(null);
-                  showToast(language === 'en' ? '❌ Marked as skipped' : '❌ İlaç atlandı olarak işaretlendi');
-                }}
-              >
-                <Ionicons name="close-circle-outline" size={15} color="#f87171" />
-                <Text style={styles.pushBannerActionSkipText}>{t.skip}</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.pushBannerActionSnooze}
+                  onPress={() => {
+                    triggerHaptic();
+                    void snoozeDoctorAppointmentNotification(180, activeBannerNotification.title, activeBannerNotification.body);
+                    setActiveBannerNotification(null);
+                    showToast(language === 'en' ? '⏱️ Snoozed 3 hours' : '⏱️ 3 saat ertelendi');
+                  }}
+                >
+                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
+                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3h' : '3 Saat Ertele'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.pushBannerActions}>
+                <TouchableOpacity
+                  style={styles.pushBannerActionTake}
+                  onPress={() => {
+                    triggerHaptic();
+                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
+                    const targetTime = activeBannerNotification.time || targetDose?.time;
+                    if (targetDose) {
+                      cancelDoseRepeatNotifications(targetDose.id, targetTime, activeBannerNotification.date).catch(console.error);
+                      setDoses(previous => previous.map(d => d.id === targetDose.id
+                        ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'taken') : d));
+                    }
+                    setActiveBannerNotification(null);
+                    showToast(language === 'en' ? '✅ Dose confirmed as taken' : '✅ İlaç alındı olarak onaylandı');
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={15} color="#081624" />
+                  <Text style={styles.pushBannerActionTakeText}>{t.take}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.pushBannerActionSnooze}
+                  onPress={() => {
+                    triggerHaptic();
+                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
+                    const targetTime = activeBannerNotification.time || targetDose?.time;
+                    if (targetDose) {
+                      void snoozeDose(targetDose, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey());
+                    }
+                    setActiveBannerNotification(null);
+                  }}
+                >
+                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
+                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3m' : '3 Dk Ertele'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.pushBannerActionSkip}
+                  onPress={() => {
+                    triggerHaptic();
+                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
+                    const targetTime = activeBannerNotification.time || targetDose?.time;
+                    if (targetDose) {
+                      cancelDoseRepeatNotifications(targetDose.id, targetTime, activeBannerNotification.date).catch(console.error);
+                      setDoses(previous => previous.map(d => d.id === targetDose.id
+                        ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'skipped') : d));
+                    }
+                    setActiveBannerNotification(null);
+                    showToast(language === 'en' ? '❌ Marked as skipped' : '❌ İlaç atlandı olarak işaretlendi');
+                  }}
+                >
+                  <Ionicons name="close-circle-outline" size={15} color="#f87171" />
+                  <Text style={styles.pushBannerActionSkipText}>{t.skip}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 
@@ -2344,6 +2476,31 @@ function MainApp() {
                   }
                 }
 
+                const bloodTestDiff = doctorBloodTestDate ? getCalendarDayDiff(today, doctorBloodTestDate) : null;
+                let bloodBadgeText = '';
+                let bloodBadgeTextColor = '#a78bfa';
+                let bloodBadgeBg = 'rgba(167, 139, 250, 0.18)';
+
+                if (bloodTestDiff !== null) {
+                  if (bloodTestDiff === 0) {
+                    bloodBadgeText = t.doctorBloodTestToday;
+                    bloodBadgeTextColor = '#fbbf24';
+                    bloodBadgeBg = 'rgba(251, 191, 36, 0.2)';
+                  } else if (bloodTestDiff === 1) {
+                    bloodBadgeText = `${t.doctorBloodTestTomorrow} (${formatLocalizedDate(doctorBloodTestDate, language)})`;
+                    bloodBadgeTextColor = '#a78bfa';
+                    bloodBadgeBg = 'rgba(167, 139, 250, 0.2)';
+                  } else if (bloodTestDiff > 1) {
+                    bloodBadgeText = `${bloodTestDiff} ${t.doctorBloodTestDaysLeft} (${formatLocalizedDate(doctorBloodTestDate, language)})`;
+                    bloodBadgeTextColor = '#38bdf8';
+                    bloodBadgeBg = 'rgba(56, 189, 248, 0.18)';
+                  } else {
+                    bloodBadgeText = `${Math.abs(bloodTestDiff)} ${t.doctorBloodTestDaysAgo} (${formatLocalizedDate(doctorBloodTestDate, language)})`;
+                    bloodBadgeTextColor = '#94a3b8';
+                    bloodBadgeBg = 'rgba(148, 163, 184, 0.15)';
+                  }
+                }
+
                 return (
                   <>
                     {/* KULLANICI BİLGİSİ */}
@@ -2489,16 +2646,146 @@ function MainApp() {
                       </TouchableOpacity>
 
                       {doctorNextAppointment ? (
+                        <>
+                          {/* Randevu Saati Seçimi */}
+                          <View style={{ marginTop: 14 }}>
+                            <Text style={styles.profileFieldLabel}>{t.doctorAppointmentTimeLabel}</Text>
+                            <TimeSlotPicker
+                              slotTime={doctorAppointmentTime}
+                              onChange={val => {
+                                setDoctorAppointmentTime(val);
+                                syncProfileSettings();
+                              }}
+                              onStep={delta => {
+                                const [h = 9, m = 0] = doctorAppointmentTime.split(':').map(Number);
+                                const cur = h * 60 + m;
+                                const next = Math.max(0, Math.min(23 * 60 + 45, cur + delta));
+                                const nextH = String(Math.floor(next / 60)).padStart(2, '0');
+                                const nextM = String(next % 60).padStart(2, '0');
+                                setDoctorAppointmentTime(`${nextH}:${nextM}`);
+                                syncProfileSettings();
+                              }}
+                              lang={language}
+                            />
+                          </View>
+
+                          {/* Önceden Hatırlatma Seçenekleri (Çoklu Seçim) */}
+                          <View style={{ marginTop: 14 }}>
+                            <Text style={styles.profileFieldLabel}>{t.doctorLeadReminderLabel}</Text>
+                            <Text style={{ color: '#adb3bf', fontSize: 11, marginBottom: 8, marginTop: 2 }}>
+                              {t.doctorLeadReminderSub}
+                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                              {[
+                                { id: '3d', label: t.leadOpt3d },
+                                { id: '2d', label: t.leadOpt2d },
+                                { id: '1d', label: t.leadOpt1d },
+                                { id: '2h', label: t.leadOpt2h },
+                                { id: '1h', label: t.leadOpt1h },
+                              ].map(opt => {
+                                const active = doctorApptLeadOptions.includes(opt.id);
+                                return (
+                                  <TouchableOpacity
+                                    key={opt.id}
+                                    style={[
+                                      styles.quickChip,
+                                      active && styles.quickChipActive,
+                                      { paddingVertical: 8, paddingHorizontal: 12 }
+                                    ]}
+                                    onPress={() => {
+                                      triggerHaptic();
+                                      let nextOpts: string[];
+                                      if (active) {
+                                        nextOpts = doctorApptLeadOptions.filter(x => x !== opt.id);
+                                      } else {
+                                        nextOpts = [...doctorApptLeadOptions, opt.id];
+                                      }
+                                      setDoctorApptLeadOptions(nextOpts);
+                                      syncProfileSettings();
+                                    }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Text style={[styles.quickChipText, active && styles.quickChipTextActive, { fontSize: 12 }]}>
+                                      {active ? '✓ ' : '+ '}{opt.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          </View>
+
+                          {/* Kilit Ekranı Erteleme Bilgi Rozeti */}
+                          <View style={{ backgroundColor: '#101d29', padding: 10, borderRadius: 8, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#23374d' }}>
+                            <Ionicons name="time-outline" size={16} color="#a9dfca" />
+                            <Text style={{ color: '#adb3bf', fontSize: 11, flex: 1, lineHeight: 16 }}>
+                              {language === 'en'
+                                ? 'When the reminder arrives, you can snooze 1 hour or 3 hours directly from the lock screen.'
+                                : 'Hatırlatıcı geldiğinde kilit ekranındaki butonlarla 1 saat veya 3 saat erteleyebilirsiniz.'}
+                            </Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 6 }}
+                            onPress={() => {
+                              triggerHaptic();
+                              setDoctorNextAppointment('');
+                              syncProfileSettings();
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={14} color="#ff9696" />
+                            <Text style={{ color: '#ff9696', fontSize: 12, fontWeight: '600' }}>{t.doctorClearAppointment}</Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : null}
+                    </View>
+
+                    {/* KAN TAHLİLİ / TETKİK HAZIRLIĞI */}
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="flask-outline" size={16} color="#a78bfa" />
+                      <Text style={styles.settingGroupTitle}>{t.doctorBloodTestSection}</Text>
+                    </View>
+                    <View style={styles.settingCard}>
+                      <Text style={styles.settingTitle}>{t.doctorBloodTestLabel}</Text>
+                      <Text style={{ color: '#adb3bf', fontSize: 11, marginBottom: 10, marginTop: 2 }}>
+                        {language === 'en'
+                          ? 'Select blood test date before visit; you will be reminded to go fasting that morning.'
+                          : 'Randevu öncesi tahlil gününüzü seçin; o sabah aç karnına kan verme uyarısı alırsınız.'}
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.appointmentCard, { borderColor: doctorBloodTestDate ? '#7c3aed' : '#203244' }]}
+                        onPress={() => openCalendarPicker('doctorBloodTestDate', t.doctorSelectBloodTest)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.appointmentRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Ionicons name="flask" size={18} color="#a78bfa" />
+                            <Text style={doctorBloodTestDate ? styles.appointmentDateText : styles.appointmentPlaceholder}>
+                              {doctorBloodTestDate ? formatLocalizedDate(doctorBloodTestDate, language) : t.doctorSelectBloodTest}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color="#5c6e80" />
+                        </View>
+
+                        {bloodBadgeText.length > 0 && (
+                          <View style={[styles.appointmentBadge, { backgroundColor: bloodBadgeBg }]}>
+                            <Text style={[styles.appointmentBadgeText, { color: bloodBadgeTextColor }]}>
+                              {bloodBadgeText}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      {doctorBloodTestDate ? (
                         <TouchableOpacity
                           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 6 }}
                           onPress={() => {
                             triggerHaptic();
-                            setDoctorNextAppointment('');
+                            setDoctorBloodTestDate('');
                             syncProfileSettings();
                           }}
                         >
                           <Ionicons name="trash-outline" size={14} color="#ff9696" />
-                          <Text style={{ color: '#ff9696', fontSize: 12, fontWeight: '600' }}>{t.doctorClearAppointment}</Text>
+                          <Text style={{ color: '#ff9696', fontSize: 12, fontWeight: '600' }}>{t.doctorClearBloodTest}</Text>
                         </TouchableOpacity>
                       ) : null}
                     </View>

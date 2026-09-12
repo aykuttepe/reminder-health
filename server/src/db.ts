@@ -88,7 +88,7 @@ export class RutinDatabase {
         this.sql.exec('DROP TABLE legacy_doses; DROP TABLE legacy_learned_meds; DROP TABLE legacy_settings;');
       }
       // Never retain old credentials in backups of application settings.
-      this.sql.exec("DELETE FROM settings WHERE key NOT IN ('userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language','doctorName','doctorSpecialty','doctorHospital','doctorPhone','doctorNextAppointment','doctorNotes'); PRAGMA user_version=4;");
+      this.sql.exec("DELETE FROM settings WHERE key NOT IN ('userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language','doctorName','doctorSpecialty','doctorHospital','doctorPhone','doctorNextAppointment','doctorNotes','doctorAppointmentTime','doctorApptLeadOptions','doctorBloodTestDate'); PRAGMA user_version=4;");
     });
   }
   transaction<T>(fn: () => T): T {

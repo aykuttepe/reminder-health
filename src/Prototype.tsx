@@ -477,6 +477,9 @@ export type PrototypeSettings = {
   doctorHospital?: string;
   doctorPhone?: string;
   doctorNextAppointment?: string;
+  doctorAppointmentTime?: string;
+  doctorApptLeadOptions?: string[];
+  doctorBloodTestDate?: string;
   doctorNotes?: string;
 };
 
@@ -487,6 +490,9 @@ const DEFAULT_SETTINGS: PrototypeSettings = {
   doctorHospital: '',
   doctorPhone: '',
   doctorNextAppointment: '',
+  doctorAppointmentTime: '09:00',
+  doctorApptLeadOptions: ['1d'],
+  doctorBloodTestDate: '',
   doctorNotes: '',
   notifications: true,
   soundEnabled: true,
@@ -708,6 +714,9 @@ function InnerPrototype() {
   const [doctorHospital, setDoctorHospital] = useState<string>(storedSettings.doctorHospital || '');
   const [doctorPhone, setDoctorPhone] = useState<string>(storedSettings.doctorPhone || '');
   const [doctorNextAppointment, setDoctorNextAppointment] = useState<string>(storedSettings.doctorNextAppointment || '');
+  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState<string>(storedSettings.doctorAppointmentTime || '09:00');
+  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(storedSettings.doctorApptLeadOptions || ['1d']);
+  const [doctorBloodTestDate, setDoctorBloodTestDate] = useState<string>(storedSettings.doctorBloodTestDate || '');
   const [doctorNotes, setDoctorNotes] = useState<string>(storedSettings.doctorNotes || '');
   const [privateMode, setPrivateMode] = useState<boolean>(storedSettings.privateMode);
   const [largeText, setLargeText] = useState<boolean>(storedSettings.largeText);
@@ -815,6 +824,9 @@ function InnerPrototype() {
         doctorHospital,
         doctorPhone,
         doctorNextAppointment,
+        doctorAppointmentTime,
+        doctorApptLeadOptions,
+        doctorBloodTestDate,
         doctorNotes,
         notifications,
         soundEnabled,
@@ -846,6 +858,9 @@ function InnerPrototype() {
     doctorHospital,
     doctorPhone,
     doctorNextAppointment,
+    doctorAppointmentTime,
+    doctorApptLeadOptions,
+    doctorBloodTestDate,
     doctorNotes,
     notifications,
     soundEnabled,
@@ -1170,7 +1185,7 @@ function InnerPrototype() {
 
   // Sync Action Handlers
 
-  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, doctorName, doctorSpecialty, doctorHospital, doctorPhone, doctorNextAppointment, doctorNotes, notifications, soundEnabled, soundType, snoozeMinutes}});
+  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, doctorName, doctorSpecialty, doctorHospital, doctorPhone, doctorNextAppointment, doctorAppointmentTime, doctorApptLeadOptions, doctorBloodTestDate, doctorNotes, notifications, soundEnabled, soundType, snoozeMinutes}});
   const bindAccount = async (next: Session) => {
     switchingAccount.current = true;
     try {
@@ -1186,6 +1201,16 @@ function InnerPrototype() {
       setDoctorHospital(snapshot.settings.doctorHospital || '');
       setDoctorPhone(snapshot.settings.doctorPhone || '');
       setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
+      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '09:00');
+      if (snapshot.settings.doctorApptLeadOptions) {
+        try {
+          const opts = typeof snapshot.settings.doctorApptLeadOptions === 'string'
+            ? JSON.parse(snapshot.settings.doctorApptLeadOptions)
+            : snapshot.settings.doctorApptLeadOptions;
+          if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
+        } catch {}
+      }
+      setDoctorBloodTestDate(snapshot.settings.doctorBloodTestDate || '');
       setDoctorNotes(snapshot.settings.doctorNotes || '');
       setNotifications(snapshot.settings.notifications ?? true);
       setSoundEnabled(snapshot.settings.soundEnabled ?? true);
@@ -1326,6 +1351,9 @@ function InnerPrototype() {
           doctorHospital,
           doctorPhone,
           doctorNextAppointment,
+          doctorAppointmentTime,
+          doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
+          doctorBloodTestDate,
           doctorNotes,
           notifications,
           soundEnabled,
@@ -1347,6 +1375,16 @@ function InnerPrototype() {
           if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
           if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
           if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
+          if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
+          if (response.settings.doctorApptLeadOptions !== undefined) {
+            try {
+              const opts = typeof response.settings.doctorApptLeadOptions === 'string'
+                ? JSON.parse(response.settings.doctorApptLeadOptions)
+                : response.settings.doctorApptLeadOptions;
+              if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
+            } catch {}
+          }
+          if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
           if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
         }
         const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1379,6 +1417,9 @@ function InnerPrototype() {
           doctorHospital: doctorHospital.trim(),
           doctorPhone: doctorPhone.trim(),
           doctorNextAppointment,
+          doctorAppointmentTime,
+          doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
+          doctorBloodTestDate,
           doctorNotes: doctorNotes.trim(),
         }
       }, session).catch(() => {});
@@ -1401,16 +1442,19 @@ function InnerPrototype() {
     } else {
       activeMeds.forEach((m, idx) => {
         const times = Array.isArray(m.times) && m.times.length > 0 ? m.times.join(', ') : (m.time || '-');
-        const meal = mealLabels[m.mealCondition ?? 'tok'];
         const stockInfo = m.stock !== undefined ? ` [${language === 'en' ? 'Stock' : 'Stok'}: ${m.stock}]` : '';
         text += `${idx + 1}. ${m.name} (${m.amount || '1 doz'})\n`;
-        text += `   ⏰ ${times} · ${meal}${stockInfo}\n`;
+        text += `   ⏰ ${times}${stockInfo}\n`;
         if (m.instructions) text += `   ℹ️ ${m.instructions}\n`;
       });
     }
 
     if (doctorNextAppointment) {
-      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${doctorNextAppointment}\n`;
+      const timePart = doctorAppointmentTime ? ` (${doctorAppointmentTime})` : '';
+      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${doctorNextAppointment}${timePart}\n`;
+    }
+    if (doctorBloodTestDate) {
+      text += `🧪 ${t.doctorBloodTestLabel}: ${doctorBloodTestDate}\n`;
     }
     if (doctorNotes.trim()) {
       text += `\n📝 ${t.doctorNotesSection}:\n${doctorNotes.trim()}\n`;
@@ -2431,7 +2475,7 @@ function InnerPrototype() {
                     <div className="info-note"><ShieldCheck size={22}/><p>Bu bir etkileşimli prototip. İlaç planınız ve tercihleriniz bu tarayıcıda yerel olarak güvenle saklanır.</p></div>
 
                     <div style={{ textAlign: 'center', marginTop: '16px', marginBottom: '8px', fontSize: '12px', color: '#68778d' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.3 (Web Prototip)</span>
+                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.4 (Web Prototip)</span>
                       <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>Karekod & Senkronizasyon · Güncel Sürüm</span>
                     </div>
                   </>
@@ -2452,9 +2496,25 @@ function InnerPrototype() {
                     } else if (diff > 1) {
                       badgeText = `${diff} ${t.doctorAppointmentDaysLeft} (${doctorNextAppointment})`;
                       badgeClass = 'info';
+                    }
+                  }
+
+                  let bloodBadgeText = '';
+                  let bloodBadgeClass = 'purple';
+                  if (doctorBloodTestDate) {
+                    const bDiff = Math.round((new Date(doctorBloodTestDate).getTime() - new Date(today).getTime()) / 86400000);
+                    if (bDiff === 0) {
+                      bloodBadgeText = t.doctorBloodTestToday;
+                      bloodBadgeClass = 'warning';
+                    } else if (bDiff === 1) {
+                      bloodBadgeText = `${t.doctorBloodTestTomorrow} (${doctorBloodTestDate})`;
+                      bloodBadgeClass = 'purple';
+                    } else if (bDiff > 1) {
+                      bloodBadgeText = `${bDiff} ${t.doctorBloodTestDaysLeft} (${doctorBloodTestDate})`;
+                      bloodBadgeClass = 'info';
                     } else {
-                      badgeText = `${Math.abs(diff)} ${t.doctorAppointmentDaysAgo} (${doctorNextAppointment})`;
-                      badgeClass = 'muted';
+                      bloodBadgeText = `${Math.abs(bDiff)} ${t.doctorBloodTestDaysAgo} (${doctorBloodTestDate})`;
+                      bloodBadgeClass = 'muted';
                     }
                   }
 
@@ -2596,6 +2656,98 @@ function InnerPrototype() {
                         {badgeText && (
                           <div className={`appointment-badge ${badgeClass}`}>
                             <span>{badgeText}</span>
+                          </div>
+                        )}
+
+                        {doctorNextAppointment && (
+                          <>
+                            <div style={{ marginTop: '12px' }}>
+                              <label className="field-sub-label">{t.doctorAppointmentTimeLabel}</label>
+                              <input
+                                type="time"
+                                className="appointment-date-input"
+                                style={{ width: '100%', marginTop: '4px' }}
+                                value={doctorAppointmentTime}
+                                onChange={(e) => {
+                                  setDoctorAppointmentTime(e.target.value);
+                                  syncProfileSettings();
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ marginTop: '12px' }}>
+                              <label className="field-sub-label">{t.doctorLeadReminderLabel}</label>
+                              <span style={{ display: 'block', fontSize: '11px', color: '#8899a8', marginBottom: '6px' }}>{t.doctorLeadReminderSub}</span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                {[
+                                  { id: '3d', label: t.leadOpt3d },
+                                  { id: '2d', label: t.leadOpt2d },
+                                  { id: '1d', label: t.leadOpt1d },
+                                  { id: '2h', label: t.leadOpt2h },
+                                  { id: '1h', label: t.leadOpt1h },
+                                ].map(opt => {
+                                  const active = doctorApptLeadOptions.includes(opt.id);
+                                  return (
+                                    <button
+                                      key={opt.id}
+                                      type="button"
+                                      className={`filter-chip ${active ? 'active' : ''}`}
+                                      style={{ fontSize: '11px', padding: '6px 10px' }}
+                                      onClick={() => {
+                                        let nextOpts: string[];
+                                        if (active) nextOpts = doctorApptLeadOptions.filter(x => x !== opt.id);
+                                        else nextOpts = [...doctorApptLeadOptions, opt.id];
+                                        setDoctorApptLeadOptions(nextOpts);
+                                        syncProfileSettings();
+                                      }}
+                                    >
+                                      {active ? '✓ ' : '+ '}{opt.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Kan Tahlili / Tetkik Hazırlığı */}
+                      <div className="settings-section-head" style={{ marginTop: '20px' }}>
+                        <Flask size={18} weight="bold" className="settings-section-icon" />
+                        <h4>{t.doctorBloodTestSection}</h4>
+                      </div>
+                      <div className="settings-detail-card">
+                        <label className="field-sub-label">{t.doctorBloodTestLabel}</label>
+                        <span style={{ display: 'block', fontSize: '11px', color: '#8899a8', marginBottom: '8px' }}>
+                          {language === 'en' ? 'Select lab test date; you will be reminded to go fasting that morning.' : 'Randevu öncesi tahlil gününüzü seçin; o sabah aç karnına kan verme uyarısı alırsınız.'}
+                        </span>
+                        <div className="appointment-picker-row">
+                          <input
+                            type="date"
+                            className="appointment-date-input"
+                            value={doctorBloodTestDate}
+                            onChange={(e) => {
+                              setDoctorBloodTestDate(e.target.value);
+                              syncProfileSettings();
+                            }}
+                          />
+                          {doctorBloodTestDate && (
+                            <button
+                              type="button"
+                              className="appointment-clear-btn"
+                              onClick={() => {
+                                setDoctorBloodTestDate('');
+                                syncProfileSettings();
+                              }}
+                              title={t.doctorClearBloodTest}
+                            >
+                              <Trash size={16} />
+                            </button>
+                          )}
+                        </div>
+                        {bloodBadgeText && (
+                          <div className={`appointment-badge ${bloodBadgeClass}`} style={{ marginTop: '8px' }}>
+                            <span>{bloodBadgeText}</span>
                           </div>
                         )}
                       </div>

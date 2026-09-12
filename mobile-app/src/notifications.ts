@@ -51,6 +51,11 @@ export const ACTION_TAKEN = 'ACTION_TAKEN';
 export const ACTION_SNOOZE = 'ACTION_SNOOZE';
 export const ACTION_SKIP = 'ACTION_SKIP';
 
+export const NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS = 'appointment-reminder-actions';
+export const ACTION_APPT_SNOOZE_1H = 'ACTION_APPT_SNOOZE_1H';
+export const ACTION_APPT_SNOOZE_3H = 'ACTION_APPT_SNOOZE_3H';
+export const ACTION_APPT_DONE = 'ACTION_APPT_DONE';
+
 export const mealLabels: Record<string, string> = {
   tok: 'Tok karnına',
   ac: 'Aç karnına',
@@ -422,6 +427,24 @@ export async function initNotifications(): Promise<void> {
           options: { opensAppToForeground: true, isDestructive: true },
         },
       ]);
+
+      await Notifications.setNotificationCategoryAsync(NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS, [
+        {
+          identifier: ACTION_APPT_SNOOZE_1H,
+          buttonTitle: '⏱️ 1 Saat Ertele',
+          options: { opensAppToForeground: true },
+        },
+        {
+          identifier: ACTION_APPT_SNOOZE_3H,
+          buttonTitle: '⏱️ 3 Saat Ertele',
+          options: { opensAppToForeground: true },
+        },
+        {
+          identifier: ACTION_APPT_DONE,
+          buttonTitle: '✅ Tamam',
+          options: { opensAppToForeground: true },
+        },
+      ]);
     } catch (e) {
       console.log('setNotificationCategoryAsync fallback:', e);
     }
@@ -512,6 +535,13 @@ export type NotificationActionResponse = {
   timeStr?: string;
   date?: string;
   isRepeat?: boolean;
+  isAppointment?: boolean;
+  appointmentDate?: string;
+  appointmentTime?: string;
+  leadOption?: string;
+  isBloodTest?: boolean;
+  title?: string;
+  body?: string;
 };
 
 export function addNotificationResponseListener(
@@ -531,6 +561,13 @@ export function addNotificationResponseListener(
         timeStr,
         date: data?.date,
         isRepeat,
+        isAppointment: data?.isAppointment,
+        appointmentDate: data?.appointmentDate,
+        appointmentTime: data?.appointmentTime,
+        leadOption: data?.leadOption,
+        isBloodTest: data?.isBloodTest,
+        title: res.notification.request.content.title ?? undefined,
+        body: res.notification.request.content.body ?? undefined,
       });
     } catch (err) {
       console.log('Notification response listener error:', err);
@@ -543,7 +580,7 @@ export function addNotificationResponseListener(
 }
 
 export function addNotificationReceivedListener(
-  listener: (notification: { isRepeat?: boolean; doseId?: string | number; time?: string; date?: string; title: string; body: string }) => void
+  listener: (notification: { isRepeat?: boolean; doseId?: string | number; time?: string; date?: string; isAppointment?: boolean; title: string; body: string }) => void
 ): () => void {
   const sub = Notifications.addNotificationReceivedListener(notif => {
     try {
@@ -553,6 +590,7 @@ export function addNotificationReceivedListener(
         doseId: data?.doseId !== undefined ? notificationId(data.doseId) : undefined,
         time: data?.time,
         date: data?.date,
+        isAppointment: data?.isAppointment,
         title: notif.request.content.title ?? 'İlaç Vakti',
         body: notif.request.content.body ?? '',
       });
@@ -970,4 +1008,217 @@ export async function scheduleTestNotification(
       isRepeat: false,
     });
   }, 3000);
+}
+
+export interface DoctorAppointmentScheduleParams {
+  appointmentDate?: string;
+  appointmentTime?: string;
+  leadOptions?: string[];
+  bloodTestDate?: string;
+  doctorName?: string;
+  hospital?: string;
+  lang?: 'tr' | 'en';
+}
+
+export function cancelDoctorAppointmentNotifications(): Promise<void> {
+  return serializeNotifications(async () => {
+    try {
+      const existing = await Notifications.getAllScheduledNotificationsAsync();
+      for (const item of existing) {
+        if (item.identifier.startsWith('appt-')) {
+          await Notifications.cancelScheduledNotificationAsync(item.identifier);
+        }
+      }
+    } catch (err) {
+      console.log('cancelDoctorAppointmentNotifications fallback:', err);
+    }
+  });
+}
+
+export function snoozeDoctorAppointmentNotification(
+  minutes = 60,
+  title?: string,
+  body?: string
+): Promise<void> {
+  return serializeNotifications(async () => {
+    try {
+      const fireAt = Date.now() + Math.max(10, minutes * 60) * 1000;
+      await Notifications.scheduleNotificationAsync({
+        identifier: `appt-snooze-${Date.now()}`,
+        content: {
+          title: title || '🗓️ Randevu Hatırlatması (Ertelendi)',
+          body: body || 'Doktor randevunuz veya tahliliniz yaklaşıyor.',
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          vibrate: [0, 500, 250, 500],
+          categoryIdentifier: NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS,
+          data: {
+            isAppointment: true,
+            isSnooze: true,
+          },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(fireAt),
+          channelId: SOUND_CHANNELS.default.id,
+        },
+      });
+    } catch (err) {
+      console.log('snoozeDoctorAppointmentNotification fallback:', err);
+    }
+  });
+}
+
+export function syncDoctorAppointmentNotifications(
+  params: DoctorAppointmentScheduleParams
+): Promise<void> {
+  return serializeNotifications(async () => {
+    try {
+      // 1. Cancel previous appointment and lab reminders
+      const existing = await Notifications.getAllScheduledNotificationsAsync();
+      for (const item of existing) {
+        if (item.identifier.startsWith('appt-')) {
+          try {
+            await Notifications.cancelScheduledNotificationAsync(item.identifier);
+          } catch {}
+        }
+      }
+
+      const {
+        appointmentDate,
+        appointmentTime = '09:00',
+        leadOptions = ['1d'],
+        bloodTestDate,
+        doctorName = '',
+        hospital = '',
+        lang = 'tr',
+      } = params;
+
+      const isEn = lang === 'en';
+      const docLabel = doctorName.trim()
+        ? (doctorName.startsWith('Dr') ? doctorName.trim() : `Dr. ${doctorName.trim()}`)
+        : (isEn ? 'your doctor' : 'doktorunuz');
+      const hospLabel = hospital.trim() ? ` (${hospital.trim()})` : '';
+
+      // 2. Schedule multi-lead appointment reminders
+      if (appointmentDate && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+        const [year, month, day] = appointmentDate.split('-').map(Number);
+        const [hour = 9, minute = 0] = appointmentTime.split(':').map(Number);
+        const appointmentDateTime = new Date(year, month - 1, day, hour, minute, 0, 0);
+
+        for (const lead of leadOptions) {
+          let triggerDate: Date | null = null;
+          let title = '';
+          let body = '';
+
+          if (lead === '3d') {
+            triggerDate = new Date(year, month - 1, day - 3, 20, 0, 0, 0);
+            title = isEn ? '🗓️ Yaklaşan Randevu (3 Gün Kaldı)' : '🗓️ Yaklaşan Doktor Randevusu (3 Gün Kaldı)';
+            body = isEn
+              ? `In 3 days (${appointmentDate} ${appointmentTime}), you have an appointment with ${docLabel}${hospLabel}.`
+              : `3 gün sonra (${appointmentDate} ${appointmentTime}) ${docLabel}${hospLabel} ile randevunuz var.`;
+          } else if (lead === '2d') {
+            triggerDate = new Date(year, month - 1, day - 2, 20, 0, 0, 0);
+            title = isEn ? '🗓️ Yaklaşan Randevu (2 Gün Kaldı)' : '🗓️ Yaklaşan Doktor Randevusu (2 Gün Kaldı)';
+            body = isEn
+              ? `In 2 days (${appointmentDate} ${appointmentTime}), you have an appointment with ${docLabel}${hospLabel}.`
+              : `2 gün sonra (${appointmentDate} ${appointmentTime}) ${docLabel}${hospLabel} ile randevunuz var.`;
+          } else if (lead === '1d') {
+            triggerDate = new Date(year, month - 1, day - 1, 20, 0, 0, 0);
+            title = isEn ? '🗓️ Tomorrow: Doctor Appointment!' : '🗓️ Yarın Doktor Randevunuz Var!';
+            body = isEn
+              ? `Tomorrow at ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}. Don't forget your med list and lab results!`
+              : `Yarın saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var. İlaç listenizi ve tahlil sonuçlarınızı yanınıza almayı unutmayın!`;
+          } else if (lead === '2h') {
+            triggerDate = new Date(appointmentDateTime.getTime() - 2 * 60 * 60 * 1000);
+            title = isEn ? '🗓️ Doctor Appointment in 2 Hours!' : '🗓️ 2 Saat Sonra Doktor Randevunuz Var!';
+            body = isEn
+              ? `At ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}.`
+              : `Saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var.`;
+          } else if (lead === '1h') {
+            triggerDate = new Date(appointmentDateTime.getTime() - 1 * 60 * 60 * 1000);
+            title = isEn ? '🗓️ Doctor Appointment in 1 Hour!' : '🗓️ 1 Saat Sonra Doktor Randevunuz Var!';
+            body = isEn
+              ? `At ${appointmentTime}, you have an appointment with ${docLabel}${hospLabel}.`
+              : `Saat ${appointmentTime}'de ${docLabel}${hospLabel} ile randevunuz var.`;
+          }
+
+          if (triggerDate && triggerDate.getTime() > Date.now() + 15000) {
+            try {
+              await Notifications.scheduleNotificationAsync({
+                identifier: `appt-lead-${lead}-${appointmentDate}`,
+                content: {
+                  title,
+                  body,
+                  sound: 'default',
+                  priority: Notifications.AndroidNotificationPriority.HIGH,
+                  vibrate: [0, 500, 250, 500],
+                  categoryIdentifier: NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS,
+                  data: {
+                    isAppointment: true,
+                    appointmentDate,
+                    appointmentTime,
+                    leadOption: lead,
+                    doctorName,
+                    hospital,
+                  },
+                },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.DATE,
+                  date: triggerDate,
+                  channelId: SOUND_CHANNELS.default.id,
+                },
+              });
+            } catch (err) {
+              console.log(`Failed to schedule appt lead ${lead}:`, err);
+            }
+          }
+        }
+      }
+
+      // 3. Schedule Blood Test (Aç karnına kan verme) reminder
+      if (bloodTestDate && /^\d{4}-\d{2}-\d{2}$/.test(bloodTestDate)) {
+        const [bYear, bMonth, bDay] = bloodTestDate.split('-').map(Number);
+        // 08:00 AM on blood test day
+        const bloodTriggerDate = new Date(bYear, bMonth - 1, bDay, 8, 0, 0, 0);
+
+        if (bloodTriggerDate.getTime() > Date.now() + 15000) {
+          const bTitle = isEn ? '🧪 Blood Test Reminder (Fasting)' : '🧪 Aç Karnına Kan Tahlili Hatırlatıcısı';
+          const bBody = isEn
+            ? `Today is your lab test day before your appointment with ${docLabel}! Please remember to go fasting.`
+            : `${docLabel} randevunuz öncesinde bugün kan verme gününüz! Lütfen aç karnına tahlilinizi yaptırmayı unutmayın.`;
+
+          try {
+            await Notifications.scheduleNotificationAsync({
+              identifier: `appt-blood-${bloodTestDate}`,
+              content: {
+                title: bTitle,
+                body: bBody,
+                sound: 'default',
+                priority: Notifications.AndroidNotificationPriority.HIGH,
+                vibrate: [0, 500, 250, 500],
+                categoryIdentifier: NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS,
+                data: {
+                  isAppointment: true,
+                  isBloodTest: true,
+                  bloodTestDate,
+                  doctorName,
+                  hospital,
+                },
+              },
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DATE,
+                date: bloodTriggerDate,
+                channelId: SOUND_CHANNELS.default.id,
+              },
+            });
+          } catch (err) {
+            console.log('Failed to schedule blood test reminder:', err);
+          }
+        }
+      }
+    } catch (outerErr) {
+      console.log('syncDoctorAppointmentNotifications error:', outerErr);
+    }
+  });
 }
