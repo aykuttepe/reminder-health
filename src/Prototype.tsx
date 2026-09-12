@@ -3548,24 +3548,14 @@ function InnerPrototype() {
                 {/* SUB PAGE 8: SENKRONİZASYON & YEDEKLEME */}
                 {settingsSubPage === 'sync' && (
                   <div className="settings-group" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
-                    <h3 className="settings-group-title"><CloudArrowUp size={18} style={{ color: '#38bdf8' }} /> Ubuntu / Self-Hosted Eşitleme</h3>
+                    <h3 className="settings-group-title"><CloudArrowUp size={18} style={{ color: '#38bdf8' }} /> Bulut Eşitleme (Senkronizasyon)</h3>
 
                     <div className="sync-card-web">
                       <p className="sync-card-desc-web">
-                        Kendi Ubuntu sunucunuzdaki veya yerel ağınızdaki Reminder Health REST API'si ile verilerinizi çift yönlü (Smart Merge) senkronize edin.
+                        Verilerinizi cihazlarınız arasında çift yönlü ve güvenli (Smart Merge) senkronize edin.
                       </p>
 
-                      <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
-                        Sunucu Adresi (URL)
-                        <KeyboardInput
-                          value={serverUrl}
-                          disabled={authBusy || syncStatus === 'syncing'}
-                          onChange={e => setServerUrl(e.target.value)}
-                          placeholder="http://192.168.1.100:3050"
-                        />
-                      </label>
-
-                      {!isSameServer(serverUrl) ? <p className="sync-card-desc-web">Tarayıcıda eşitleme için <a href={serverUrl}>sunucudaki uygulamayı aç</a>.</p> : session ? <div>
+                      {session ? <div>
                         <p className="sync-card-desc-web">{t.syncConnectedAccount}: <strong style={{ color: '#34d399' }}>{session.user.name}</strong></p>
                         
                         <div style={{ background: '#071626', padding: 8, borderRadius: 6, margin: '8px 0', border: '1px solid #1e293b' }}>

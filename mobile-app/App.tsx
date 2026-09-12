@@ -3610,29 +3610,16 @@ function MainApp() {
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
                     <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
-                      {language === 'en' ? 'SELF-HOSTED / SERVER SYNC' : 'UBUNTU / SELF-HOSTED EŞİTLEME'}
+                      {language === 'en' ? 'CLOUD SYNCHRONIZATION' : 'BULUT EŞİTLEME (SENKRONİZASYON)'}
                     </Text>
                   </View>
 
                   <View style={styles.syncCard}>
                     <Text style={styles.syncCardDesc}>
                       {language === 'en'
-                        ? 'Synchronize your data bi-directionally (Smart Merge) with your self-hosted Reminder Health REST API on your local network or server.'
-                        : "Kendi Ubuntu sunucunuzdaki veya yerel ağınızdaki Reminder Health REST API'si ile verilerinizi çift yönlü (Smart Merge) senkronize edin."}
+                        ? 'Synchronize your data bi-directionally (Smart Merge) and securely across your devices.'
+                        : 'Verilerinizi cihazlarınız arasında çift yönlü ve güvenli (Smart Merge) senkronize edin.'}
                     </Text>
-
-                    {/* Server URL Input */}
-                    <Text style={styles.inputLabel}>{t.syncServerUrl}</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={serverUrl}
-                      editable={!authBusy && syncStatus !== 'syncing'}
-                      onChangeText={setServerUrl}
-                      placeholder="http://192.168.1.100:3050"
-                      placeholderTextColor="#667"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
 
                     {session ? (
                       <View>

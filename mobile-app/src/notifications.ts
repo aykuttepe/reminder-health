@@ -34,6 +34,7 @@ export type ActiveNotificationPayload = {
   date?: string;
   isRepeat?: boolean;
   repeatIndex?: number;
+  isAppointment?: boolean;
 };
 
 export type NotificationSoundType = 'default' | 'alarm' | 'gentle' | 'chime' | 'system_custom' | 'silent';

@@ -2,7 +2,7 @@ import type {Session} from './account';
 import {newId} from './account';
 export const localStore={getItem:async(key:string)=>localStorage.getItem(key),setItem:async(key:string,value:string)=>{localStorage.setItem(key,value);}};
 function base(url:string){return new URL(url).origin;}
-export function isSameServer(url:string){try{return base(url)===window.location.origin;}catch{return false;}}
+export function isSameServer(url:string){try{const b=base(url);return b===window.location.origin||b.includes('workers.dev')||b.includes('192.168.')||b.includes('localhost');}catch{return false;}}
 export async function authRequest(url:string,endpoint:string,body?:any,session?:Session):Promise<any>{
   if(!isSameServer(url))throw new Error('Web eşitlemesi için uygulamayı sunucu adresinden açın.');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);

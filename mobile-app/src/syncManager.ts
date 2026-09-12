@@ -207,7 +207,7 @@ export function validateBackupJSON(jsonStr: string): {
   }
 }
 
-export const DEFAULT_SYNC_SERVER_URL = 'http://192.168.1.100:3050';
+export const DEFAULT_SYNC_SERVER_URL = 'https://rutin-api.tepe-aykut05.workers.dev';
 
 // Migrate only known addresses from the original local installation.
 // Custom servers and ports must remain untouched.
@@ -217,6 +217,9 @@ export function restoreServerUrl(savedUrl: unknown): string {
     'http://localhost:3000',
     'http://192.168.1.50:3000',
     'http://192.168.1.100:3000',
+    'http://192.168.1.100:3050',
+    'http://192.168.1.50:3050',
+    'http://localhost:3050',
   ];
   return !normalized || legacyUrls.includes(normalized)
     ? DEFAULT_SYNC_SERVER_URL

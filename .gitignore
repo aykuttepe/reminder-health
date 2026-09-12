@@ -42,6 +42,8 @@ mobile-app/ios/Pods/
 server/data/
 data/
 *.sqlite
+*.sqlite*
+*.sql
 server/*.db
 server/*.db-journal
 server/*.db-wal
