@@ -82,7 +82,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
           return (
             <TouchableOpacity key={dose.id} style={styles.medCard} onPress={() => openEditor(dose)}>
               <View style={styles.medCardHeader}>
-                <Text style={styles.medCardTime}>{medTimes.join(', ')}</Text>
+                <Text style={styles.medCardTime}>{medTimes.map(t => dose.slotAmounts?.[t] ? `${t} (${dose.slotAmounts[t]})` : t).join(', ')}</Text>
                 <View style={styles.medCardBadges}>
                   {!durationInfo.isContinuous && (
                     <View style={[styles.durationTag, durationInfo.isExpired && styles.durationTagExpired]}>

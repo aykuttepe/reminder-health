@@ -17,6 +17,7 @@ export type Dose = {
   amount: string;
   time: string;
   times?: string[];
+  slotAmounts?: Record<string, string>;
   status: 'pending' | 'taken' | 'skipped';
   paused?: boolean;
   snooze?: number;
@@ -299,10 +300,20 @@ export function isDoseActive(dose: Dose, date: string): boolean {
   return !dose.paused && duration.hasStarted && !duration.isExpired && getCycleInfo(dose, date).isActiveToday;
 }
 
+export function getSlotAmount(dose: Dose, time: string, date = localDateKey()): string {
+  if (dose.slotAmounts?.[time]?.trim()) {
+    return dose.slotAmounts[time].trim();
+  }
+  return getCycleInfo(dose, date).todayAmount || dose.amount || '1 tablet';
+}
+
 export function updateDoseSlot(dose: Dose, time: string, date: string, status: Dose['status']): Dose {
   const current = {...normalizeDoseDay(dose), updatedAt: Date.now()};
   const previous = slotStatus(current, time, date);
-  const amount = parseDoseAmount(getCycleInfo(current, date).todayAmount);
+  const slotAmtStr = (current.slotAmounts?.[time]?.trim())
+    ? current.slotAmounts[time].trim()
+    : getCycleInfo(current, date).todayAmount;
+  const amount = parseDoseAmount(slotAmtStr);
   const delta = (previous === 'taken' ? amount : 0) - (status === 'taken' ? amount : 0);
   const stock = Math.max(0, Math.round(((current.stock ?? 0) + delta) * 10) / 10);
   if (date !== current.statusDate) {

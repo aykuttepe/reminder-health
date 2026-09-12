@@ -98,6 +98,8 @@ export interface Translations {
   timesPerDay: string;
   addTime: string;
   removeTime: string;
+  slotAmountLabel: string;
+  slotAmountPlaceholder: string;
   instructions: string;
   instructionsPlaceholder: string;
   stockTracking: string;
@@ -343,6 +345,8 @@ export const translations: Record<Language, Translations> = {
     timesPerDay: 'Günlük Doz Saatleri',
     addTime: '+ Saat Ekle',
     removeTime: 'Kaldır',
+    slotAmountLabel: 'Bu Saatin Doz Miktarı',
+    slotAmountPlaceholder: 'Örn. 2 tablet (farklıysa girin)',
     instructions: 'Talimatlar & Notlar',
     instructionsPlaceholder: 'Örn. Bol su ile çiğnemeden içiniz.',
     stockTracking: 'Kutu & Stok Takibi',
@@ -587,6 +591,8 @@ export const translations: Record<Language, Translations> = {
     timesPerDay: 'Daily Dose Times',
     addTime: '+ Add Time',
     removeTime: 'Remove',
+    slotAmountLabel: 'Dose Amount for this Time',
+    slotAmountPlaceholder: 'E.g. 2 tablets (if different)',
     instructions: 'Instructions & Notes',
     instructionsPlaceholder: 'E.g. Swallow with water, do not chew.',
     stockTracking: 'Box & Stock Tracking',

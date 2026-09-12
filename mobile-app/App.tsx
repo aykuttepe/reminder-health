@@ -360,6 +360,7 @@ function MainApp() {
   const [amount, setAmount] = useState('1 tablet');
   const [doseCount, setDoseCount] = useState<number>(1);
   const [times, setTimes] = useState<string[]>(['09:00']);
+  const [slotAmounts, setSlotAmounts] = useState<Record<string, string>>({});
   const [mealCondition, setMealCondition] = useState<MealCondition>('tok');
   const [formType, setFormType] = useState<MedicineForm>('tablet');
   const [instructions, setInstructions] = useState('');
@@ -515,9 +516,21 @@ function MainApp() {
   };
 
   const setSlotTime = (index: number, newTime: string) => {
+    const oldTime = times[index];
     const updated = [...times];
     updated[index] = newTime;
     setTimes(updated);
+    if (oldTime && oldTime !== newTime && slotAmounts[oldTime]) {
+      setSlotAmounts(prev => {
+        const next = { ...prev, [newTime]: prev[oldTime] };
+        delete next[oldTime];
+        return next;
+      });
+    }
+  };
+
+  const setSlotAmountForTime = (time: string, val: string) => {
+    setSlotAmounts(prev => ({ ...prev, [time]: val }));
   };
 
   const stepSlotMinutes = (index: number, delta: number) => {
@@ -1100,7 +1113,7 @@ function MainApp() {
         dose: d,
         time: t,
         status,
-        todayAmount: info.todayAmount,
+        todayAmount: (d.slotAmounts?.[t]?.trim()) ? d.slotAmounts[t].trim() : info.todayAmount,
         cycleInfo: info,
         durationInfo: durInfo,
       });
@@ -1268,11 +1281,13 @@ function MainApp() {
       setCurrentGTIN(dose.gtin ?? null);
       setCurrentExpiryDate(dose.expiryDate ?? null);
       setCurrentBatchNo(null);
+      setSlotAmounts(dose.slotAmounts ? { ...dose.slotAmounts } : {});
     } else {
       setEditingId(null);
       setName('');
       setAmount('1 tablet');
       setTimes(['09:00']);
+      setSlotAmounts({});
       setDoseCount(1);
       setMealCondition('tok');
       setFormType('tablet');
@@ -1323,11 +1338,20 @@ function MainApp() {
       return;
     }
     const effectiveTimes = times.length > 0 ? times : ['09:00'];
+    const cleanSlotAmounts: Record<string, string> = {};
+    if (effectiveTimes.length > 1) {
+      for (const t of effectiveTimes) {
+        if (slotAmounts[t]?.trim()) {
+          cleanSlotAmounts[t] = slotAmounts[t].trim();
+        }
+      }
+    }
     const patch = {
       name: name.trim(),
       amount: amount.trim(),
       time: effectiveTimes[0] || '09:00',
       times: effectiveTimes,
+      slotAmounts: Object.keys(cleanSlotAmounts).length > 0 ? cleanSlotAmounts : undefined,
       mealCondition,
       form: formType,
       instructions: instructions.trim() || undefined,
@@ -1771,11 +1795,12 @@ function MainApp() {
       text += `  • ${t.doctorShareNoMeds}\n`;
     } else {
       activeMeds.forEach((m, idx) => {
-        const times = Array.isArray(m.times) && m.times.length > 0 ? m.times.join(', ') : (m.time || '-');
+        const mTimes = Array.isArray(m.times) && m.times.length > 0 ? m.times : [m.time || '-'];
+        const timesStr = mTimes.map(t => m.slotAmounts?.[t] ? `${t} (${m.slotAmounts[t]})` : t).join(', ');
         const meal = getMealLabel(m.mealCondition);
         const stockInfo = m.stock !== undefined ? ` [${language === 'en' ? 'Stock' : 'Stok'}: ${m.stock}]` : '';
         text += `${idx + 1}. ${m.name} (${m.amount || '1 doz'})\n`;
-        text += `   ⏰ ${times} • ${meal}${stockInfo}\n`;
+        text += `   ⏰ ${timesStr} • ${meal}${stockInfo}\n`;
         if (m.instructions) text += `   ℹ️ ${m.instructions}\n`;
       });
     }
@@ -4497,6 +4522,33 @@ function MainApp() {
                           </TouchableOpacity>
                         ))}
                       </View>
+
+                      {/* Saate Özel Doz Miktarı */}
+                      {times.length > 1 && (
+                        <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1a2836' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={[styles.timeInputLabel, { marginBottom: 0 }]}>{t.slotAmountLabel}</Text>
+                            {slotAmounts[slotTime]?.trim() ? (
+                              <TouchableOpacity onPress={() => setSlotAmountForTime(slotTime, '')}>
+                                <Text style={{ fontSize: 11, color: '#ff9696' }}>{language === 'en' ? 'Reset' : 'Varsayılana Dön'}</Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                          <TextInput
+                            style={[
+                              styles.textInput,
+                              {
+                                backgroundColor: '#09141f',
+                                borderColor: slotAmounts[slotTime]?.trim() ? '#46a382' : '#23374d',
+                              },
+                            ]}
+                            value={slotAmounts[slotTime] ?? ''}
+                            onChangeText={val => setSlotAmountForTime(slotTime, val)}
+                            placeholder={amount ? `${amount} (${language === 'en' ? 'default' : 'varsayılan'})` : t.slotAmountPlaceholder}
+                            placeholderTextColor="#667"
+                          />
+                        </View>
+                      )}
                     </View>
                   );
                 })}

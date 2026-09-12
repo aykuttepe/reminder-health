@@ -43,6 +43,7 @@ type Dose = {
   amount: string;
   time: string;
   times?: string[];
+  slotAmounts?: Record<string, string>;
   status: 'pending' | 'taken' | 'skipped';
   paused?: boolean;
   snooze?: number;
@@ -676,6 +677,7 @@ function InnerPrototype() {
   const [amount, setAmount] = useState('1 tablet');
   const [time, setTime] = useState('09:00');
   const [times, setTimes] = useState<string[]>(['09:00']);
+  const [slotAmounts, setSlotAmounts] = useState<Record<string, string>>({});
   const [doseCount, setDoseCount] = useState<number>(1);
   const [mealCondition, setMealCondition] = useState<MealCondition>('tok');
   const [formType, setFormType] = useState<MedicineForm>('tablet');
@@ -908,7 +910,7 @@ function InnerPrototype() {
         dose: d,
         time: t,
         status,
-        todayAmount: info.todayAmount,
+        todayAmount: (d.slotAmounts?.[t]?.trim()) ? d.slotAmounts[t].trim() : info.todayAmount,
         cycleInfo: info,
       });
     });
@@ -1022,6 +1024,7 @@ function InnerPrototype() {
     const medTimes = dose?.times && dose.times.length > 0 ? dose.times : [dose?.time ?? '09:00'];
     setTimes(medTimes);
     setDoseCount(medTimes.length);
+    setSlotAmounts(dose?.slotAmounts ? { ...dose.slotAmounts } : {});
     setTime(medTimes[0] ?? '09:00');
     setMealCondition(dose?.mealCondition ?? 'tok');
     setFormType(dose?.form ?? 'tablet');
@@ -1135,11 +1138,20 @@ function InnerPrototype() {
       return;
     }
     const previous = doses;
+    const cleanSlotAmounts: Record<string, string> = {};
+    if (effectiveTimes.length > 1) {
+      for (const t of effectiveTimes) {
+        if (slotAmounts[t]?.trim()) {
+          cleanSlotAmounts[t] = slotAmounts[t].trim();
+        }
+      }
+    }
     const patch = {
       name: name.trim(),
       amount: amount.trim(),
       time: effectiveTimes[0],
       times: effectiveTimes,
+      slotAmounts: Object.keys(cleanSlotAmounts).length > 0 ? cleanSlotAmounts : undefined,
       mealCondition,
       form: formType,
       instructions: instructions.trim() || undefined,
@@ -1870,15 +1882,41 @@ function InnerPrototype() {
 
             {/* Dinamik Saat Girişleri (Numatör & Kolay Fokus) */}
             <div className="time-slots-grid">
-              {Array.from({ length: doseCount }).map((_, idx) => (
-                <DualTimeInput
-                  key={idx}
-                  label={doseCount === 1 ? 'Hatırlatma saati' : `${idx + 1}. Doz saati`}
-                  value={times[idx] ?? (idx === 0 ? '08:00' : idx === 1 ? '14:00' : '20:00')}
-                  onChange={val => handleTimeChange(idx, val)}
-                  onStep={delta => stepTime(idx, delta)}
-                />
-              ))}
+              {Array.from({ length: doseCount }).map((_, idx) => {
+                const currentTime = times[idx] ?? (idx === 0 ? '08:00' : idx === 1 ? '14:00' : '20:00');
+                return (
+                  <div key={idx} className="time-slot-card-box" style={{ background: '#0e1823', padding: '10px', borderRadius: '10px', border: '1px solid #1a2836', marginBottom: '8px' }}>
+                    <DualTimeInput
+                      label={doseCount === 1 ? 'Hatırlatma saati' : `${idx + 1}. Doz saati`}
+                      value={currentTime}
+                      onChange={val => handleTimeChange(idx, val)}
+                      onStep={delta => stepTime(idx, delta)}
+                    />
+                    {doseCount > 1 && (
+                      <div style={{ marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                          <span style={{ fontSize: '11px', color: '#8899a8' }}>{t.slotAmountLabel}</span>
+                          {slotAmounts[currentTime]?.trim() && (
+                            <button
+                              type="button"
+                              style={{ background: 'none', border: 'none', color: '#ff9696', fontSize: '10px', cursor: 'pointer', padding: 0 }}
+                              onClick={() => setSlotAmounts(prev => { const n = { ...prev }; delete n[currentTime]; return n; })}
+                            >
+                              {language === 'en' ? 'Reset' : 'Sıfırla'}
+                            </button>
+                          )}
+                        </div>
+                        <KeyboardInput
+                          value={slotAmounts[currentTime] ?? ''}
+                          onChange={e => setSlotAmounts(prev => ({ ...prev, [currentTime]: e.target.value }))}
+                          placeholder={amount ? `${amount} (${language === 'en' ? 'default' : 'varsayılan'})` : t.slotAmountPlaceholder}
+                          maxLength={30}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Kullanım Düzeni & Döngü */}

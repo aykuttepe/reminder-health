@@ -269,3 +269,44 @@ test('calendar-day differences do not depend on daylight-saving day lengths', ()
   assert.equal(api.getCalendarDayDiff('2026-10-31', '2026-11-02'), 2);
   assert.equal(api.getCalendarDayDiff('2026-09-09', '2026-09-07'), -2);
 });
+
+test('slotAmounts accurately deducts different amounts for morning and evening and customizes notifications', () => {
+  const api = setup();
+  let d = dose({
+    name: 'Coraspin',
+    amount: '1 tablet',
+    time: '08:00',
+    times: ['08:00', '20:00'],
+    slotAmounts: { '08:00': '2 tablet', '20:00': '1 tablet' },
+    stock: 30,
+    statusDate: '2026-09-07',
+  });
+
+  // Morning dose confirmation (2 tablets)
+  d = api.updateDoseSlot(d, '08:00', '2026-09-07', 'taken');
+  assert.equal(d.stock, 28, 'Morning dose of 2 tablets must deduct 2 from stock');
+  assert.equal(d.slotStatuses['08:00'], 'taken');
+  assert.equal(d.status, 'pending', 'Dose is not fully taken until evening slot is taken');
+
+  // Evening dose confirmation (1 tablet)
+  d = api.updateDoseSlot(d, '20:00', '2026-09-07', 'taken');
+  assert.equal(d.stock, 27, 'Evening dose of 1 tablet must deduct 1 from stock');
+  assert.equal(d.slotStatuses['20:00'], 'taken');
+  assert.equal(d.status, 'taken', 'All slots taken sets dose status to taken');
+
+  // Verify notifications content uses slot-specific amounts
+  const unconfirmedDose = dose({
+    name: 'Coraspin',
+    amount: '1 tablet',
+    time: '08:00',
+    times: ['08:00', '20:00'],
+    slotAmounts: { '08:00': '2 tablet', '20:00': '1 tablet' },
+    stock: 30,
+    statusDate: '2026-09-07',
+  });
+  const schedule = api.buildMedicationSchedule([unconfirmedDose], options, new Date('2026-09-07T07:00:00'));
+  const morningReq = schedule.find(r => r.content.data.time === '08:00' && !r.content.data.isRepeat);
+  const eveningReq = schedule.find(r => r.content.data.time === '20:00' && !r.content.data.isRepeat);
+  assert.ok(morningReq.content.title.includes('2 tablet'), 'Morning notification title should state 2 tablet');
+  assert.ok(eveningReq.content.title.includes('1 tablet'), 'Evening notification title should state 1 tablet');
+});

@@ -723,11 +723,11 @@ export function buildMedicationSchedule(
     for (const input of doses) {
       const dose: Dose = { ...input, status: input.status ?? 'pending' };
       if (!isDoseActive(dose, date)) continue;
-      const amount = getCycleInfo(dose, date).todayAmount;
       for (const time of new Set(dose.times?.length ? dose.times : [dose.time])) {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) continue;
         if (slotStatus(dose, time, date) !== 'pending') continue;
         if (snoozedSlots.has(`${dose.id}|${date}|${time}`)) continue;
+        const slotAmount = (dose.slotAmounts?.[time]?.trim()) || getCycleInfo(dose, date).todayAmount;
         const [hour, minute] = time.split(':').map(Number);
         const due = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute);
         // Repeat nag reminders (every 3 minutes) are only critical for the immediate window:
@@ -740,7 +740,7 @@ export function buildMedicationSchedule(
           const fireAt = new Date(due.getTime() + (repeatIndex ? repeatIndex * 3 : -(options.leadTimeMinutes ?? 0)) * 60000);
           if (fireAt <= now) continue;
           const isRepeat = repeatIndex > 0;
-          const content = buildNotificationContent({ ...dose, amount }, { ...options, isRepeat, repeatIndex, timeStr: time });
+          const content = buildNotificationContent({ ...dose, amount: slotAmount }, { ...options, isRepeat, repeatIndex, timeStr: time });
           requests.push({
             identifier: `dose-${dose.id}-${date}-${time}-${isRepeat ? `repeat-${repeatIndex}` : 'main'}`,
             content: {
