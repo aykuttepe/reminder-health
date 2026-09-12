@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { doseId, randomUUID } from './identity.js';
+import { seedMedCatalog } from './catalogSeed.js';
 
 export class RutinDatabase {
   public sql!: DatabaseSync;
@@ -13,6 +14,22 @@ export class RutinDatabase {
     if (dbPath !== ':memory:') fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     this.sql = new DatabaseSync(dbPath);
     this.sql.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS med_catalog (
+        gtin TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        amount TEXT,
+        form TEXT,
+        meal_condition TEXT,
+        instructions TEXT,
+        active_ingredient TEXT,
+        default_stock INTEGER,
+        stock_threshold INTEGER,
+        full_name TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_med_catalog_name ON med_catalog(name);
+    `);
+    seedMedCatalog(this.sql);
     const version = Number((this.sql.prepare('PRAGMA user_version').get() as any).user_version);
     if (version > 4) throw new Error('Veritabanı sürümü bu uygulamadan yeni.');
     if (version === 4) return;
@@ -106,6 +123,43 @@ export class RutinDatabase {
   }
   clearUserData(userId: string) {
     for (const table of ['doses','learned_meds','settings']) this.sql.prepare(`DELETE FROM ${table} WHERE user_id=?`).run(userId);
+  }
+  findCatalogMedicine(gtin: string): any {
+    if (!gtin) return null;
+    const cleanGTIN = gtin.trim().padStart(14, '0');
+    const row: any = this.sql.prepare('SELECT * FROM med_catalog WHERE gtin=?').get(cleanGTIN);
+    if (!row) return null;
+    return {
+      gtin: row.gtin,
+      name: row.name,
+      amount: row.amount || '1 tablet',
+      form: row.form || 'tablet',
+      mealCondition: row.meal_condition || 'tok',
+      instructions: row.instructions || '',
+      activeIngredient: row.active_ingredient || '',
+      defaultStock: row.default_stock || 30,
+      stockThreshold: row.stock_threshold || 5,
+      fullName: row.full_name || row.name,
+    };
+  }
+  searchCatalog(query: string, limit = 25): any[] {
+    if (!query || !query.trim()) return [];
+    const q = `%${query.trim()}%`;
+    const rows: any[] = this.sql.prepare(
+      'SELECT * FROM med_catalog WHERE name LIKE ? OR active_ingredient LIKE ? OR full_name LIKE ? LIMIT ?'
+    ).all(q, q, q, limit);
+    return rows.map((r: any) => ({
+      gtin: r.gtin,
+      name: r.name,
+      amount: r.amount || '1 tablet',
+      form: r.form || 'tablet',
+      mealCondition: r.meal_condition || 'tok',
+      instructions: r.instructions || '',
+      activeIngredient: r.active_ingredient || '',
+      defaultStock: r.default_stock || 30,
+      stockThreshold: r.stock_threshold || 5,
+      fullName: r.full_name || r.name,
+    }));
   }
   close() { this.sql?.close(); }
 }

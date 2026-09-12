@@ -23,6 +23,25 @@ export function createServer(db: RutinDatabase, options: {publicUrl?:string;allo
       const url = new URL(req.url || '/', publicUrl), method = req.method || 'GET';
       if (method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token' }); return res.end(); }
       if (url.pathname === '/health' && method === 'GET') return send(200, { status: 'ok', version: '2.0.0', authRequired: true });
+      if (url.pathname === '/api/version' && method === 'GET') {
+        return send(200, {
+          version: '0.2.2',
+          apkUrl: '/app-release.apk',
+          appName: 'Rutin',
+          publishedAt: new Date().toISOString(),
+        });
+      }
+      if (url.pathname.startsWith('/api/catalog/') && method === 'GET') {
+        const rawGtin = decodeURIComponent(url.pathname.slice('/api/catalog/'.length)).trim();
+        const med = db.findCatalogMedicine(rawGtin);
+        if (med) return send(200, { found: true, ...med });
+        return send(404, { found: false, error: 'İlaç bulunamadı.' });
+      }
+      if (url.pathname === '/api/catalog' && method === 'GET') {
+        const q = url.searchParams.get('q') || '';
+        if (!q.trim()) return send(200, { results: [] });
+        return send(200, { results: db.searchCatalog(q.trim(), 25) });
+      }
       const readBody = async () => {
         if (!(req.headers['content-type'] || '').startsWith('application/json')) throw new HttpError(415, 'JSON gerekli.');
         let size = 0; const chunks: Buffer[] = [];

@@ -181,3 +181,34 @@ test("findMedicineByGTIN resolves catalog medicines and learned user memory", ()
   const unknown = findMedicineByGTIN('00000000000000');
   assert.equal(unknown, null);
 });
+
+test("TURKISH_MED_CATALOG covers organ transplant, anticoagulant and cardiovascular medicines offline", async () => {
+  const { TURKISH_MED_CATALOG, findMedicineByGTIN } = await import('../src/data/medCatalog.ts');
+  assert.ok(Object.keys(TURKISH_MED_CATALOG).length >= 600, 'Catalog should contain 600+ medicines');
+
+  // Prograf 1 mg
+  const prograf = findMedicineByGTIN('08699043890338');
+  assert.notEqual(prograf, null);
+  assert.equal(prograf.name, 'Prograf');
+  assert.equal(prograf.amount, '1 mg');
+  assert.equal(prograf.form, 'kapsul');
+
+  // Warfmadin 5 mg (Coumadin equivalent)
+  const warfmadin = findMedicineByGTIN('08699809018853');
+  assert.notEqual(warfmadin, null);
+  assert.equal(warfmadin.name, 'Warfmadin');
+  assert.equal(warfmadin.amount, '5 mg');
+
+  // Cellcept 250 mg
+  const cellcept = findMedicineByGTIN('08699505152752');
+  assert.notEqual(cellcept, null);
+  assert.equal(cellcept.name, 'Cellcept');
+  assert.equal(cellcept.amount, '250 mg');
+
+  // Prednol 16 mg
+  const prednol = findMedicineByGTIN('08699541010504');
+  assert.notEqual(prednol, null);
+  assert.equal(prednol.name, 'Prednol');
+  assert.equal(prednol.amount, '16 mg');
+});
+

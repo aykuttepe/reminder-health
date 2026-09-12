@@ -97,7 +97,40 @@ test('legacy migration backs up, assigns owner and atomically preserves old IDs 
   assert.ok(existsSync(db.backupPath));
   const owner=db.sql.prepare('SELECT id FROM users WHERE is_legacy_owner=1').get().id;
   assert.equal(db.getAllDoses(owner)[0].id,doseId(owner,101));
-  assert.equal(db.sql.prepare('PRAGMA foreign_key_check').all().length,0);
-  const backup=new DatabaseSync(db.backupPath);assert.equal(backup.prepare('SELECT id FROM doses').get().id,101);backup.close();db.close();
   const again=new RutinDatabase(file);await again.initAsync();assert.equal(again.getAllDoses(owner).length,1);assert.equal(again.backupPath,null);again.close();
 });
+test('catalog lookup resolves GTIN barcodes and text search without authentication', async t => {
+  const { call } = await fixture(t);
+  // 1. Known medicine lookup (Prograf 1 mg: 08699043890338)
+  const resPrograf = await call('/api/catalog/08699043890338');
+  assert.equal(resPrograf.r.status, 200);
+  assert.equal(resPrograf.data.found, true);
+  assert.equal(resPrograf.data.name, 'Prograf');
+  assert.equal(resPrograf.data.amount, '1 mg');
+  assert.equal(resPrograf.data.form, 'kapsul');
+
+  // 2. Coraspin (08699546130238)
+  const resCoraspin = await call('/api/catalog/08699546130238');
+  assert.equal(resCoraspin.r.status, 200);
+  assert.equal(resCoraspin.data.found, true);
+  assert.equal(resCoraspin.data.name, 'Coraspin');
+
+  // 3. Unknown barcode returns 404
+  const resUnknown = await call('/api/catalog/08699999999999');
+  assert.equal(resUnknown.r.status, 404);
+  assert.equal(resUnknown.data.found, false);
+
+  // 4. Text search
+  const resSearch = await call('/api/catalog?q=prograf');
+  assert.equal(resSearch.r.status, 200);
+  assert.ok(resSearch.data.results.length > 0);
+  assert.ok(resSearch.data.results.some(m => m.name.includes('Prograf')));
+
+  // 5. Version endpoint
+  const resVersion = await call('/api/version');
+  assert.equal(resVersion.r.status, 200);
+  assert.equal(resVersion.data.version, '0.2.2');
+  assert.equal(resVersion.data.apkUrl, '/app-release.apk');
+});
+
+

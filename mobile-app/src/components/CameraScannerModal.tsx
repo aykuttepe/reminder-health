@@ -27,11 +27,14 @@ interface CameraScannerModalProps {
     form?: 'tablet' | 'kapsul' | 'damla' | 'surup';
     mealCondition?: 'tok' | 'ac' | 'yemekle' | 'farketmez';
     instructions?: string;
+    defaultStock?: number;
+    stockThreshold?: number;
     expiryDate?: string;
     batchNo?: string;
     raw: string;
   }) => void;
   learnedMeds?: Record<string, Partial<CatalogMedicine>>;
+  serverUrl?: string;
   lang?: 'tr' | 'en';
 }
 
@@ -40,6 +43,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   onClose,
   onScanResult,
   learnedMeds,
+  serverUrl,
   lang = 'tr',
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
@@ -56,7 +60,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     }
   }, [visible]);
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
+  const handleBarcodeScanned = async ({ data }: { data: string }) => {
     if (isScanningRef.current) return;
     isScanningRef.current = true;
 
@@ -66,15 +70,64 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
     const parsed = parseITSKarekod(data);
     const gtin = parsed ? parsed.gtin : (data.length === 13 ? '0' + data : data);
-    const med = findMedicineByGTIN(gtin, learnedMeds);
+    const localMed = findMedicineByGTIN(gtin, learnedMeds);
 
+    if (localMed) {
+      onScanResult({
+        gtin,
+        name: localMed.name,
+        amount: localMed.amount,
+        form: localMed.form,
+        mealCondition: localMed.mealCondition,
+        instructions: localMed.instructions,
+        defaultStock: localMed.defaultStock,
+        stockThreshold: localMed.stockThreshold,
+        expiryDate: parsed?.expiryDate,
+        batchNo: parsed?.batchNo,
+        raw: data,
+      });
+      onClose();
+      return;
+    }
+
+    // Çevrimdışı katalogda yoksa, yapılandırılmış sunucudan sorgula
+    if (serverUrl && serverUrl.trim()) {
+      try {
+        const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(`${cleanUrl}/api/catalog/${encodeURIComponent(gtin)}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.found) {
+            onScanResult({
+              gtin,
+              name: json.name,
+              amount: json.amount,
+              form: json.form,
+              mealCondition: json.mealCondition,
+              instructions: json.instructions,
+              defaultStock: json.defaultStock,
+              stockThreshold: json.stockThreshold,
+              expiryDate: parsed?.expiryDate,
+              batchNo: parsed?.batchNo,
+              raw: data,
+            });
+            onClose();
+            return;
+          }
+        }
+      } catch {
+        // Ağ hatası veya zaman aşımında sessizce devam et
+      }
+    }
+
+    // Bulunamadıysa kullanıcıya ad girmesi için barkodu ilet
     onScanResult({
       gtin,
-      name: med?.name,
-      amount: med?.amount,
-      form: med?.form,
-      mealCondition: med?.mealCondition,
-      instructions: med?.instructions,
       expiryDate: parsed?.expiryDate,
       batchNo: parsed?.batchNo,
       raw: data,
@@ -192,6 +245,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     </Text>
                     <View style={styles.presetsGrid}>
                       {[
+                        { name: 'Prograf 1 mg', gtin: '08699043890338' },
+                        { name: 'Warfmadin 5 mg', gtin: '08699809018853' },
                         { name: 'Coraspin 100 mg', gtin: '08699546011122' },
                         { name: 'Parol 500 mg', gtin: '08699508010071' },
                         { name: 'Nexium 40 mg', gtin: '08699786010084' },

@@ -3250,6 +3250,16 @@ function InnerPrototype() {
             <div className="scanner-presets-grid">
               {[
                 {
+                  name: 'Prograf 1 mg (ITS Karekod)',
+                  code: '010869904389033821PRO1234567891727093010LOT99',
+                  desc: 'GTIN: 08699043890338 · SKT: 2027-09-30',
+                },
+                {
+                  name: 'Warfmadin 5 mg (ITS Karekod)',
+                  code: '010869980901885321WARF123456781726113010LOT88',
+                  desc: 'GTIN: 08699809018853 · SKT: 2026-11-30',
+                },
+                {
                   name: 'Coraspin 100 mg (ITS Karekod)',
                   code: '0108699546011122211234567890121727043010BATCH01',
                   desc: 'GTIN: 08699546011122 · SKT: 2027-04-30',

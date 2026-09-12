@@ -18,6 +18,7 @@ import {
   Vibration,
   AppState,
   Share,
+  Linking,
   Dimensions,
 } from 'react-native';
 
@@ -61,6 +62,7 @@ import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
 import { CatalogMedicine } from './src/data/medCatalog';
+import { checkForAppUpdates, UpdateCheckResult, CURRENT_APP_VERSION } from './src/updateChecker';
 import {
   DEFAULT_SYNC_SERVER_URL,
   restoreServerUrl,
@@ -376,6 +378,46 @@ function MainApp() {
   const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
   const [currentBatchNo, setCurrentBatchNo] = useState<string | null>(null);
 
+  // Update Checker State
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [updateCheckedOnce, setUpdateCheckedOnce] = useState(false);
+
+  const handleCheckUpdate = async (isManual = true) => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      const result = await checkForAppUpdates({ serverUrl });
+      setUpdateInfo(result);
+      setUpdateCheckedOnce(true);
+      if (isManual) {
+        if (result.updateAvailable) {
+          showToast(language === 'en' ? `🚀 New update: v${result.latestVersion}` : `🚀 Yeni güncelleme: v${result.latestVersion}`);
+        } else {
+          showToast(language === 'en' ? `✓ You are on the latest version (v${CURRENT_APP_VERSION})` : `✓ En güncel sürümü kullanıyorsunuz (v${CURRENT_APP_VERSION})`);
+        }
+      }
+    } catch {
+      if (isManual) {
+        showToast(language === 'en' ? 'Could not check updates.' : 'Güncellemeler denetlenemedi.');
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo?.downloadUrl) return;
+    try {
+      await Linking.openURL(updateInfo.downloadUrl);
+    } catch {
+      Alert.alert(
+        language === 'en' ? 'Download Error' : 'İndirme Hatası',
+        language === 'en' ? 'Could not open update download link.' : 'Güncelleme bağlantısı açılamadı.'
+      );
+    }
+  };
+
   // Modern Calendar Modal State
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate'>('startDate');
@@ -402,6 +444,8 @@ function MainApp() {
     form?: MedicineForm;
     mealCondition?: MealCondition;
     instructions?: string;
+    defaultStock?: number;
+    stockThreshold?: number;
     expiryDate?: string;
     batchNo?: string;
     raw: string;
@@ -413,6 +457,24 @@ function MainApp() {
     if (result.name) {
       setName(result.name);
       showToast(language === 'en' ? `📦 ${result.name} auto-filled from barcode` : `📦 ${result.name} karekoddan otomatik tanımlandı`);
+
+      // Çevrimdışı geleceğe yönelik olarak learnedMeds hafızasına kaydet
+      const cleanG = result.gtin.trim().padStart(14, '0');
+      const learnedItem: Partial<CatalogMedicine> = {
+        gtin: cleanG,
+        name: result.name,
+        amount: result.amount || '1 tablet',
+        form: result.form || 'tablet',
+        mealCondition: result.mealCondition || 'tok',
+        instructions: result.instructions || '',
+        defaultStock: result.defaultStock ?? 30,
+        stockThreshold: result.stockThreshold ?? 5,
+      };
+      setLearnedMeds(prev => {
+        const updated = { ...prev, [cleanG]: learnedItem };
+        AsyncStorage.setItem(STORAGE_KEY_LEARNED_MEDS, JSON.stringify(updated)).catch(() => {});
+        return updated;
+      });
     } else {
       showToast(language === 'en' ? `🏷️ Barcode scanned (${result.gtin}). Please enter medication name.` : `🏷️ Barkod okundu (${result.gtin}). Lütfen ilaç adını yazınız.`);
     }
@@ -421,6 +483,8 @@ function MainApp() {
     if (result.form) setFormType(result.form);
     if (result.mealCondition) setMealCondition(result.mealCondition);
     if (result.instructions) setInstructions(result.instructions);
+    if (result.defaultStock) setStock(String(result.defaultStock));
+    if (result.stockThreshold) setStockThreshold(String(result.stockThreshold));
   };
 
   const addDoseSlot = () => {
@@ -2043,12 +2107,67 @@ function MainApp() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* SÜRÜM BİLGİSİ */}
-                  <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 16 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#a9dfca' }}>Reminder Health v0.2.1 (Release)</Text>
-                    <Text style={{ fontSize: 11, color: '#68778d', marginTop: 2 }}>
-                      {language === 'en' ? 'Barcode & Cloud Sync · Up to Date' : 'Karekod & Senkronizasyon · Güncel Sürüm'}
-                    </Text>
+                  {/* SÜRÜM & GÜNCELLEME KARTI */}
+                  <View style={styles.updateCard}>
+                    <View style={styles.updateHeaderRow}>
+                      <View style={styles.updateIconBox}>
+                        <Ionicons name="git-branch-outline" size={20} color="#a9dfca" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.updateTitle}>Rutin v{CURRENT_APP_VERSION}</Text>
+                        <Text style={styles.updateSub}>
+                          {language === 'en' ? 'GitHub Releases & Local Server' : 'GitHub Releases & Yerel Sunucu'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.checkUpdateBtn, checkingUpdate && { opacity: 0.6 }]}
+                        onPress={() => handleCheckUpdate(true)}
+                        disabled={checkingUpdate}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name={checkingUpdate ? 'sync' : 'refresh-outline'} size={14} color="#081624" />
+                        <Text style={styles.checkUpdateBtnText}>
+                          {checkingUpdate
+                            ? (language === 'en' ? 'Checking...' : 'Denetleniyor...')
+                            : (language === 'en' ? 'Check Updates' : 'Güncellemeleri Denetle')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {updateInfo?.updateAvailable && (
+                      <View style={styles.updateAlertBox}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="sparkles" size={18} color="#5eead4" />
+                          <Text style={styles.updateAlertTitle}>
+                            {language === 'en' ? `New Version Available: v${updateInfo.latestVersion}` : `Yeni Sürüm Mevcut: v${updateInfo.latestVersion}`}
+                          </Text>
+                        </View>
+                        {!!updateInfo.releaseNotes && (
+                          <Text style={styles.updateAlertNotes} numberOfLines={3}>
+                            {updateInfo.releaseNotes}
+                          </Text>
+                        )}
+                        <TouchableOpacity
+                          style={styles.downloadUpdateBtn}
+                          onPress={handleDownloadUpdate}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="cloud-download-outline" size={18} color="#081624" />
+                          <Text style={styles.downloadUpdateBtnText}>
+                            {language === 'en' ? 'Download & Install Update' : 'İndir ve Güncellemeyi Yükle'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {updateCheckedOnce && !updateInfo?.updateAvailable && !checkingUpdate && (
+                      <View style={styles.upToDateRow}>
+                        <Ionicons name="checkmark-circle-outline" size={15} color="#34d399" />
+                        <Text style={styles.upToDateText}>
+                          {language === 'en' ? 'Your app is up to date.' : 'Uygulamanız en güncel sürümde.'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </>
               )}
@@ -4108,6 +4227,7 @@ function MainApp() {
           onClose={() => setScannerOpen(false)}
           onScanResult={handleScanResult}
           learnedMeds={learnedMeds}
+          serverUrl={serverUrl}
           lang={language}
         />
 
@@ -5197,5 +5317,100 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 13,
     width: '100%',
+  },
+
+  updateCard: {
+    backgroundColor: '#0f1f2e',
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 14,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#1e3347',
+  },
+  updateHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  updateIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#162e3d',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  updateTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#f5f3f0',
+  },
+  updateSub: {
+    fontSize: 11,
+    color: '#7e90a6',
+    marginTop: 2,
+  },
+  checkUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#a9dfca',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  checkUpdateBtnText: {
+    color: '#081624',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  updateAlertBox: {
+    backgroundColor: '#122b30',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#1b4d45',
+  },
+  updateAlertTitle: {
+    color: '#5eead4',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  updateAlertNotes: {
+    color: '#c4d7d1',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 6,
+  },
+  downloadUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#5eead4',
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  downloadUpdateBtnText: {
+    color: '#081624',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  upToDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#172b3c',
+  },
+  upToDateText: {
+    color: '#34d399',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
