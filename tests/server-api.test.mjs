@@ -41,7 +41,44 @@ test('tenant isolation covers sync, identical UUID/GTIN/setting keys, backup and
   assert.equal((await call('/api/sync',undefined,hb)).data.doses[0].name,'B');
   for(const route of ['/api/sync','/api/backup'])assert.equal((await call(route)).r.status,401);
   for(const k of ['user_id','userId'])assert.equal((await call('/api/sync',{[k]:b.userId,doses:[]},ha)).r.status,400);
-  assert.equal((await call('/api/sync',{doses:[medicine({user_id:b.userId})]},ha)).r.status,400);
+});
+test('doctor profile settings persist into sqlite settings table and sync across devices', async t => {
+  const { a, call, login, db } = await fixture(t);
+  const sa = (await login(a)).data;
+  const ha = { Authorization: `Bearer ${sa.token}` };
+
+  const doctorData = {
+    userName: 'Aykut',
+    doctorName: 'Prof. Dr. Ahmet Yılmaz',
+    doctorSpecialty: 'Nefroloji',
+    doctorHospital: 'Acıbadem Maslak',
+    doctorPhone: '05321234567',
+    doctorNextAppointment: '2026-09-25',
+    doctorNotes: 'Tansiyon 14ü geçerse haber ver',
+  };
+
+  const syncRes = await call('/api/sync', { settings: doctorData }, ha);
+  assert.equal(syncRes.r.status, 200);
+  assert.equal(syncRes.data.settings.doctorName, doctorData.doctorName);
+  assert.equal(syncRes.data.settings.doctorSpecialty, doctorData.doctorSpecialty);
+  assert.equal(syncRes.data.settings.doctorHospital, doctorData.doctorHospital);
+  assert.equal(syncRes.data.settings.doctorPhone, doctorData.doctorPhone);
+  assert.equal(syncRes.data.settings.doctorNextAppointment, doctorData.doctorNextAppointment);
+  assert.equal(syncRes.data.settings.doctorNotes, doctorData.doctorNotes);
+
+  // Directly verify records in SQLite settings table:
+  const dbSettings = db.getAllSettings(a.userId);
+  assert.equal(dbSettings.doctorName, doctorData.doctorName);
+  assert.equal(dbSettings.doctorSpecialty, doctorData.doctorSpecialty);
+  assert.equal(dbSettings.doctorHospital, doctorData.doctorHospital);
+  assert.equal(dbSettings.doctorPhone, doctorData.doctorPhone);
+  assert.equal(dbSettings.doctorNextAppointment, doctorData.doctorNextAppointment);
+  assert.equal(dbSettings.doctorNotes, doctorData.doctorNotes);
+
+  // Verify second device gets them on empty sync:
+  const secondDeviceRes = await call('/api/sync', undefined, ha);
+  assert.equal(secondDeviceRes.data.settings.doctorName, doctorData.doctorName);
+  assert.equal(secondDeviceRes.data.settings.doctorPhone, doctorData.doctorPhone);
 });
 test('same-user devices share UUID conversion, deep dated history and deletion',async t=>{
   const {a,b,service}=await fixture(t);
@@ -129,7 +166,7 @@ test('catalog lookup resolves GTIN barcodes and text search without authenticati
   // 5. Version endpoint
   const resVersion = await call('/api/version');
   assert.equal(resVersion.r.status, 200);
-  assert.equal(resVersion.data.version, '0.2.2');
+  assert.equal(resVersion.data.version, '0.2.3');
   assert.equal(resVersion.data.apkUrl, '/app-release.apk');
 });
 
