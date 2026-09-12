@@ -24,10 +24,24 @@ export function createServer(db: RutinDatabase, options: {publicUrl?:string;allo
       if (method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token' }); return res.end(); }
       if (url.pathname === '/health' && method === 'GET') return send(200, { status: 'ok', version: '2.0.0', authRequired: true });
       if (url.pathname === '/api/version' && method === 'GET') {
+        const vFile = path.join(webRoot, 'version.json');
+        if (fs.existsSync(vFile)) {
+          try {
+            const content = JSON.parse(fs.readFileSync(vFile, 'utf-8'));
+            return send(200, {
+              version: content.version || '0.2.5',
+              apkUrl: content.apkUrl || '/app-release.apk',
+              appName: content.appName || 'Rutin',
+              releaseNotes: content.releaseNotes || 'v0.2.5 güncellemesi mevcut.',
+              publishedAt: content.publishedAt || new Date().toISOString(),
+            });
+          } catch {}
+        }
         return send(200, {
-          version: '0.2.3',
+          version: process.env.APP_VERSION || '0.2.5',
           apkUrl: '/app-release.apk',
           appName: 'Rutin',
+          releaseNotes: 'v0.2.5: Randevu sabahı saat 05:00 bildirimi ve sade onay.',
           publishedAt: new Date().toISOString(),
         });
       }
