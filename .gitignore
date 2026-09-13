@@ -65,3 +65,4 @@ server/*.db-shm
 .vscode/
 *.swp
 *.swo
+graphify-out/

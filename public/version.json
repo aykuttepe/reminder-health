@@ -1,7 +1,7 @@
 {
-  "version": "0.2.19",
+  "version": "0.2.20",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.19: Sunucu bağlantısı api.mytepeapi.com.tr adresine taşındı. Mevcut hesap ve kayıtlar korunur; zaman aşımı açıklamaları ve oturum koruması iyileştirildi.",
-  "publishedAt": "2026-09-13T19:30:00Z"
+  "releaseNotes": "v0.2.20: Bugün sekmesindeki Yaklaşan Randevu kartı isteğe bağlı hale getirildi; Ayarlar (Profil ve Deneyim) altına açıp kapatma toggle butonu eklendi.",
+  "publishedAt": "2026-09-13T22:56:00Z"
 }

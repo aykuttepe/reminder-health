@@ -569,6 +569,7 @@ export type PrototypeSettings = {
   privateMode: boolean;
   largeText: boolean;
   autoCollapseTaken: boolean;
+  showAppointmentCard?: boolean;
   hapticsEnabled: boolean;
   repeatNagEnabled: boolean;
   repeatNagCount: number;
@@ -631,6 +632,7 @@ const DEFAULT_SETTINGS: PrototypeSettings = {
   privateMode: false,
   largeText: false,
   autoCollapseTaken: false,
+  showAppointmentCard: true,
   hapticsEnabled: true,
   repeatNagEnabled: true,
   repeatNagCount: 5,
@@ -1039,6 +1041,7 @@ function InnerPrototype() {
   const [stockAlertsEnabled, setStockAlertsEnabled] = useState<boolean>(storedSettings.stockAlertsEnabled);
   const [hideDoseAmount, setHideDoseAmount] = useState<boolean>(storedSettings.hideDoseAmount);
   const [autoCollapseTaken, setAutoCollapseTaken] = useState<boolean>(storedSettings.autoCollapseTaken);
+  const [showAppointmentCard, setShowAppointmentCard] = useState<boolean>(storedSettings.showAppointmentCard ?? true);
   const [hapticsEnabled, setHapticsEnabled] = useState<boolean>(storedSettings.hapticsEnabled);
   const [repeatNagEnabled, setRepeatNagEnabled] = useState<boolean>(storedSettings.repeatNagEnabled ?? true);
   const [repeatNagCount, setRepeatNagCount] = useState<number>(storedSettings.repeatNagCount ?? 5);
@@ -1150,6 +1153,7 @@ function InnerPrototype() {
         privateMode,
         largeText,
         autoCollapseTaken,
+        showAppointmentCard,
         hapticsEnabled,
         repeatNagEnabled,
         repeatNagCount,
@@ -1185,6 +1189,7 @@ function InnerPrototype() {
     privateMode,
     largeText,
     autoCollapseTaken,
+    showAppointmentCard,
     hapticsEnabled,
     repeatNagEnabled,
     repeatNagCount,
@@ -2561,6 +2566,7 @@ function InnerPrototype() {
           {tab === 'Bugün' && <>
 
             {(() => {
+              if (!showAppointmentCard) return null;
               const activeAppts = appointments.filter(a => !a.completed && a.date)
                 .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')));
               const isEn = language === 'en';
@@ -3365,6 +3371,26 @@ function InnerPrototype() {
                         </button>
                       </div>
 
+                      {/* Bugün Sekmesinde Göster Toggle */}
+                      <button
+                        type="button"
+                        className="setting-row"
+                        role="switch"
+                        aria-checked={showAppointmentCard}
+                        onClick={() => {
+                          const next = !showAppointmentCard;
+                          setShowAppointmentCard(next);
+                          setToast({ text: next ? (language === 'en' ? 'Appointment card enabled' : 'Randevu kartı açıldı') : (language === 'en' ? 'Appointment card hidden' : 'Randevu kartı gizlendi') });
+                        }}
+                        style={{ marginBottom: '12px' }}
+                      >
+                        <span>
+                          <strong>{language === 'en' ? 'Show on Today Tab' : 'Bugün Sekmesinde Göster'}</strong>
+                          <small>{language === 'en' ? 'Display upcoming appointment card on the main screen' : 'Ana ekranda (Bugün) randevu kartını göster'}</small>
+                        </span>
+                        <span className={`switch ${showAppointmentCard ? 'on' : ''}`}><span/></span>
+                      </button>
+
                       {appointments.length === 0 ? (
                         <div
                           onClick={() => handleOpenAppointmentEditor()}
@@ -4017,6 +4043,18 @@ function InnerPrototype() {
                     <button className="setting-row" role="switch" aria-checked={hapticsEnabled} onClick={() => setHapticsEnabled(!hapticsEnabled)}>
                       <span><strong>Dokunsal Titreşim (Haptik)</strong><small>Butonlara basıldığında hafif titreşim geribildirimi</small></span>
                       <span className={`switch ${hapticsEnabled ? 'on' : ''}`}><span/></span>
+                    </button>
+
+                    <button className="setting-row" role="switch" aria-checked={showAppointmentCard} onClick={() => {
+                      const next = !showAppointmentCard;
+                      setShowAppointmentCard(next);
+                      setToast({ text: next ? (language === 'en' ? 'Appointment card enabled' : 'Randevu kartı açıldı') : (language === 'en' ? 'Appointment card hidden' : 'Randevu kartı gizlendi') });
+                    }}>
+                      <span>
+                        <strong>{language === 'en' ? 'Upcoming Appointments Card' : 'Yaklaşan Randevu Kartı'}</strong>
+                        <small>{language === 'en' ? 'Show upcoming appointments and reminders on Today tab' : 'Bugün sekmesinde yaklaşan randevuları ve hatırlatıcı kartını göster'}</small>
+                      </span>
+                      <span className={`switch ${showAppointmentCard ? 'on' : ''}`}><span/></span>
                     </button>
                   </div>
                 )}

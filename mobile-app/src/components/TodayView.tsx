@@ -60,6 +60,7 @@ export interface TodayViewProps {
   doctorHospital?: string;
   doctorSpecialty?: string;
   onNavigateDoctorProfile?: () => void;
+  showAppointmentCard?: boolean;
 }
 
 export const TodayView: React.FC<TodayViewProps> = ({
@@ -86,6 +87,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
   doctorHospital,
   doctorSpecialty,
   onNavigateDoctorProfile,
+  showAppointmentCard = true,
   today,
   snoozeMinutes,
   language,
@@ -107,6 +109,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
 
       {/* Yaklaşan Doktor Randevusu Kartı ve Yönetimi */}
       {(() => {
+        if (!showAppointmentCard) return null;
         const activeAppts: AppointmentItem[] = appointments !== undefined
           ? appointments
               .filter(a => !a.completed && a.date)

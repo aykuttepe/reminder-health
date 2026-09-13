@@ -674,6 +674,7 @@ function MainApp() {
   const [stockAlertsEnabled, setStockAlertsEnabled] = useState(true);
   const [hideDoseAmount, setHideDoseAmount] = useState(false);
   const [autoCollapseTaken, setAutoCollapseTaken] = useState(false);
+  const [showAppointmentCard, setShowAppointmentCard] = useState(true);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [repeatNagEnabled, setRepeatNagEnabled] = useState(true);
   const [repeatNagCount, setRepeatNagCount] = useState(5);
@@ -954,6 +955,7 @@ function MainApp() {
           if (parsed.stockAlertsEnabled !== undefined) setStockAlertsEnabled(parsed.stockAlertsEnabled);
           if (parsed.hideDoseAmount !== undefined) setHideDoseAmount(parsed.hideDoseAmount);
           if (parsed.autoCollapseTaken !== undefined) setAutoCollapseTaken(parsed.autoCollapseTaken);
+          if (parsed.showAppointmentCard !== undefined) setShowAppointmentCard(parsed.showAppointmentCard);
           if (parsed.hapticsEnabled !== undefined) setHapticsEnabled(parsed.hapticsEnabled);
           if (parsed.repeatNagEnabled !== undefined) setRepeatNagEnabled(parsed.repeatNagEnabled);
           if (parsed.repeatNagCount !== undefined) setRepeatNagCount(parsed.repeatNagCount);
@@ -1034,6 +1036,7 @@ function MainApp() {
         stockAlertsEnabled,
         hideDoseAmount,
         autoCollapseTaken,
+        showAppointmentCard,
         hapticsEnabled,
         repeatNagEnabled,
         repeatNagCount,
@@ -1067,6 +1070,7 @@ function MainApp() {
     stockAlertsEnabled,
     hideDoseAmount,
     autoCollapseTaken,
+    showAppointmentCard,
     hapticsEnabled,
     repeatNagEnabled,
     repeatNagCount,
@@ -1528,6 +1532,7 @@ function MainApp() {
       stockAlertsEnabled,
       hideDoseAmount,
       autoCollapseTaken,
+      showAppointmentCard,
       hapticsEnabled,
     }
   });
@@ -1574,6 +1579,7 @@ function MainApp() {
       if (snapshot.settings.stockAlertsEnabled !== undefined) setStockAlertsEnabled(snapshot.settings.stockAlertsEnabled);
       if (snapshot.settings.hideDoseAmount !== undefined) setHideDoseAmount(snapshot.settings.hideDoseAmount);
       if (snapshot.settings.autoCollapseTaken !== undefined) setAutoCollapseTaken(snapshot.settings.autoCollapseTaken);
+      if (snapshot.settings.showAppointmentCard !== undefined) setShowAppointmentCard(snapshot.settings.showAppointmentCard);
       if (snapshot.settings.hapticsEnabled !== undefined) setHapticsEnabled(snapshot.settings.hapticsEnabled);
       setPreviousState(null);
       setActiveBannerNotification(null);
@@ -1607,6 +1613,7 @@ function MainApp() {
         stockAlertsEnabled,
         hideDoseAmount,
         autoCollapseTaken,
+        showAppointmentCard,
         hapticsEnabled,
       };
       payloadSettings.userName = (userName || '').trim();
@@ -1698,6 +1705,7 @@ function MainApp() {
           if (response.settings.stockAlertsEnabled !== undefined) setStockAlertsEnabled(response.settings.stockAlertsEnabled);
           if (response.settings.hideDoseAmount !== undefined) setHideDoseAmount(response.settings.hideDoseAmount);
           if (response.settings.autoCollapseTaken !== undefined) setAutoCollapseTaken(response.settings.autoCollapseTaken);
+          if (response.settings.showAppointmentCard !== undefined) setShowAppointmentCard(response.settings.showAppointmentCard);
           if (response.settings.hapticsEnabled !== undefined) setHapticsEnabled(response.settings.hapticsEnabled);
         } else if (currentSession.user?.name && (!userName || !userName.trim())) {
           setUserName(currentSession.user.name);
@@ -2212,6 +2220,7 @@ function MainApp() {
             setStockAlertsEnabled(true);
             setHideDoseAmount(false);
             setAutoCollapseTaken(false);
+            setShowAppointmentCard(true);
             setHapticsEnabled(true);
             showToast(t.toastResetSuccess);
           },
@@ -2386,6 +2395,7 @@ function MainApp() {
               doctorSpecialty={doctorSpecialty}
               appointments={appointments}
               onOpenAppointmentEditor={handleOpenAppointmentEditor}
+              showAppointmentCard={showAppointmentCard}
               today={today}
               snoozeMinutes={snoozeMinutes}
               language={language}
@@ -2963,6 +2973,33 @@ function MainApp() {
                           {language === 'en' ? 'Add Appointment' : 'Yeni Randevu Ekle'}
                         </Text>
                       </TouchableOpacity>
+                    </View>
+
+                    {/* Bugün Sekmesinde Göster Toggle Card */}
+                    <View style={[styles.settingCard, { marginBottom: 12 }]}>
+                      <View style={styles.settingRow}>
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text style={styles.settingTitle}>
+                            {language === 'en' ? 'Show on Today Tab' : 'Bugün Sekmesinde Göster'}
+                          </Text>
+                          <Text style={styles.settingSub}>
+                            {language === 'en'
+                              ? 'Display upcoming appointment card on the main screen'
+                              : 'Ana ekranda (Bugün) randevu kartını göster'}
+                          </Text>
+                        </View>
+                        <Switch
+                          value={showAppointmentCard}
+                          onValueChange={val => {
+                            triggerHaptic();
+                            setShowAppointmentCard(val);
+                            showToast(val
+                              ? (language === 'en' ? 'Appointment card enabled' : 'Randevu kartı açıldı')
+                              : (language === 'en' ? 'Appointment card hidden' : 'Randevu kartı gizlendi'));
+                          }}
+                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        />
+                      </View>
                     </View>
 
                     {/* Randevu Kartları Listesi */}
@@ -3957,6 +3994,32 @@ function MainApp() {
                           showToast(val
                             ? (language === 'en' ? 'Haptic feedback enabled' : 'Titreşimli geri bildirim açıldı')
                             : (language === 'en' ? 'Haptic feedback disabled' : 'Titreşim kapatıldı'));
+                        }}
+                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                      />
+                    </View>
+
+                    <View style={styles.settingDivider} />
+
+                    <View style={styles.settingRow}>
+                      <View style={{ flex: 1, paddingRight: 10 }}>
+                        <Text style={styles.settingTitle}>
+                          {language === 'en' ? 'Upcoming Appointments Card' : 'Yaklaşan Randevu Kartı'}
+                        </Text>
+                        <Text style={styles.settingSub}>
+                          {language === 'en'
+                            ? 'Show upcoming appointment reminders on Today tab'
+                            : 'Bugün sekmesinde yaklaşan randevu kartını göster'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={showAppointmentCard}
+                        onValueChange={val => {
+                          triggerHaptic();
+                          setShowAppointmentCard(val);
+                          showToast(val
+                            ? (language === 'en' ? 'Appointment card enabled' : 'Randevu kartı açıldı')
+                            : (language === 'en' ? 'Appointment card hidden' : 'Randevu kartı gizlendi'));
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
