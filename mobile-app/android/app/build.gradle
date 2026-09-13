@@ -2,7 +2,13 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+import groovy.json.JsonSlurper
+
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+def appJsonFile = new File(projectRoot, "app.json")
+def appJson = appJsonFile.exists() ? new JsonSlurper().parseText(appJsonFile.text) : null
+def appVersionCode = (appJson?.expo?.android?.versionCode ?: 12) as Integer
+def appVersionName = (appJson?.expo?.version ?: "0.2.11") as String
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -92,8 +98,8 @@ android {
         applicationId 'com.itmarti.reminder'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "0.2.2"
+        versionCode appVersionCode
+        versionName appVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

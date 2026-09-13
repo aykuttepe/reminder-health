@@ -146,6 +146,10 @@ export function createServer(db: RutinDatabase, options: {publicUrl?:string;allo
       if(!fs.existsSync(file))throw new HttpError(404,'Web derlemesi henüz kurulmamış.');
       const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.woff':'font/woff','.woff2':'font/woff2','.apk':'application/vnd.android.package-archive'};
       res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');
+      if(path.extname(file)==='.apk'){
+        res.setHeader('Content-Length', String(fs.statSync(file).size));
+        res.setHeader('Content-Disposition', `attachment; filename="${path.basename(file)}"`);
+      }
       if(method==='HEAD')return res.end();
       if(path.extname(file)==='.html')return res.end(fs.readFileSync(file,'utf8').replace('<head>',`<head><meta name="reminder-api-origin" content="${publicUrl.origin}">`));
       fs.createReadStream(file).pipe(res);
