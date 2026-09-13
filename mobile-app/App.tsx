@@ -872,9 +872,20 @@ function MainApp() {
         if (syncData) {
           try {
             const parsed = JSON.parse(syncData);
-            setServerUrl(restoreServerUrl(parsed?.serverUrl));
+            const activeUrl = restoreServerUrl(parsed?.serverUrl);
+            setServerUrl(activeUrl);
             if (parsed.autoSync !== undefined) setAutoSync(parsed.autoSync);
             if (parsed.lastSyncAt) setLastSyncAt(parsed.lastSyncAt);
+            if (parsed?.serverUrl !== activeUrl) {
+              AsyncStorage.setItem(
+                STORAGE_KEY_SYNC_CONFIG,
+                JSON.stringify({
+                  serverUrl: activeUrl,
+                  autoSync: parsed.autoSync,
+                  lastSyncAt: parsed.lastSyncAt,
+                })
+              ).catch(() => {});
+            }
           } catch {}
         }
         if (settingData) {
@@ -1570,10 +1581,12 @@ function MainApp() {
     }
     setSyncStatus('syncing');
     setSyncStatusMsg(language === 'en' ? 'Syncing...' : 'Eşitleniyor...');
+    const targetUrl = restoreServerUrl(serverUrl);
+    if (targetUrl !== serverUrl) setServerUrl(targetUrl);
     try {
-      await assertAccount(localStore, serverUrl, s.user);
-      const currentSession = await getSession(serverUrl);
+      const currentSession = await getSession(targetUrl);
       if (currentSession.user.id !== s.user.id) throw new Error(language === 'en' ? 'Account changed; please reconnect.' : 'Hesap değişti; yeniden bağlanın.');
+      await assertAccount(localStore, targetUrl, currentSession.user);
 
       const payloadSettings: Record<string, any> = {
         notifications,
@@ -1601,7 +1614,7 @@ function MainApp() {
       if (doctorNotes && doctorNotes.trim()) payloadSettings.doctorNotes = doctorNotes.trim();
       if (appointments && appointments.length > 0) payloadSettings.appointments = JSON.stringify(appointments);
 
-      const response = await authRequest(serverUrl, '/api/sync', {
+      const response = await authRequest(targetUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
         learnedMeds,
         settings: payloadSettings,
@@ -1804,7 +1817,9 @@ function MainApp() {
     triggerHaptic();
     setSyncStatus('testing');
     setSyncStatusMsg(language === 'en' ? 'Connecting to server...' : 'Sunucuya bağlanılıyor...');
-    const result = await checkServerHealth(serverUrl);
+    const targetUrl = restoreServerUrl(serverUrl);
+    if (targetUrl !== serverUrl) setServerUrl(targetUrl);
+    const result = await checkServerHealth(targetUrl);
     if (result.ok) {
       setSyncStatus('connected');
       setSyncStatusMsg(language === 'en' ? `Server Online (v${result.version} · ${result.latencyMs}ms)` : `Sunucu Çevrimiçi (v${result.version} · ${result.latencyMs}ms)`);
@@ -1818,7 +1833,9 @@ function MainApp() {
 
   const handleSyncNow = async () => {
     triggerHaptic();
-    logger.breadcrumb(`Sunucu eşitlemesi başlatıldı: ${serverUrl}`);
+    const targetUrl = restoreServerUrl(serverUrl);
+    if (targetUrl !== serverUrl) setServerUrl(targetUrl);
+    logger.breadcrumb(`Sunucu eşitlemesi başlatıldı: ${targetUrl}`);
     await syncWithServer(session, true);
   };
 
@@ -3856,6 +3873,25 @@ function MainApp() {
                   </View>
 
                   <View style={styles.syncCard}>
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#071626',
+                      paddingHorizontal: 10,
+                      paddingVertical: 7,
+                      borderRadius: 8,
+                      marginBottom: 10,
+                      borderWidth: 1,
+                      borderColor: '#1e293b',
+                      gap: 8
+                    }}>
+                      <Ionicons name="cloud-done-outline" size={15} color="#38bdf8" />
+                      <Text style={{ color: '#94a3b8', fontSize: 11, flex: 1 }}>
+                        {language === 'en' ? 'Server: ' : 'Sunucu: '}
+                        <Text style={{ color: '#38bdf8', fontWeight: '700' }}>Rutin Cloud (Cloudflare & Turso)</Text>
+                      </Text>
+                    </View>
+
                     <Text style={styles.syncCardDesc}>
                       {language === 'en'
                         ? 'Synchronize your data bi-directionally (Smart Merge) and securely across your devices.'

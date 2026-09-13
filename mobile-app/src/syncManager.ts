@@ -209,23 +209,40 @@ export function validateBackupJSON(jsonStr: string): {
 
 export const DEFAULT_SYNC_SERVER_URL = 'https://rutin-api.tepe-aykut05.workers.dev';
 
-// Migrate only known addresses from the original local installation.
-export function restoreServerUrl(savedUrl: unknown): string {
-  if (typeof savedUrl !== 'string' || !savedUrl.trim()) return DEFAULT_SYNC_SERVER_URL;
-  const normalized = normalizeServerUrl(savedUrl);
-  if (!normalized || /^(https?:\/\/)?(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|localhost|127\.0\.0\.1)/i.test(normalized)) {
-    return DEFAULT_SYNC_SERVER_URL;
-  }
-  return normalized;
-}
-
 export function normalizeServerUrl(rawUrl: string): string {
   let clean = rawUrl.trim().replace(/\/+$/, '');
   if (!clean) return '';
   if (!/^https?:\/\//i.test(clean)) {
     clean = `http://${clean}`;
   }
+  clean = clean.replace(/\/api$/i, '');
   return clean;
+}
+
+// HTTP and private-network installations migrate to the managed cloud server.
+export function isLegacyServerOrigin(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol === 'http:') return true;
+    if (url.protocol !== 'https:') return false;
+    if (host === 'localhost' || host.endsWith('.localhost') || host === '[::1]') return true;
+    const octets = host.split('.').map(Number);
+    return octets.length === 4 && octets.every(n => Number.isInteger(n) && n >= 0 && n <= 255) &&
+      (octets[0] === 10 || octets[0] === 127 ||
+       (octets[0] === 192 && octets[1] === 168) ||
+       (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31));
+  } catch { return false; }
+}
+
+export function restoreServerUrl(savedUrl: unknown): string {
+  if (typeof savedUrl !== 'string' || !savedUrl.trim()) return DEFAULT_SYNC_SERVER_URL;
+  const normalized = normalizeServerUrl(savedUrl);
+  try {
+    const url = new URL(normalized);
+    if (url.protocol !== 'https:' || isLegacyServerOrigin(normalized)) return DEFAULT_SYNC_SERVER_URL;
+    return normalized;
+  } catch { return DEFAULT_SYNC_SERVER_URL; }
 }
 
 /**

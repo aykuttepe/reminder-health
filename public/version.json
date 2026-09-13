@@ -1,7 +1,7 @@
 {
-  "version": "0.2.11",
-  "apkUrl": "/app-release.apk",
+  "version": "0.2.12",
+  "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.11: Çoklu randevu yönetimi (+ Yeni Randevu Ekle), randevu içi aç karnına kan tahlili hazırlığı ve tam bulut senkronizasyonu.",
-  "publishedAt": "2026-09-13T12:40:00Z"
+  "releaseNotes": "v0.2.12: Bulut senkronizasyon bağlantı düzeltmesi ve doğrudan GitHub Releases indirmesi.",
+  "publishedAt": "2026-09-13T13:40:00Z"
 }

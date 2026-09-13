@@ -1,3 +1,4 @@
+import {DEFAULT_SYNC_SERVER_URL, isLegacyServerOrigin} from './syncManager';
 import { v5, validate } from 'uuid';
 import { randomUUID } from 'expo-crypto';
 export const newId = () => randomUUID();
@@ -10,16 +11,23 @@ export type Snapshot = {doses:any[];learnedMeds:Record<string,any>;settings:Reco
 export interface Store {getItem(key:string):Promise<string|null>;setItem(key:string,value:string):Promise<void>}
 export const emptySnapshot=():Snapshot=>({doses:[],learnedMeds:{},settings:{}});
 export const accountKey=(url:string,id:string)=>`${new URL(url).origin}|${id}`;
+function canMigrateAccount(previous: string, next: string): boolean {
+  const [origin, userId] = previous.split('|');
+  const [targetOrigin, targetUserId] = next.split('|');
+  return userId === targetUserId && targetOrigin === DEFAULT_SYNC_SERVER_URL && isLegacyServerOrigin(origin);
+}
+
 // All account switches are journaled before changing the UI. Legacy data is retained separately.
 export async function switchAccount(store:Store,url:string,account:Account,current:Snapshot):Promise<Snapshot>{
   const next=accountKey(url,account.id), previous=await store.getItem('reminder_bound_account_v2');
   if(previous===next)return {...current,doses:migrateDoseIds(current.doses,account.id)};
+  const migrating = !!previous && canMigrateAccount(previous, next);
   if(previous)await store.setItem(`reminder_vault:${previous}`,JSON.stringify(current));
   else if(!(await store.getItem('reminder_legacy_snapshot_v2')))await store.setItem('reminder_legacy_snapshot_v2',JSON.stringify(current));
   const saved=await store.getItem(`reminder_vault:${next}`);
   const legacyClaim=await store.getItem('reminder_legacy_claim_v2');
   const legacy=account.legacyOwner&&!legacyClaim?await store.getItem('reminder_legacy_snapshot_v2'):null;
-  const selected:Snapshot=saved?JSON.parse(saved):legacy?JSON.parse(legacy):emptySnapshot();
+  const selected:Snapshot=migrating?current:saved?JSON.parse(saved):legacy?JSON.parse(legacy):emptySnapshot();
   const result={...selected,doses:migrateDoseIds(selected.doses,account.id)};
   // The pending snapshot lets startup recover if the process closes during a switch.
   await store.setItem('reminder_pending_switch_v2',JSON.stringify({key:next,snapshot:result}));
@@ -29,7 +37,14 @@ export async function switchAccount(store:Store,url:string,account:Account,curre
   return result;
 }
 export async function assertAccount(store:Store,url:string,account:Account){
-  if(await store.getItem('reminder_bound_account_v2')!==accountKey(url,account.id))throw new Error('Hesabınıza yeniden bağlanın.');
+  const bound = await store.getItem('reminder_bound_account_v2');
+  const target = accountKey(url,account.id);
+  if (bound === target) return;
+  if (bound && canMigrateAccount(bound, target)) {
+    await store.setItem('reminder_bound_account_v2', target);
+    return;
+  }
+  throw new Error('Hesabınıza yeniden bağlanın.');
 }
 export async function finishSwitch(store:Store,keys:{doses:string;learned:string;settings:string}){
   const pending=await store.getItem('reminder_pending_switch_v2');if(!pending)return;

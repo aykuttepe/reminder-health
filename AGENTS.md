@@ -76,6 +76,7 @@ When any text-entry control loses focus, dismiss the simulated keyboard. If the 
 - Dark navy, mint accent, large time and medication name; bottom tabs Bugün, İlaçlarım, Geçmiş, Ayarlar.
 - Keep communication concise and tools focused to conserve tokens.
 - The project includes the web prototype, an Expo native app with notifications and persistent storage, and a self-hosted sync server.
-- The local sync server is `http://192.168.1.100:3050`; port 3000 is occupied by another application. The deployment directory is `/home/tepe/apps/reminder-sync` and the container is `reminder-sync-server` (host 3050 -> container 3000).
+- The default sync server is `https://rutin-api.tepe-aykut05.workers.dev` (Cloudflare Worker with Turso). Saved HTTP and private-network server addresses migrate to this cloud endpoint. Preserve account isolation and local snapshots during migration.
+- The legacy local sync server is `http://192.168.1.100:3050`; port 3000 is occupied by another application. The deployment directory is `/home/tepe/apps/reminder-sync` and the container is `reminder-sync-server` (host 3050 -> container 3000).
 - Preserve local `data/` and `server/data/` directories; they are ignored by Git and must not be deleted during checks.
 - Always commit and push changes to Git (GitHub repository `aykuttepe/reminder-health`) whenever the app or server is updated, and tag new releases so that GitHub Releases and the in-app update mechanism stay in sync.

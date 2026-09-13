@@ -1,3 +1,4 @@
+import {DEFAULT_SYNC_SERVER_URL, isLegacyServerOrigin} from './syncManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import {Platform} from 'react-native';
@@ -8,15 +9,17 @@ function base(url:string){return new URL(url).origin;}
 export async function authRequest(url:string,endpoint:string,body?:any,session?:Session):Promise<any>{
   const origin=base(url),stored=await SecureStore.getItemAsync(key);
   const saved=stored?JSON.parse(stored):null;
-  const token=session?.token||(saved?.origin===origin?saved.session.token:(saved?.session?.token?saved.session.token:undefined));
-  if(saved&&saved.origin!==origin&&saved.session?.token){
-    saved.origin=origin;
-    SecureStore.setItemAsync(key,JSON.stringify(saved),{keychainAccessible:SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY}).catch(()=>{});
-  }
+  const migrating = !!saved?.session?.token && origin === DEFAULT_SYNC_SERVER_URL &&
+    isLegacyServerOrigin(saved.origin);
+  const token = session?.token || (saved?.origin === origin || migrating ? saved?.session?.token : undefined);
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
   try{
     const res=await fetch(`${origin}${endpoint}`,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
-    const data=await res.json();if(!res.ok)throw new Error(data.error||'Bağlantı başarısız.');return data;
+    const data=await res.json();if(!res.ok)throw new Error(data.error||'Bağlantı başarısız.');
+    if (migrating && endpoint === '/auth/session' && data.user?.id === saved.session.user.id) {
+      await SecureStore.setItemAsync(key,JSON.stringify({...saved,origin}),{keychainAccessible:SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY});
+    }
+    return data;
   }finally{clearTimeout(timer);}
 }
 const codeKey='reminder_sync_code_v2';
