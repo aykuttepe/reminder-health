@@ -291,49 +291,6 @@
 .sim-action-btn.skip {flex:0.8;background:#2b161f;color:#f87171;border:1px solid #5c2234;}
 .sim-action-btn.skip:hover {background:#3b1f2b;}
 
-/* Device Reliability & Alarm Protection Styles */
-.reliability-status-pill {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #0b1f22;
-  border: 1px solid #1c4d43;
-  border-radius: 10px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-.reliability-status-pill:hover {
-  background: #10292e;
-  border-color: var(--mint);
-}
-.status-pill-left {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #d1fae5;
-}
-.proto-dot-pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-  animation: pulseDot 2s infinite;
-}
-@keyframes pulseDot {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
-  70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-.status-pill-action {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--mint);
-}
 
 .reliability-proto-card {
   background: #111e2b;

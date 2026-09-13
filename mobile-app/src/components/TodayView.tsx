@@ -104,31 +104,6 @@ export const TodayView: React.FC<TodayViewProps> = ({
 }) => {
   return (
     <>
-      {/* Cihaz Güvenilirliği & Alarm Koruma Durumu */}
-      <TouchableOpacity
-        style={styles.reliabilityStatusBanner}
-        onPress={() => {
-          triggerHaptic();
-          onNavigateSettings();
-        }}
-        activeOpacity={0.8}
-      >
-        <View style={styles.reliabilityStatusLeft}>
-          <View style={styles.reliabilityStatusDot} />
-          <Ionicons name="shield-checkmark" size={14} color="#a9dfca" />
-          <Text style={styles.reliabilityStatusText}>
-            {language === 'en'
-              ? 'Alarms & 3-Min Repeats Fully Protected'
-              : 'Alarmlar & 3 Dk Tekrarlar Tam Korumalı'}
-          </Text>
-        </View>
-        <View style={styles.reliabilityStatusAction}>
-          <Text style={styles.reliabilityStatusActionText}>
-            {language === 'en' ? 'Battery / Permissions' : 'Pil / İzinler'}
-          </Text>
-          <Ionicons name="chevron-forward" size={12} color="#a9dfca" />
-        </View>
-      </TouchableOpacity>
 
       {/* Yaklaşan Doktor Randevusu Kartı ve Yönetimi */}
       {(() => {
@@ -511,48 +486,6 @@ export const TodayView: React.FC<TodayViewProps> = ({
 };
 
 const styles = StyleSheet.create({
-  reliabilityStatusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#0d2422',
-    borderWidth: 1,
-    borderColor: '#194c44',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  reliabilityStatusLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  reliabilityStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34d399',
-  },
-  reliabilityStatusText: {
-    color: '#a9dfca',
-    fontSize: 11,
-    fontWeight: '700',
-    flex: 1,
-  },
-  reliabilityStatusAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingLeft: 6,
-  },
-  reliabilityStatusActionText: {
-    color: '#a9dfca',
-    fontSize: 10.5,
-    fontWeight: '600',
-  },
   emptyCard: {
     backgroundColor: '#152332',
     borderRadius: 16,

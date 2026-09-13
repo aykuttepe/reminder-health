@@ -2452,14 +2452,6 @@ function InnerPrototype() {
             {tab==='İlaçlarım' && <button className="icon-button add-button" aria-label={t.addFirstMedicine} onClick={()=>openEditor()}><Plus size={24}/></button>}
           </header>
           {tab === 'Bugün' && <>
-            <div className="reliability-status-pill" onClick={() => setTab('Ayarlar')}>
-              <div className="status-pill-left">
-                <span className="proto-dot-pulse" />
-                <ShieldCheck size={14} weight="bold" />
-                <span>{language === 'en' ? 'Alarms & 3-Min Repeat Fully Protected' : 'Alarmlar & 3 Dk Tekrarlar Tam Korumalı'}</span>
-              </div>
-              <span className="status-pill-action">{language === 'en' ? 'Battery / Permissions →' : 'Pil / İzinler →'}</span>
-            </div>
 
             {(() => {
               const activeAppts = appointments.filter(a => !a.completed && a.date)
