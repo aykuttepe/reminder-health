@@ -256,46 +256,51 @@ export const TodayView: React.FC<TodayViewProps> = ({
               }}
               activeOpacity={0.8}
             >
-              <View style={styles.appointmentBannerLeft}>
-                <View style={styles.appointmentBannerIconWrap}>
-                  <Ionicons name="calendar" size={18} color="#a9dfca" />
+              <View style={styles.appointmentTopRow}>
+                <View style={styles.appointmentBannerLeft}>
+                  <View style={styles.appointmentBannerIconWrap}>
+                    <Ionicons name="calendar" size={18} color="#a9dfca" />
+                  </View>
+                  <View style={styles.appointmentBannerContent}>
+                    <View style={styles.appointmentTitleRow}>
+                      <Text style={styles.appointmentBannerTitle} numberOfLines={1} ellipsizeMode="tail">
+                        {docTitle}
+                      </Text>
+                      {hospitalText ? (
+                        <Text style={styles.appointmentBannerSub} numberOfLines={1} ellipsizeMode="tail">
+                          {hospitalText}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.appointmentDateRow}>
+                      <Text style={styles.appointmentBannerDate} numberOfLines={1} ellipsizeMode="tail">
+                        {formatLocalizedDate(primaryAppt.date, language)}
+                      </Text>
+                      <View style={styles.appointmentBannerTimeBadge}>
+                        <Text style={styles.appointmentBannerTimeText}>⏰ {timeText}</Text>
+                      </View>
+                    </View>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                    <Text style={styles.appointmentBannerTitle} numberOfLines={1}>
-                      {docTitle}
-                    </Text>
-                    {hospitalText ? (
-                      <Text style={styles.appointmentBannerSub} numberOfLines={1}>
-                        {hospitalText}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                    <Text style={styles.appointmentBannerDate}>
-                      {formatLocalizedDate(primaryAppt.date, language)}
-                    </Text>
-                    <View style={styles.appointmentBannerTimeBadge}>
-                      <Text style={styles.appointmentBannerTimeText}>⏰ {timeText}</Text>
-                    </View>
-                  </View>
+                <View style={[styles.appointmentBannerDaysBadge, { backgroundColor: badgeBg }]}>
+                  <Text style={[styles.appointmentBannerDaysText, { color: badgeColor }]}>{badgeText}</Text>
+                  <Ionicons name="chevron-forward" size={12} color={badgeColor} style={{ marginLeft: 3 }} />
+                </View>
+              </View>
 
-                  {/* Randevu İçi Tahlil / Kan Verme Bilgisi */}
-                  {primaryAppt.hasBloodTest && primaryAppt.bloodTestDate ? (
-                    <View style={styles.appointmentBloodRow}>
-                      <Ionicons name="flask-outline" size={13} color="#c4b5fd" />
-                      <Text style={styles.appointmentBloodText}>
-                        {formatLocalizedDate(primaryAppt.bloodTestDate, language)}
-                        {primaryAppt.bloodTestFasting ? (isEn ? ' (Fasting)' : ' (Aç Karnına Tahlil)') : (isEn ? ' (Lab Test)' : ' (Kan Tahlili)')}
-                      </Text>
-                    </View>
+              {/* Randevu İçi Tahlil / Kan Verme Bilgisi */}
+              {primaryAppt.hasBloodTest && primaryAppt.bloodTestDate ? (
+                <View style={styles.appointmentBloodRow}>
+                  <Ionicons name="flask-outline" size={13} color="#c4b5fd" />
+                  <Text style={styles.appointmentBloodText} numberOfLines={1} ellipsizeMode="tail">
+                    {formatLocalizedDate(primaryAppt.bloodTestDate, language)}
+                    {primaryAppt.bloodTestFasting ? (isEn ? ' (Aç Karnına Tahlil)' : ' (Aç Karnına Tahlil)') : (isEn ? ' (Kan Tahlili)' : ' (Kan Tahlili)')}
+                  </Text>
+                  {primaryAppt.bloodTestTime ? (
+                    <Text style={styles.appointmentBloodTimeText}>⏰ {primaryAppt.bloodTestTime}</Text>
                   ) : null}
                 </View>
-              </View>
-              <View style={[styles.appointmentBannerDaysBadge, { backgroundColor: badgeBg }]}>
-                <Text style={[styles.appointmentBannerDaysText, { color: badgeColor }]}>{badgeText}</Text>
-                <Ionicons name="chevron-forward" size={12} color={badgeColor} style={{ marginLeft: 3 }} />
-              </View>
+              ) : null}
             </TouchableOpacity>
 
             {/* Ek randevu varsa gösterge şeridi */}
@@ -752,9 +757,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   appointmentBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#101d29',
     borderRadius: 12,
     padding: 12,
@@ -762,12 +764,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(169, 223, 202, 0.25)',
   },
+  appointmentTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   appointmentBannerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
-    marginRight: 8,
+    minWidth: 0,
   },
   appointmentBannerIconWrap: {
     width: 36,
@@ -776,20 +784,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(169, 223, 202, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
+  },
+  appointmentBannerContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  appointmentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   appointmentBannerTitle: {
     color: '#f5f3f0',
     fontSize: 14,
     fontWeight: '700',
+    flexShrink: 1,
   },
   appointmentBannerSub: {
     color: '#a9dfca',
     fontSize: 12,
     fontWeight: '500',
+    flexShrink: 2,
+  },
+  appointmentDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 3,
   },
   appointmentBannerDate: {
     color: '#adb3bf',
     fontSize: 12,
+    flexShrink: 1,
   },
   appointmentBannerTimeBadge: {
     backgroundColor: 'rgba(169, 223, 202, 0.15)',
@@ -798,6 +826,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: 'rgba(169, 223, 202, 0.3)',
+    flexShrink: 0,
   },
   appointmentBannerTimeText: {
     color: '#a9dfca',
@@ -810,6 +839,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+    flexShrink: 0,
   },
   appointmentBannerDaysText: {
     fontSize: 11,
@@ -858,20 +888,28 @@ const styles = StyleSheet.create({
   appointmentBloodRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 5,
-    backgroundColor: 'rgba(167, 139, 250, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(167, 139, 250, 0.25)',
+    backgroundColor: 'rgba(167, 139, 250, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
   appointmentBloodText: {
     color: '#c4b5fd',
     fontSize: 11,
     fontWeight: '600',
+    flex: 1,
+    minWidth: 0,
+  },
+  appointmentBloodTimeText: {
+    color: '#a78bfa',
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 0,
   },
   appointmentMoreChip: {
     flexDirection: 'row',
@@ -880,6 +918,7 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 6,
     paddingVertical: 6,
+    paddingHorizontal: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: 6,
   },
@@ -887,6 +926,8 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 11,
     fontWeight: '500',
+    flex: 1,
+    textAlign: 'center',
   },
   appointmentEmptyBanner: {
     flexDirection: 'row',

@@ -2592,8 +2592,8 @@ function InnerPrototype() {
                       cursor: 'pointer'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, marginRight: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0, marginRight: '8px' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '18px', background: 'rgba(169, 223, 202, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9dfca', flexShrink: 0 }}>
                           <CalendarDots size={20} weight="bold" />
                         </div>
