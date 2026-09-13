@@ -1,7 +1,7 @@
 {
-  "version": "0.2.12",
+  "version": "0.2.13",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.12: Bulut senkronizasyon bağlantı düzeltmesi ve doğrudan GitHub Releases indirmesi.",
-  "publishedAt": "2026-09-13T13:40:00Z"
+  "releaseNotes": "v0.2.13: Android ağ istemcisi uyumluluğu ve bağlantı testi zaman aşımı düzeltmesi.",
+  "publishedAt": "2026-09-13T14:09:56.051296Z"
 }

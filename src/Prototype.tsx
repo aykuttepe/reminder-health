@@ -3124,7 +3124,7 @@ function InnerPrototype() {
                     <div className="info-note"><ShieldCheck size={22}/><p>Bu bir etkileşimli prototip. İlaç planınız ve tercihleriniz bu tarayıcıda yerel olarak güvenle saklanır.</p></div>
 
                     <div style={{ textAlign: 'center', marginTop: '16px', marginBottom: '8px', fontSize: '12px', color: '#68778d' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.12 (Web Prototip)</span>
+                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.13 (Web Prototip)</span>
                       <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>Karekod & Senkronizasyon · Çoklu Randevu & Tahlil</span>
                     </div>
                   </>

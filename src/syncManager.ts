@@ -253,34 +253,30 @@ export async function checkServerHealth(
   apiToken?: string
 ): Promise<{ ok: boolean; version?: string; latencyMs?: number; error?: string }> {
   const cleanUrl = normalizeServerUrl(serverUrl);
-  if (!cleanUrl) {
-    return { ok: false, error: 'Sunucu adresi boş olamaz.' };
-  }
+  if (!cleanUrl) return { ok: false, error: 'Sunucu adresi boş olamaz.' };
   const start = Date.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
-    const headers: Record<string, string> = {};
-    if (apiToken?.trim()) {
-      headers['Authorization'] = `Bearer ${apiToken.trim()}`;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
+    const headers: Record<string, string> = {Accept: 'application/json'};
+    if (apiToken?.trim()) headers.Authorization = `Bearer ${apiToken.trim()}`;
     const res = await fetch(`${cleanUrl}/health`, {
-      method: 'GET',
-      headers,
-      signal: controller.signal,
+      method: 'GET', headers, signal: controller.signal,
     });
-    clearTimeout(timeoutId);
-
-    const latencyMs = Date.now() - start;
     if (!res.ok) {
-      return { ok: false, latencyMs, error: `HTTP ${res.status}: ${res.statusText}` };
+      return {ok: false, latencyMs: Date.now() - start, error: `HTTP ${res.status}: ${res.statusText}`};
     }
     const data = await res.json();
-    return { ok: true, version: data.version || '1.0.0', latencyMs };
+    if (data?.status !== 'ok') {
+      return {ok: false, error: 'Sunucu beklenen sağlık yanıtını vermedi.'};
+    }
+    return {ok: true, version: data.version || '1.0.0', latencyMs: Date.now() - start};
   } catch (err: any) {
-    return { ok: false, error: err.name === 'AbortError' ? 'Zaman aşımı (6 sn)' : (err.message || 'Bağlantı hatası') };
+    return {ok: false, error: controller.signal.aborted || err?.name === 'AbortError'
+      ? 'Zaman aşımı (15 sn)'
+      : (err?.message || 'Bağlantı hatası')};
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

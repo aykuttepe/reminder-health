@@ -80,3 +80,5 @@ When any text-entry control loses focus, dismiss the simulated keyboard. If the 
 - The legacy local sync server is `http://192.168.1.100:3050`; port 3000 is occupied by another application. The deployment directory is `/home/tepe/apps/reminder-sync` and the container is `reminder-sync-server` (host 3050 -> container 3000).
 - Preserve local `data/` and `server/data/` directories; they are ignored by Git and must not be deleted during checks.
 - Always commit and push changes to Git (GitHub repository `aykuttepe/reminder-health`) whenever the app or server is updated, and tag new releases so that GitHub Releases and the in-app update mechanism stay in sync.
+
+- Native networking uses the React Native XMLHttpRequest-backed fetch installed in `mobile-app/src/networking.ts` after Expo initialization. Keep this bootstrap before App imports; do not rely solely on an environment flag for release builds.
