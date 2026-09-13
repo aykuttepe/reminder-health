@@ -6,12 +6,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const MONTH_NAMES_TR = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
@@ -89,6 +87,9 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
   title,
   lang = 'tr',
 }) => {
+  const { width, height } = useWindowDimensions();
+  const isTablet = Math.min(width, height) >= 600 || width >= 768;
+
   const isEn = lang === 'en';
   const modalTitle = title || (isEn ? 'Select Date' : 'Tarih Seçin');
   const monthNames = isEn ? MONTH_NAMES_EN : MONTH_NAMES_TR;
@@ -223,11 +224,11 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
       onRequestClose={onClose}
     >
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, isTablet && styles.backdropTablet]}>
           <TouchableWithoutFeedback onPress={e => e.stopPropagation()}>
-            <View style={styles.sheetContainer}>
+            <View style={[styles.sheetContainer, isTablet && styles.sheetContainerTablet]}>
               {/* Tutamaç Barı */}
-              <View style={styles.dragHandle} />
+              {!isTablet && <View style={styles.dragHandle} />}
 
               {/* Başlık & Kapat Butonu */}
               <View style={styles.headerRow}>
@@ -388,6 +389,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 11, 20, 0.75)',
     justifyContent: 'flex-end',
   },
+  backdropTablet: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   sheetContainer: {
     backgroundColor: '#0f1c2c',
     borderTopLeftRadius: 24,
@@ -398,6 +404,14 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 36 : 20,
     maxHeight: '90%',
+  },
+  sheetContainerTablet: {
+    borderRadius: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxWidth: 460,
+    width: '100%',
+    paddingBottom: 20,
   },
   dragHandle: {
     width: 36,

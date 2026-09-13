@@ -19,11 +19,9 @@ import {
   AppState,
   Share,
   Linking,
-  Dimensions,
 } from 'react-native';
+import { useResponsive } from './src/useResponsive';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CAROUSEL_CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.80);
 const CAROUSEL_SPACING = 10;
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -326,6 +324,7 @@ function TimeSlotPicker({
 }
 
 function MainApp() {
+  const { isTablet, contentMaxWidth, tabBarMaxWidth, modalMaxWidth, carouselCardWidth } = useResponsive();
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [today, setToday] = useState(localDateKey);
@@ -2216,15 +2215,15 @@ function MainApp() {
 
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>
+        <View style={[styles.header, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}>
+          <View style={styles.headerTitleCol}>
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
               {tab === 'Bugün' && t.tabToday}
               {tab === 'İlaçlarım' && t.tabMedicines}
               {tab === 'Geçmiş' && t.tabHistory}
               {tab === 'Ayarlar' && t.tabSettings}
             </Text>
-            <Text style={styles.headerSubtitle}>
+            <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
               {tab === 'Bugün' || tab === 'Geçmiş'
                 ? dateFromKey(today).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })
                 : tab === 'İlaçlarım'
@@ -2253,7 +2252,7 @@ function MainApp() {
         <ScrollView
           ref={mainScrollViewRef}
           style={styles.scrollArea}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}
         >
           {tab === 'Bugün' && (
             <TodayView
@@ -2296,7 +2295,7 @@ function MainApp() {
               formatStock={formatStock}
               getCycleInfo={getCycleInfo}
               getDurationInfo={getDurationInfo}
-              CAROUSEL_CARD_WIDTH={CAROUSEL_CARD_WIDTH}
+              CAROUSEL_CARD_WIDTH={carouselCardWidth}
               CAROUSEL_SPACING={CAROUSEL_SPACING}
             />
           )}
@@ -4578,21 +4577,23 @@ function MainApp() {
 
         {/* Bottom Tab Navigation */}
         <View style={styles.bottomNav}>
-          {[
-            { id: 'Bugün' as const, label: t.tabToday, icon: 'calendar' },
-            { id: 'İlaçlarım' as const, label: t.tabMedicines, icon: 'medkit' },
-            { id: 'Geçmiş' as const, label: t.tabHistory, icon: 'time' },
-            { id: 'Ayarlar' as const, label: t.tabSettings, icon: 'settings' },
-          ].map(tabItem => (
-            <TouchableOpacity
-              key={tabItem.id}
-              style={styles.navItem}
-              onPress={() => handleTabPress(tabItem.id)}
-            >
-              <Ionicons name={tabItem.icon as any} size={22} color={tab === tabItem.id ? '#a9dfca' : '#adb3bf'} />
-              <Text style={[styles.navLabel, tab === tabItem.id && styles.navLabelActive]}>{tabItem.label}</Text>
-            </TouchableOpacity>
-          ))}
+          <View style={[styles.bottomNavInner, isTablet && { maxWidth: tabBarMaxWidth, alignSelf: 'center', width: '100%' }]}>
+            {[
+              { id: 'Bugün' as const, label: t.tabToday, icon: 'calendar' },
+              { id: 'İlaçlarım' as const, label: t.tabMedicines, icon: 'medkit' },
+              { id: 'Geçmiş' as const, label: t.tabHistory, icon: 'time' },
+              { id: 'Ayarlar' as const, label: t.tabSettings, icon: 'settings' },
+            ].map(tabItem => (
+              <TouchableOpacity
+                key={tabItem.id}
+                style={styles.navItem}
+                onPress={() => handleTabPress(tabItem.id)}
+              >
+                <Ionicons name={tabItem.icon as any} size={22} color={tab === tabItem.id ? '#a9dfca' : '#adb3bf'} />
+                <Text style={[styles.navLabel, tab === tabItem.id && styles.navLabelActive]}>{tabItem.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Toast Notification */}
@@ -4610,7 +4611,7 @@ function MainApp() {
         {/* Add / Edit Modal */}
         <Modal visible={editorOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditorOpen(false)}>
           <SafeAreaView style={styles.modalSafe}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
               <TouchableOpacity onPress={() => setEditorOpen(false)}>
                 <Ionicons name="close" size={26} color="#f5f3f0" />
               </TouchableOpacity>
@@ -4620,7 +4621,7 @@ function MainApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
+            <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalContent, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
               {/* Scan Barcode / Karekod Banner Button */}
               <TouchableOpacity
                 style={styles.scanBarcodeBtn}
@@ -5182,9 +5183,10 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#081624' },
   container: { flex: 1, backgroundColor: '#081624' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
+  headerTitleCol: { flex: 1, minWidth: 0, marginRight: 12 },
   headerTitle: { fontSize: 28, fontWeight: '700', color: '#f5f3f0' },
   headerSubtitle: { fontSize: 13, color: '#adb3bf', marginTop: 4 },
-  progressBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#152332', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
+  progressBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#152332', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, flexShrink: 0 },
   progressText: { fontSize: 12, color: '#adb3bf' },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#a9dfca', justifyContent: 'center', alignItems: 'center' },
   scrollArea: { flex: 1 },
@@ -5511,13 +5513,14 @@ const styles = StyleSheet.create({
   emptyCardSub: { color: '#adb3bf', fontSize: 13, marginTop: 4 },
 
   // Bottom Navigation
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 75, flexDirection: 'row', backgroundColor: '#081624', borderTopWidth: 1, borderTopColor: '#23313f', paddingBottom: Platform.OS === 'ios' ? 15 : 5 },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 75, backgroundColor: '#081624', borderTopWidth: 1, borderTopColor: '#23313f', paddingBottom: Platform.OS === 'ios' ? 15 : 5, justifyContent: 'center' },
+  bottomNavInner: { flexDirection: 'row', flex: 1, justifyContent: 'space-around', alignItems: 'center' },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   navLabel: { color: '#adb3bf', fontSize: 11, marginTop: 4 },
   navLabelActive: { color: '#a9dfca', fontWeight: '600' },
 
   // Toast
-  toast: { position: 'absolute', bottom: 85, left: 16, right: 16, backgroundColor: '#193c37', padding: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#48655f' },
+  toast: { position: 'absolute', bottom: 85, left: 16, right: 16, maxWidth: 560, alignSelf: 'center', backgroundColor: '#193c37', padding: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#48655f' },
   toastText: { color: '#f5f3f0', fontSize: 13, flex: 1, marginRight: 8 },
   toastUndo: { color: '#a9dfca', fontSize: 13, fontWeight: '700' },
 
@@ -5527,6 +5530,8 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 50 : 20,
     left: 14,
     right: 14,
+    maxWidth: 600,
+    alignSelf: 'center',
     zIndex: 9999,
     backgroundColor: '#152535',
     borderRadius: 16,

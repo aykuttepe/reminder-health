@@ -2590,10 +2590,8 @@ function InnerPrototype() {
                           <CalendarDots size={20} weight="bold" />
                         </div>
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                            <span style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 700 }}>{docTitle}</span>
-                            {hospText && <span style={{ color: '#a9dfca', fontSize: '12px', fontWeight: 500 }}>{hospText}</span>}
-                          </div>
+                          <div style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 700 }}>{docTitle}</div>
+                          {hospText && <div style={{ color: '#a9dfca', fontSize: '12px', fontWeight: 500, marginTop: '1px' }}>{hospText}</div>}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
                             <span style={{ color: '#adb3bf', fontSize: '12px' }}>{primaryAppt.date}</span>
                             <span style={{ background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(169, 223, 202, 0.3)' }}>

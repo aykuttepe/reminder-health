@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { AppointmentItem } from '../medicationPlan';
 import { formatLocalizedDate, toDateKey } from './CalendarModal';
+import { useResponsive } from '../useResponsive';
 
 const POPULAR_SPECIALTIES_TR = [
   'Dahiliye',
@@ -67,6 +68,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
   externalSelectedDate,
   lang = 'tr',
 }) => {
+  const { isTablet, modalMaxWidth } = useResponsive();
   const isEn = lang === 'en';
   const todayStr = toDateKey(new Date());
 
@@ -228,7 +230,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
     >
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
           <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
             <Ionicons name="close" size={24} color="#f5f3f0" />
           </TouchableOpacity>
@@ -240,7 +242,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
           {/* Branş / Uzmanlık */}
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Medical Specialty' : 'Tıbbi Branş / Uzmanlık'}</Text>

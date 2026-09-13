@@ -126,7 +126,7 @@ export const TodayCarousel: React.FC<TodayCarouselProps> = ({
         snapToAlignment="start"
         contentContainerStyle={[
           styles.carouselScrollContent,
-          carouselSlots.length === 1 && { width: '100%' },
+          carouselSlots.length === 1 && { justifyContent: 'center', width: '100%', alignItems: 'center' },
         ]}
         onMomentumScrollEnd={(e) => {
           const offset = e.nativeEvent.contentOffset.x;
@@ -149,6 +149,8 @@ export const TodayCarousel: React.FC<TodayCarouselProps> = ({
                 styles.heroCarouselCard,
                 {
                   width: carouselSlots.length > 1 ? CAROUSEL_CARD_WIDTH : '100%',
+                  maxWidth: 420,
+                  alignSelf: 'center',
                   marginRight: carouselSlots.length > 1 ? (idx === carouselSlots.length - 1 ? 0 : CAROUSEL_SPACING) : 0,
                 },
               ]}

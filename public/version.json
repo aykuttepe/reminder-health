@@ -1,7 +1,7 @@
 {
-  "version": "0.2.15",
+  "version": "0.2.16",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.15: Bugün sekmesindeki koruma durumu rozeti kaldırıldı, arayüz sadeleştirildi.",
-  "publishedAt": "2026-09-13T14:42:00Z"
+  "releaseNotes": "v0.2.16: Tablet ve telefon duyarlı (responsive) tasarım ayrımı, 2 sütunlu ızgara düzeni ve taşma korumaları.",
+  "publishedAt": "2026-09-13T15:05:00Z"
 }

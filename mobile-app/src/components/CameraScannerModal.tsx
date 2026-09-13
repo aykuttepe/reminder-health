@@ -15,7 +15,7 @@ import { parseITSKarekod, ITSParsedData } from '../itsParser';
 import { findMedicineByGTIN, CatalogMedicine, TURKISH_MED_CATALOG } from '../data/medCatalog';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SCAN_AREA_SIZE = SCREEN_WIDTH * 0.72;
+const SCAN_AREA_SIZE = Math.min(Math.round(SCREEN_WIDTH * 0.72), 340);
 
 interface CameraScannerModalProps {
   visible: boolean;

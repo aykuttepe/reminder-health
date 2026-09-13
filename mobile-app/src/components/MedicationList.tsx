@@ -15,6 +15,7 @@ import {
 } from '../medicationPlan';
 import { Translations } from '../i18n/translations';
 import { StockInventoryView } from './StockInventoryView';
+import { useResponsive } from '../useResponsive';
 
 export interface MedicationListProps {
   doses: Dose[];
@@ -43,6 +44,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
   getDurationInfo,
   calculateEndDate,
 }) => {
+  const { isTablet } = useResponsive();
   const [subTab, setSubTab] = useState<'plan' | 'stock'>('plan');
   const activeDoses = doses.filter((d) => !d.deletedAt);
 
@@ -123,77 +125,79 @@ export const MedicationList: React.FC<MedicationListProps> = ({
           <Text style={styles.emptyCardSub}>{t.noMedsRecordedDesc}</Text>
         </View>
       ) : (
-        activeDoses.map((dose) => {
-          const cycleInfo = getCycleInfo(dose, today, language);
-          const durationInfo = getDurationInfo(dose, today, language);
-          const medTimes = dose.times && dose.times.length > 0 ? dose.times : [dose.time];
-          const isLow = (dose.stock ?? 10) <= (dose.stockThreshold ?? 5);
+        <View style={isTablet ? styles.tabletGrid : undefined}>
+          {activeDoses.map((dose) => {
+            const cycleInfo = getCycleInfo(dose, today, language);
+            const durationInfo = getDurationInfo(dose, today, language);
+            const medTimes = dose.times && dose.times.length > 0 ? dose.times : [dose.time];
+            const isLow = (dose.stock ?? 10) <= (dose.stockThreshold ?? 5);
 
-          let regimenText = language === 'en' ? 'Every day' : 'Her gün';
-          if (dose.frequencyType === 'alternate') {
-            regimenText = language === 'en' ? 'Alternate days' : 'Gün aşırı';
-          } else if (dose.frequencyType === 'cycle') {
-            regimenText =
-              language === 'en'
-                ? `${dose.cyclePhase1Days || 3}d on / ${dose.cyclePhase2Days || 4}d off`
-                : `${dose.cyclePhase1Days || 3} gün al / ${dose.cyclePhase2Days || 4} gün ara`;
-          } else if (dose.frequencyType === 'variable') {
-            regimenText =
-              language === 'en'
-                ? `${dose.cyclePhase1Days || 4}d ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3}d ${dose.cyclePhase2Amount || '1 tab'}`
-                : `${dose.cyclePhase1Days || 4} gün ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3} gün ${dose.cyclePhase2Amount || '1 tab'}`;
-          }
+            let regimenText = language === 'en' ? 'Every day' : 'Her gün';
+            if (dose.frequencyType === 'alternate') {
+              regimenText = language === 'en' ? 'Alternate days' : 'Gün aşırı';
+            } else if (dose.frequencyType === 'cycle') {
+              regimenText =
+                language === 'en'
+                  ? `${dose.cyclePhase1Days || 3}d on / ${dose.cyclePhase2Days || 4}d off`
+                  : `${dose.cyclePhase1Days || 3} gün al / ${dose.cyclePhase2Days || 4} gün ara`;
+            } else if (dose.frequencyType === 'variable') {
+              regimenText =
+                language === 'en'
+                  ? `${dose.cyclePhase1Days || 4}d ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3}d ${dose.cyclePhase2Amount || '1 tab'}`
+                  : `${dose.cyclePhase1Days || 4} gün ${dose.cyclePhase1Amount || '1.5 tab'} / ${dose.cyclePhase2Days || 3} gün ${dose.cyclePhase2Amount || '1 tab'}`;
+            }
 
-          return (
-            <TouchableOpacity key={dose.id} style={styles.medCard} onPress={() => openEditor(dose)}>
-              <View style={styles.medCardHeader}>
-                <Text style={styles.medCardTime}>{medTimes.map(t => dose.slotAmounts?.[t] ? `${t} (${dose.slotAmounts[t]})` : t).join(', ')}</Text>
-                <View style={styles.medCardBadges}>
-                  {!durationInfo.isContinuous && (
-                    <View style={[styles.durationTag, durationInfo.isExpired && styles.durationTagExpired]}>
-                      <Ionicons
-                        name={durationInfo.isExpired ? 'checkmark-circle' : 'hourglass-outline'}
-                        size={10}
-                        color={durationInfo.isExpired ? '#94a3b8' : '#a9dfca'}
-                      />
-                      <Text style={[styles.durationTagText, durationInfo.isExpired && styles.durationTagTextExpired]}>
-                        {durationInfo.badgeText}
+            return (
+              <TouchableOpacity key={dose.id} style={[styles.medCard, isTablet && styles.medCardTablet]} onPress={() => openEditor(dose)}>
+                <View style={styles.medCardHeader}>
+                  <Text style={styles.medCardTime}>{medTimes.map(t => dose.slotAmounts?.[t] ? `${t} (${dose.slotAmounts[t]})` : t).join(', ')}</Text>
+                  <View style={styles.medCardBadges}>
+                    {!durationInfo.isContinuous && (
+                      <View style={[styles.durationTag, durationInfo.isExpired && styles.durationTagExpired]}>
+                        <Ionicons
+                          name={durationInfo.isExpired ? 'checkmark-circle' : 'hourglass-outline'}
+                          size={10}
+                          color={durationInfo.isExpired ? '#94a3b8' : '#a9dfca'}
+                        />
+                        <Text style={[styles.durationTagText, durationInfo.isExpired && styles.durationTagTextExpired]}>
+                          {durationInfo.badgeText}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={[styles.cycleTag, cycleInfo.phaseType === 'off' && styles.cycleTagOff]}>
+                      <Text style={[styles.cycleTagText, cycleInfo.phaseType === 'off' && styles.cycleTagOffText]}>
+                        {cycleInfo.phaseType === 'off'
+                          ? language === 'en'
+                            ? 'Rest day'
+                            : 'Ara gününde'
+                          : cycleInfo.phaseLabel}
                       </Text>
                     </View>
-                  )}
-                  <View style={[styles.cycleTag, cycleInfo.phaseType === 'off' && styles.cycleTagOff]}>
-                    <Text style={[styles.cycleTagText, cycleInfo.phaseType === 'off' && styles.cycleTagOffText]}>
-                      {cycleInfo.phaseType === 'off'
-                        ? language === 'en'
-                          ? 'Rest day'
-                          : 'Ara gününde'
-                        : cycleInfo.phaseLabel}
-                    </Text>
-                  </View>
-                  <View style={[styles.stockPill, isLow && styles.stockPillLow]}>
-                    <Text style={[styles.stockPillText, isLow && styles.stockPillLowText]}>
-                      {formatStock(dose.stock)}
-                    </Text>
+                    <View style={[styles.stockPill, isLow && styles.stockPillLow]}>
+                      <Text style={[styles.stockPillText, isLow && styles.stockPillLowText]}>
+                        {formatStock(dose.stock)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-              <Text style={styles.medCardName}>{dose.name}</Text>
-              <Text style={styles.medCardSub}>
-                {dose.amount} · {getMealLabel(dose.mealCondition)} · {regimenText}
-                {dose.instructions ? ` · ${dose.instructions}` : ''}
-              </Text>
-              {!durationInfo.isContinuous && (
-                <View style={styles.medCardDurationRow}>
-                  <Ionicons name="calendar-outline" size={11} color="#a9dfca" />
-                  <Text style={styles.medCardDurationText}>
-                    {dose.startDate} - {dose.endDate || calculateEndDate(dose.startDate || today, dose.durationDays || 7)} (
-                    {language === 'en' ? `${dose.durationDays}-Day Treatment` : `${dose.durationDays} Günlük Tedavi`})
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })
+                <Text style={styles.medCardName}>{dose.name}</Text>
+                <Text style={styles.medCardSub}>
+                  {dose.amount} · {getMealLabel(dose.mealCondition)} · {regimenText}
+                  {dose.instructions ? ` · ${dose.instructions}` : ''}
+                </Text>
+                {!durationInfo.isContinuous && (
+                  <View style={styles.medCardDurationRow}>
+                    <Ionicons name="calendar-outline" size={11} color="#a9dfca" />
+                    <Text style={styles.medCardDurationText}>
+                      {dose.startDate} - {dose.endDate || calculateEndDate(dose.startDate || today, dose.durationDays || 7)} (
+                      {language === 'en' ? `${dose.durationDays}-Day Treatment` : `${dose.durationDays} Günlük Tedavi`})
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       )}
 
       <TouchableOpacity style={styles.fullAddBtn} onPress={() => openEditor()}>
@@ -235,6 +239,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
   },
+  tabletGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   medCard: {
     backgroundColor: '#152332',
     borderRadius: 12,
@@ -243,10 +252,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#203244',
   },
+  medCardTablet: {
+    width: '48.8%',
+    marginBottom: 0,
+  },
   medCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 6,
     marginBottom: 6,
   },
   medCardTime: {

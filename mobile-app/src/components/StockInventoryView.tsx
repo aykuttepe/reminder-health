@@ -12,6 +12,7 @@ import {
   calculateStockProjection,
 } from '../medicationPlan';
 import { Translations } from '../i18n/translations';
+import { useResponsive } from '../useResponsive';
 
 export interface StockInventoryViewProps {
   doses: Dose[];
@@ -31,6 +32,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
   openEditor,
   onUpdateStock,
 }) => {
+  const { isTablet } = useResponsive();
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'good'>('all');
 
   const activeDoses = useMemo(() => doses.filter(d => !d.deletedAt), [doses]);
@@ -168,122 +170,124 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
       </View>
 
       {/* Medication Stock Cards */}
-      {filteredList.map(({ dose, projection }) => {
-        const isCritical = projection.statusTier === 'critical';
-        const isLow = projection.statusTier === 'low';
+      <View style={isTablet ? styles.tabletGrid : undefined}>
+        {filteredList.map(({ dose, projection }) => {
+          const isCritical = projection.statusTier === 'critical';
+          const isLow = projection.statusTier === 'low';
 
-        const tierColor = isCritical ? '#ef4444' : isLow ? '#f59e0b' : '#10b981';
-        const tierBg = isCritical ? '#2c1618' : isLow ? '#2c2314' : '#102622';
-        const tierBorder = isCritical ? '#5c2428' : isLow ? '#5c431d' : '#1d4a3e';
+          const tierColor = isCritical ? '#ef4444' : isLow ? '#f59e0b' : '#10b981';
+          const tierBg = isCritical ? '#2c1618' : isLow ? '#2c2314' : '#102622';
+          const tierBorder = isCritical ? '#5c2428' : isLow ? '#5c431d' : '#1d4a3e';
 
-        return (
-          <View key={dose.id} style={styles.stockCard}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => openEditor(dose)}
-              style={styles.cardMainTap}
-            >
-              {/* Card Header */}
-              <View style={styles.cardHeader}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={styles.medName} numberOfLines={1}>
-                    {dose.name}
-                  </Text>
-                  <Text style={styles.medMeta}>
-                    {t.stockDailyConsumption}: {projection.dailyConsumption}{' '}
-                    {dose.form || t.stockUnitPiece}
-                  </Text>
-                </View>
-
-                {/* Days Remaining Badge */}
-                <View
-                  style={[
-                    styles.daysBadge,
-                    { backgroundColor: tierBg, borderColor: tierBorder },
-                  ]}
-                >
-                  <View style={[styles.dot, { backgroundColor: tierColor }]} />
-                  <Text style={[styles.daysBadgeText, { color: tierColor }]}>
-                    {projection.isOutOfStock
-                      ? t.stockRunOut
-                      : `${projection.daysRemaining} ${t.stockDaysLeft}`}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Run-out estimation */}
-              <View style={styles.runOutRow}>
-                <Ionicons name="calendar-outline" size={13} color="#adb3bf" />
-                <Text style={styles.runOutText}>
-                  {t.stockRunOutDate}:{' '}
-                  <Text style={{ color: tierColor, fontWeight: '600' }}>
-                    {projection.runOutDateFormatted}
-                  </Text>
-                </Text>
-              </View>
-
-              {/* Visual Stock Progress Bar */}
-              <View style={styles.progressBarTrack}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      width: `${Math.max(4, projection.progressPercent)}%`,
-                      backgroundColor: tierColor,
-                    },
-                  ]}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* Quick Actions Row */}
-            <View style={styles.actionsRow}>
-              {/* Stepper (- / count / +) */}
-              <View style={styles.stepperBox}>
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => handleAdjustStock(dose, -1)}
-                  disabled={projection.currentStock <= 0}
-                >
-                  <Ionicons
-                    name="remove"
-                    size={16}
-                    color={projection.currentStock <= 0 ? '#4b5563' : '#f5f3f0'}
-                  />
-                </TouchableOpacity>
-
-                <View style={styles.stepperValueBox}>
-                  <Text style={styles.stepperValueText}>
-                    {projection.currentStock}
-                  </Text>
-                  <Text style={styles.stepperUnitText}>
-                    {t.stockUnitPiece}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => handleAdjustStock(dose, 1)}
-                >
-                  <Ionicons name="add" size={16} color="#f5f3f0" />
-                </TouchableOpacity>
-              </View>
-
-              {/* +1 Box Quick Button */}
+          return (
+            <View key={dose.id} style={[styles.stockCard, isTablet && styles.stockCardTablet]}>
               <TouchableOpacity
-                style={styles.addBoxBtn}
-                onPress={() => handleAddBox(dose, projection.boxSize)}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
+                onPress={() => openEditor(dose)}
+                style={styles.cardMainTap}
               >
-                <Ionicons name="cube" size={14} color="#081624" />
-                <Text style={styles.addBoxBtnText}>
-                  {t.stockAddBox} (+{projection.boxSize})
-                </Text>
+                {/* Card Header */}
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={styles.medName} numberOfLines={1}>
+                      {dose.name}
+                    </Text>
+                    <Text style={styles.medMeta}>
+                      {t.stockDailyConsumption}: {projection.dailyConsumption}{' '}
+                      {dose.form || t.stockUnitPiece}
+                    </Text>
+                  </View>
+
+                  {/* Days remaining badge */}
+                  <View
+                    style={[
+                      styles.daysBadge,
+                      { backgroundColor: tierBg, borderColor: tierBorder },
+                    ]}
+                  >
+                    <View style={[styles.dot, { backgroundColor: tierColor }]} />
+                    <Text style={[styles.daysBadgeText, { color: tierColor }]}>
+                      {projection.isOutOfStock
+                        ? t.stockRunOut
+                        : `${projection.daysRemaining} ${t.stockDaysLeft}`}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Run-out estimation */}
+                <View style={styles.runOutRow}>
+                  <Ionicons name="calendar-outline" size={13} color="#adb3bf" />
+                  <Text style={styles.runOutText}>
+                    {t.stockRunOutDate}:{' '}
+                    <Text style={{ color: tierColor, fontWeight: '600' }}>
+                      {projection.runOutDateFormatted}
+                    </Text>
+                  </Text>
+                </View>
+
+                {/* Visual Stock Progress Bar */}
+                <View style={styles.progressBarTrack}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${Math.max(4, projection.progressPercent)}%`,
+                        backgroundColor: tierColor,
+                      },
+                    ]}
+                  />
+                </View>
               </TouchableOpacity>
+
+              {/* Quick Actions Row */}
+              <View style={styles.actionsRow}>
+                {/* Stepper (- / count / +) */}
+                <View style={styles.stepperBox}>
+                  <TouchableOpacity
+                    style={styles.stepperBtn}
+                    onPress={() => handleAdjustStock(dose, -1)}
+                    disabled={projection.currentStock <= 0}
+                  >
+                    <Ionicons
+                      name="remove"
+                      size={16}
+                      color={projection.currentStock <= 0 ? '#4b5563' : '#f5f3f0'}
+                    />
+                  </TouchableOpacity>
+
+                  <View style={styles.stepperValueBox}>
+                    <Text style={styles.stepperValueText}>
+                      {projection.currentStock}
+                    </Text>
+                    <Text style={styles.stepperUnitText}>
+                      {t.stockUnitPiece}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.stepperBtn}
+                    onPress={() => handleAdjustStock(dose, 1)}
+                  >
+                    <Ionicons name="add" size={16} color="#f5f3f0" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* +1 Box Quick Button */}
+                <TouchableOpacity
+                  style={styles.addBoxBtn}
+                  onPress={() => handleAddBox(dose, projection.boxSize)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="cube" size={14} color="#081624" />
+                  <Text style={styles.addBoxBtnText}>
+                    {t.stockAddBox} (+{projection.boxSize})
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        );
-      })}
+          );
+        })}
+      </View>
     </View>
   );
 };
@@ -402,6 +406,11 @@ const styles = StyleSheet.create({
     color: '#081624',
     fontWeight: '700',
   },
+  tabletGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   stockCard: {
     backgroundColor: '#152332',
     borderRadius: 14,
@@ -409,6 +418,10 @@ const styles = StyleSheet.create({
     borderColor: '#203244',
     marginBottom: 12,
     overflow: 'hidden',
+  },
+  stockCardTablet: {
+    width: '48.8%',
+    marginBottom: 0,
   },
   cardMainTap: {
     padding: 14,
@@ -473,6 +486,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d1a27',
     borderTopWidth: 1,
     borderTopColor: '#1a2938',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   stepperBox: {
     flexDirection: 'row',

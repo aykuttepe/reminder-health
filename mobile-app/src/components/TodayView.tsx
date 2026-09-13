@@ -237,16 +237,14 @@ export const TodayView: React.FC<TodayViewProps> = ({
                     <Ionicons name="calendar" size={18} color="#a9dfca" />
                   </View>
                   <View style={styles.appointmentBannerContent}>
-                    <View style={styles.appointmentTitleRow}>
-                      <Text style={styles.appointmentBannerTitle} numberOfLines={1} ellipsizeMode="tail">
-                        {docTitle}
+                    <Text style={styles.appointmentBannerTitle} numberOfLines={1} ellipsizeMode="tail">
+                      {docTitle}
+                    </Text>
+                    {hospitalText ? (
+                      <Text style={styles.appointmentBannerSub} numberOfLines={1} ellipsizeMode="tail">
+                        {hospitalText}
                       </Text>
-                      {hospitalText ? (
-                        <Text style={styles.appointmentBannerSub} numberOfLines={1} ellipsizeMode="tail">
-                          {hospitalText}
-                        </Text>
-                      ) : null}
-                    </View>
+                    ) : null}
                     <View style={styles.appointmentDateRow}>
                       <Text style={styles.appointmentBannerDate} numberOfLines={1} ellipsizeMode="tail">
                         {formatLocalizedDate(primaryAppt.date, language)}
