@@ -1,7 +1,7 @@
 {
-  "version": "0.2.17",
+  "version": "0.2.18",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.17: Randevu silme ve veritabanı senkronizasyon kalıcılığı düzeltildi, editör içi silme butonu eklendi.",
-  "publishedAt": "2026-09-13T15:20:00Z"
+  "releaseNotes": "v0.2.18: Yaklaşan randevu yok kartındaki taşmalar ve buton sıkışmaları giderildi, yazı boyutu sınırlandırması ve esnek yerleşim korumaları eklendi.",
+  "publishedAt": "2026-09-13T18:55:00Z"
 }

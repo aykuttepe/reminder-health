@@ -1,6 +1,6 @@
 {
   "name": "reminder-health",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

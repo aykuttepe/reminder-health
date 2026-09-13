@@ -137,22 +137,38 @@ export const TodayView: React.FC<TodayViewProps> = ({
               }}
               activeOpacity={0.8}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={styles.appointmentEmptyLeft}>
                 <View style={styles.appointmentBannerIconWrap}>
                   <Ionicons name="calendar-outline" size={18} color="#a9dfca" />
                 </View>
-                <View>
-                  <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '600' }}>
+                <View style={styles.appointmentEmptyTextCol}>
+                  <Text
+                    style={styles.appointmentEmptyTitle}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    maxFontSizeMultiplier={1.2}
+                  >
                     {isEn ? 'No Upcoming Appointments' : 'Yaklaşan Randevu Yok'}
                   </Text>
-                  <Text style={{ color: '#adb3bf', fontSize: 11, marginTop: 1 }}>
+                  <Text
+                    style={styles.appointmentEmptySub}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    maxFontSizeMultiplier={1.2}
+                  >
                     {isEn ? 'Tap to add doctor & lab reminders' : 'Doktor kontrol ve tahlil hatırlatıcısı ekle'}
                   </Text>
                 </View>
               </View>
-              <View style={styles.appointmentAddBtn}>
+              <View style={styles.appointmentEmptyAddBtn}>
                 <Ionicons name="add" size={14} color="#a9dfca" />
-                <Text style={styles.appointmentAddBtnText}>{isEn ? 'Add' : 'Randevu Ekle'}</Text>
+                <Text
+                  style={styles.appointmentAddBtnText}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.2}
+                >
+                  {isEn ? 'Add' : 'Randevu Ekle'}
+                </Text>
               </View>
             </TouchableOpacity>
           );
@@ -810,6 +826,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(169, 223, 202, 0.3)',
+    flexShrink: 0,
   },
   appointmentAddBtnText: {
     color: '#a9dfca',
@@ -871,5 +888,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(169, 223, 202, 0.2)',
     borderStyle: 'dashed',
+    gap: 8,
+  },
+  appointmentEmptyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  appointmentEmptyTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  appointmentEmptyTitle: {
+    color: '#f5f3f0',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  appointmentEmptySub: {
+    color: '#adb3bf',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  appointmentEmptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(169, 223, 202, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(169, 223, 202, 0.3)',
+    flexShrink: 0,
   },
 });

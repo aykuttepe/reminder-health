@@ -2582,20 +2582,20 @@ function InnerPrototype() {
                       cursor: 'pointer'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0, marginRight: '8px' }}>
                       <div style={{ width: '36px', height: '36px', borderRadius: '18px', background: 'rgba(169, 223, 202, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9dfca', flexShrink: 0 }}>
                         <CalendarDots size={20} weight="bold" />
                       </div>
-                      <div>
-                        <div style={{ color: '#f5f3f0', fontSize: '13px', fontWeight: 700 }}>
+                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ color: '#f5f3f0', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {isEn ? 'No Upcoming Appointments' : 'Yaklaşan Randevu Yok'}
                         </div>
-                        <div style={{ color: '#adb3bf', fontSize: '11px', marginTop: '2px' }}>
+                        <div style={{ color: '#adb3bf', fontSize: '11px', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {isEn ? 'Tap to add doctor & lab reminders' : 'Doktor kontrol ve tahlil hatırlatıcısı ekle'}
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, border: '1px solid rgba(169, 223, 202, 0.3)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, border: '1px solid rgba(169, 223, 202, 0.3)', flexShrink: 0, whiteSpace: 'nowrap' }}>
                       <Plus size={12} weight="bold" />
                       <span>{isEn ? 'Add' : 'Randevu Ekle'}</span>
                     </div>
