@@ -15,6 +15,7 @@ import {
   CycleInfo,
   DurationInfo,
   getCalendarDayDiff,
+  type AppointmentItem,
 } from '../medicationPlan';
 import { Translations } from '../i18n/translations';
 import { TodayCarousel } from './TodayCarousel';
@@ -51,6 +52,8 @@ export interface TodayViewProps {
   getDurationInfo: (dose: Dose, date: string, lang?: 'tr' | 'en') => DurationInfo;
   CAROUSEL_CARD_WIDTH: number;
   CAROUSEL_SPACING: number;
+  appointments?: AppointmentItem[];
+  onOpenAppointmentEditor?: (appt?: AppointmentItem) => void;
   doctorNextAppointment?: string;
   doctorAppointmentTime?: string;
   doctorName?: string;
@@ -75,6 +78,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
   triggerHaptic,
   openEditor,
   onNavigateSettings,
+  appointments,
+  onOpenAppointmentEditor,
   doctorNextAppointment,
   doctorAppointmentTime,
   doctorName,
@@ -125,80 +130,196 @@ export const TodayView: React.FC<TodayViewProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* Yaklaşan Doktor Randevusu Kartı */}
-      {doctorNextAppointment ? (() => {
-        const diff = getCalendarDayDiff(today, doctorNextAppointment);
+      {/* Yaklaşan Doktor Randevusu Kartı ve Yönetimi */}
+      {(() => {
+        const activeAppts: AppointmentItem[] = (appointments && appointments.length > 0)
+          ? appointments
+              .filter(a => !a.completed && a.date)
+              .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))
+          : (doctorNextAppointment ? [{
+              id: 'default',
+              doctorName: doctorName || '',
+              specialty: doctorSpecialty || '',
+              hospital: doctorHospital || '',
+              date: doctorNextAppointment,
+              time: doctorAppointmentTime || '13:00',
+              leadOptions: ['1d', '0d'],
+              hasBloodTest: false,
+              createdAt: 0,
+              updatedAt: 0,
+            } as AppointmentItem] : []);
+
+        const isEn = language === 'en';
+
+        if (activeAppts.length === 0) {
+          return (
+            <TouchableOpacity
+              style={styles.appointmentEmptyBanner}
+              onPress={() => {
+                triggerHaptic();
+                if (onOpenAppointmentEditor) onOpenAppointmentEditor();
+                else onNavigateDoctorProfile?.();
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={styles.appointmentBannerIconWrap}>
+                  <Ionicons name="calendar-outline" size={18} color="#a9dfca" />
+                </View>
+                <View>
+                  <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '600' }}>
+                    {isEn ? 'No Upcoming Appointments' : 'Yaklaşan Randevu Yok'}
+                  </Text>
+                  <Text style={{ color: '#adb3bf', fontSize: 11, marginTop: 1 }}>
+                    {isEn ? 'Tap to add doctor & lab reminders' : 'Doktor kontrol ve tahlil hatırlatıcısı ekle'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.appointmentAddBtn}>
+                <Ionicons name="add" size={14} color="#a9dfca" />
+                <Text style={styles.appointmentAddBtnText}>{isEn ? 'Add' : 'Randevu Ekle'}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }
+
+        const primaryAppt = activeAppts[0];
+        const diff = getCalendarDayDiff(today, primaryAppt.date);
         let badgeText = '';
         let badgeBg = 'rgba(52, 211, 153, 0.18)';
         let badgeColor = '#34d399';
-        const timeText = doctorAppointmentTime || '13:00';
+        const timeText = primaryAppt.time || '13:00';
 
         if (diff === 0) {
-          badgeText = language === 'en' ? 'Today' : 'Bugün';
+          badgeText = isEn ? 'Today' : 'Bugün';
           badgeBg = 'rgba(251, 191, 36, 0.2)';
           badgeColor = '#fbbf24';
         } else if (diff === 1) {
-          badgeText = language === 'en' ? 'Tomorrow' : 'Yarın';
+          badgeText = isEn ? 'Tomorrow' : 'Yarın';
           badgeBg = 'rgba(52, 211, 153, 0.2)';
           badgeColor = '#34d399';
         } else if (diff > 1) {
-          badgeText = language === 'en' ? `in ${diff} days` : `${diff} gün kaldı`;
+          badgeText = isEn ? `in ${diff} days` : `${diff} gün kaldı`;
           badgeBg = 'rgba(56, 189, 248, 0.18)';
           badgeColor = '#38bdf8';
         } else {
-          badgeText = language === 'en' ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`;
+          badgeText = isEn ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`;
           badgeBg = 'rgba(148, 163, 184, 0.15)';
           badgeColor = '#94a3b8';
         }
 
-        const docTitle = doctorName && doctorName.trim()
-          ? doctorName.trim()
-          : (language === 'en' ? 'Doctor Appointment' : 'Doktor Randevusu');
-        const hospitalText = doctorHospital && doctorHospital.trim()
-          ? ` • ${doctorHospital.trim()}`
-          : (doctorSpecialty && doctorSpecialty.trim() ? ` • ${doctorSpecialty.trim()}` : '');
+        const docTitle = primaryAppt.doctorName && primaryAppt.doctorName.trim()
+          ? primaryAppt.doctorName.trim()
+          : (primaryAppt.specialty && primaryAppt.specialty.trim()
+              ? `${primaryAppt.specialty.trim()} ${isEn ? 'Appointment' : 'Randevusu'}`
+              : (isEn ? 'Doctor Appointment' : 'Doktor Randevusu'));
+
+        const hospitalText = primaryAppt.hospital && primaryAppt.hospital.trim()
+          ? ` • ${primaryAppt.hospital.trim()}`
+          : (primaryAppt.specialty && primaryAppt.specialty.trim() && primaryAppt.doctorName
+              ? ` • ${primaryAppt.specialty.trim()}`
+              : '');
 
         return (
-          <TouchableOpacity
-            style={styles.appointmentBanner}
-            onPress={() => {
-              triggerHaptic();
-              onNavigateDoctorProfile?.();
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={styles.appointmentBannerLeft}>
-              <View style={styles.appointmentBannerIconWrap}>
-                <Ionicons name="calendar" size={18} color="#a9dfca" />
+          <View style={{ marginBottom: 12 }}>
+            <View style={styles.appointmentSectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="calendar" size={13} color="#a9dfca" />
+                <Text style={styles.appointmentSectionTitle}>
+                  {isEn ? 'UPCOMING APPOINTMENTS' : 'YAKLAŞAN RANDEVULAR'}
+                </Text>
+                {activeAppts.length > 1 && (
+                  <View style={styles.appointmentCountBadge}>
+                    <Text style={styles.appointmentCountBadgeText}>{activeAppts.length}</Text>
+                  </View>
+                )}
               </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                  <Text style={styles.appointmentBannerTitle} numberOfLines={1}>
-                    {docTitle}
-                  </Text>
-                  {hospitalText ? (
-                    <Text style={styles.appointmentBannerSub} numberOfLines={1}>
-                      {hospitalText}
+              <TouchableOpacity
+                style={styles.appointmentAddBtn}
+                onPress={() => {
+                  triggerHaptic();
+                  if (onOpenAppointmentEditor) onOpenAppointmentEditor();
+                  else onNavigateDoctorProfile?.();
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={13} color="#a9dfca" />
+                <Text style={styles.appointmentAddBtnText}>{isEn ? 'Add' : 'Randevu Ekle'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.appointmentBanner}
+              onPress={() => {
+                triggerHaptic();
+                onNavigateDoctorProfile?.();
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.appointmentBannerLeft}>
+                <View style={styles.appointmentBannerIconWrap}>
+                  <Ionicons name="calendar" size={18} color="#a9dfca" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <Text style={styles.appointmentBannerTitle} numberOfLines={1}>
+                      {docTitle}
                     </Text>
+                    {hospitalText ? (
+                      <Text style={styles.appointmentBannerSub} numberOfLines={1}>
+                        {hospitalText}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <Text style={styles.appointmentBannerDate}>
+                      {formatLocalizedDate(primaryAppt.date, language)}
+                    </Text>
+                    <View style={styles.appointmentBannerTimeBadge}>
+                      <Text style={styles.appointmentBannerTimeText}>⏰ {timeText}</Text>
+                    </View>
+                  </View>
+
+                  {/* Randevu İçi Tahlil / Kan Verme Bilgisi */}
+                  {primaryAppt.hasBloodTest && primaryAppt.bloodTestDate ? (
+                    <View style={styles.appointmentBloodRow}>
+                      <Ionicons name="flask-outline" size={13} color="#c4b5fd" />
+                      <Text style={styles.appointmentBloodText}>
+                        {formatLocalizedDate(primaryAppt.bloodTestDate, language)}
+                        {primaryAppt.bloodTestFasting ? (isEn ? ' (Fasting)' : ' (Aç Karnına Tahlil)') : (isEn ? ' (Lab Test)' : ' (Kan Tahlili)')}
+                      </Text>
+                    </View>
                   ) : null}
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                  <Text style={styles.appointmentBannerDate}>
-                    {formatLocalizedDate(doctorNextAppointment, language)}
-                  </Text>
-                  <View style={styles.appointmentBannerTimeBadge}>
-                    <Text style={styles.appointmentBannerTimeText}>⏰ {timeText}</Text>
-                  </View>
-                </View>
               </View>
-            </View>
-            <View style={[styles.appointmentBannerDaysBadge, { backgroundColor: badgeBg }]}>
-              <Text style={[styles.appointmentBannerDaysText, { color: badgeColor }]}>{badgeText}</Text>
-              <Ionicons name="chevron-forward" size={12} color={badgeColor} style={{ marginLeft: 3 }} />
-            </View>
-          </TouchableOpacity>
+              <View style={[styles.appointmentBannerDaysBadge, { backgroundColor: badgeBg }]}>
+                <Text style={[styles.appointmentBannerDaysText, { color: badgeColor }]}>{badgeText}</Text>
+                <Ionicons name="chevron-forward" size={12} color={badgeColor} style={{ marginLeft: 3 }} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Ek randevu varsa gösterge şeridi */}
+            {activeAppts.length > 1 && (
+              <TouchableOpacity
+                style={styles.appointmentMoreChip}
+                onPress={() => {
+                  triggerHaptic();
+                  onNavigateDoctorProfile?.();
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={12} color="#94a3b8" />
+                <Text style={styles.appointmentMoreText}>
+                  {isEn
+                    ? `+${activeAppts.length - 1} more: ${formatLocalizedDate(activeAppts[1].date, language)} (${activeAppts[1].specialty || activeAppts[1].doctorName || 'Doctor'})`
+                    : `+${activeAppts.length - 1} randevu daha: ${formatLocalizedDate(activeAppts[1].date, language)} (${activeAppts[1].specialty || activeAppts[1].doctorName || 'Hekim'})`}
+                </Text>
+                <Ionicons name="chevron-forward" size={10} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
         );
-      })() : null}
+      })()}
 
       {/* Next Dose Hero Carousel */}
       {carouselSlots.length > 0 ? (
@@ -693,5 +814,90 @@ const styles = StyleSheet.create({
   appointmentBannerDaysText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  appointmentSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  appointmentSectionTitle: {
+    color: '#a9dfca',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  appointmentCountBadge: {
+    backgroundColor: 'rgba(169, 223, 202, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  appointmentCountBadgeText: {
+    color: '#a9dfca',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  appointmentAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(169, 223, 202, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(169, 223, 202, 0.3)',
+  },
+  appointmentAddBtnText: {
+    color: '#a9dfca',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  appointmentBloodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 5,
+    backgroundColor: 'rgba(167, 139, 250, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+  },
+  appointmentBloodText: {
+    color: '#c4b5fd',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  appointmentMoreChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 6,
+  },
+  appointmentMoreText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  appointmentEmptyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#101d29',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(169, 223, 202, 0.2)',
+    borderStyle: 'dashed',
   },
 });

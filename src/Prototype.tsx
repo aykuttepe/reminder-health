@@ -585,7 +585,28 @@ export type PrototypeSettings = {
   doctorApptLeadOptions?: string[];
   doctorBloodTestDate?: string;
   doctorNotes?: string;
+  appointments?: AppointmentItem[];
 };
+
+export interface AppointmentItem {
+  id: string;
+  doctorName: string;
+  specialty: string;
+  hospital: string;
+  phone?: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm, default "13:00"
+  leadOptions: string[]; // ['3d', '2d', '1d', '0d']
+  hasBloodTest: boolean;
+  bloodTestDate?: string; // YYYY-MM-DD
+  bloodTestTime?: string; // HH:mm, default "08:30"
+  bloodTestFasting?: boolean;
+  bloodTestNotes?: string;
+  notes?: string;
+  completed?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
 
 const DEFAULT_SETTINGS: PrototypeSettings = {
   userName: '',
@@ -598,6 +619,7 @@ const DEFAULT_SETTINGS: PrototypeSettings = {
   doctorApptLeadOptions: ['1d', '0d'],
   doctorBloodTestDate: '',
   doctorNotes: '',
+  appointments: [],
   notifications: true,
   soundEnabled: true,
   soundType: 'default',
@@ -710,6 +732,37 @@ function loadStoredSettings(): PrototypeSettings {
     const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
     if (saved) {
       const parsed = JSON.parse(saved);
+      let initialAppointments: AppointmentItem[] = [];
+      if (parsed.appointments) {
+        try {
+          const apptsParsed = typeof parsed.appointments === 'string' ? JSON.parse(parsed.appointments) : parsed.appointments;
+          if (Array.isArray(apptsParsed)) {
+            initialAppointments = apptsParsed;
+          }
+        } catch {}
+      }
+      if (initialAppointments.length === 0 && (parsed.doctorNextAppointment || parsed.doctorName)) {
+        initialAppointments = [{
+          id: 'appt-legacy-1',
+          doctorName: parsed.doctorName || '',
+          specialty: parsed.doctorSpecialty || 'Göz',
+          hospital: parsed.doctorHospital || '',
+          phone: parsed.doctorPhone || '',
+          date: parsed.doctorNextAppointment || '2026-12-10',
+          time: parsed.doctorAppointmentTime === '09:00' ? '13:00' : (parsed.doctorAppointmentTime || '13:00'),
+          leadOptions: parsed.doctorApptLeadOptions || ['1d', '0d'],
+          hasBloodTest: !!parsed.doctorBloodTestDate,
+          bloodTestDate: parsed.doctorBloodTestDate || '2026-12-07',
+          bloodTestFasting: true,
+          bloodTestTime: '08:30',
+          bloodTestNotes: parsed.doctorNotes || 'Tahlilleri 3 gün öncesinden yaptır',
+          notes: parsed.doctorNotes || '',
+          completed: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }];
+      }
+      parsed.appointments = initialAppointments;
       return { ...DEFAULT_SETTINGS, ...parsed };
     }
   } catch (e) {
@@ -825,6 +878,97 @@ function InnerPrototype() {
   const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(storedSettings.doctorApptLeadOptions || ['1d', '0d']);
   const [doctorBloodTestDate, setDoctorBloodTestDate] = useState<string>(storedSettings.doctorBloodTestDate || '');
   const [doctorNotes, setDoctorNotes] = useState<string>(storedSettings.doctorNotes || '');
+  const [appointments, setAppointments] = useState<AppointmentItem[]>(() => {
+    if (storedSettings.appointments && Array.isArray(storedSettings.appointments) && storedSettings.appointments.length > 0) {
+      return storedSettings.appointments;
+    }
+    if (storedSettings.doctorNextAppointment || storedSettings.doctorName) {
+      return [{
+        id: 'appt-legacy-1',
+        doctorName: storedSettings.doctorName || '',
+        specialty: storedSettings.doctorSpecialty || 'Göz',
+        hospital: storedSettings.doctorHospital || '',
+        phone: storedSettings.doctorPhone || '',
+        date: storedSettings.doctorNextAppointment || '2026-12-10',
+        time: storedSettings.doctorAppointmentTime === '09:00' ? '13:00' : (storedSettings.doctorAppointmentTime || '13:00'),
+        leadOptions: storedSettings.doctorApptLeadOptions || ['1d', '0d'],
+        hasBloodTest: !!storedSettings.doctorBloodTestDate,
+        bloodTestDate: storedSettings.doctorBloodTestDate || '2026-12-07',
+        bloodTestFasting: true,
+        bloodTestTime: '08:30',
+        bloodTestNotes: storedSettings.doctorNotes || 'Tahlilleri 3 gün öncesinden yaptır',
+        notes: storedSettings.doctorNotes || '',
+        completed: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }];
+    }
+    return [];
+  });
+  const [appointmentEditorOpen, setAppointmentEditorOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<AppointmentItem | null>(null);
+
+  const handleOpenAppointmentEditor = (appt?: AppointmentItem) => {
+    setEditingAppointment(appt || null);
+    setAppointmentEditorOpen(true);
+  };
+
+  const handleSaveAppointment = (saved: AppointmentItem) => {
+    const exists = appointments.some(a => a.id === saved.id);
+    let updated: AppointmentItem[];
+    if (exists) {
+      updated = appointments.map(a => a.id === saved.id ? saved : a);
+    } else {
+      updated = [...appointments, saved];
+    }
+    setAppointments(updated);
+    const active = updated.filter(a => !a.completed).sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))[0] || updated[0];
+    if (active) {
+      setDoctorName(active.doctorName || '');
+      setDoctorSpecialty(active.specialty || '');
+      setDoctorHospital(active.hospital || '');
+      setDoctorPhone(active.phone || '');
+      setDoctorNextAppointment(active.date || '');
+      setDoctorAppointmentTime(active.time || '13:00');
+      setDoctorApptLeadOptions(active.leadOptions || ['1d', '0d']);
+      setDoctorBloodTestDate(active.hasBloodTest ? (active.bloodTestDate || '') : '');
+      setDoctorNotes(active.notes || '');
+    }
+    setAppointmentEditorOpen(false);
+    setEditingAppointment(null);
+    setToast({ text: exists ? (language === 'en' ? 'Appointment updated' : 'Randevu güncellendi') : (language === 'en' ? 'Appointment added' : 'Yeni randevu eklendi') });
+    syncProfileSettings({ appointments: updated });
+  };
+
+  const handleDeleteAppointment = (id: string) => {
+    const updated = appointments.filter(a => a.id !== id);
+    setAppointments(updated);
+    const active = updated.filter(a => !a.completed).sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))[0];
+    if (active) {
+      setDoctorName(active.doctorName || '');
+      setDoctorSpecialty(active.specialty || '');
+      setDoctorHospital(active.hospital || '');
+      setDoctorPhone(active.phone || '');
+      setDoctorNextAppointment(active.date || '');
+      setDoctorAppointmentTime(active.time || '13:00');
+      setDoctorApptLeadOptions(active.leadOptions || ['1d', '0d']);
+      setDoctorBloodTestDate(active.hasBloodTest ? (active.bloodTestDate || '') : '');
+      setDoctorNotes(active.notes || '');
+    } else {
+      setDoctorNextAppointment('');
+      setDoctorBloodTestDate('');
+    }
+    setToast({ text: language === 'en' ? 'Appointment deleted' : 'Randevu silindi' });
+    syncProfileSettings({ appointments: updated });
+  };
+
+  const handleToggleCompleteAppointment = (id: string) => {
+    const updated = appointments.map(a => a.id === id ? { ...a, completed: !a.completed, updatedAt: Date.now() } : a);
+    setAppointments(updated);
+    setToast({ text: language === 'en' ? 'Appointment status updated' : 'Randevu durumu güncellendi' });
+    syncProfileSettings({ appointments: updated });
+  };
+
   const [privateMode, setPrivateMode] = useState<boolean>(storedSettings.privateMode);
   const [largeText, setLargeText] = useState<boolean>(storedSettings.largeText);
   const [notifications, setNotifications] = useState<boolean>(storedSettings.notifications);
@@ -935,6 +1079,7 @@ function InnerPrototype() {
         doctorApptLeadOptions,
         doctorBloodTestDate,
         doctorNotes,
+        appointments,
         notifications,
         soundEnabled,
         soundType,
@@ -969,6 +1114,7 @@ function InnerPrototype() {
     doctorApptLeadOptions,
     doctorBloodTestDate,
     doctorNotes,
+    appointments,
     notifications,
     soundEnabled,
     soundType,
@@ -1302,7 +1448,7 @@ function InnerPrototype() {
 
   // Sync Action Handlers
 
-  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, doctorName, doctorSpecialty, doctorHospital, doctorPhone, doctorNextAppointment, doctorAppointmentTime, doctorApptLeadOptions, doctorBloodTestDate, doctorNotes, notifications, soundEnabled, soundType, snoozeMinutes}});
+  const accountSnapshot = (): Snapshot => ({doses, learnedMeds, settings: {userName, doctorName, doctorSpecialty, doctorHospital, doctorPhone, doctorNextAppointment, doctorAppointmentTime, doctorApptLeadOptions, doctorBloodTestDate, doctorNotes, appointments: JSON.stringify(appointments), notifications, soundEnabled, soundType, snoozeMinutes}});
   const bindAccount = async (next: Session) => {
     switchingAccount.current = true;
     try {
@@ -1329,6 +1475,14 @@ function InnerPrototype() {
       }
       setDoctorBloodTestDate(snapshot.settings.doctorBloodTestDate || '');
       setDoctorNotes(snapshot.settings.doctorNotes || '');
+      if (snapshot.settings.appointments) {
+        try {
+          const appts = typeof snapshot.settings.appointments === 'string'
+            ? JSON.parse(snapshot.settings.appointments)
+            : snapshot.settings.appointments;
+          if (Array.isArray(appts)) setAppointments(appts);
+        } catch {}
+      }
       setNotifications(snapshot.settings.notifications ?? true);
       setSoundEnabled(snapshot.settings.soundEnabled ?? true);
       setSoundType(snapshot.settings.soundType || 'default');
@@ -1474,6 +1628,7 @@ function InnerPrototype() {
       if (doctorApptLeadOptions && doctorApptLeadOptions.length > 0) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
       if (doctorBloodTestDate && doctorBloodTestDate.trim()) payloadSettings.doctorBloodTestDate = doctorBloodTestDate.trim();
       if (doctorNotes && doctorNotes.trim()) payloadSettings.doctorNotes = doctorNotes.trim();
+      if (appointments && appointments.length > 0) payloadSettings.appointments = JSON.stringify(appointments);
 
       const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: d.updatedAt || Date.now() })),
@@ -1505,6 +1660,14 @@ function InnerPrototype() {
           }
           if (response.settings.doctorBloodTestDate !== undefined && response.settings.doctorBloodTestDate !== '') setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
           if (response.settings.doctorNotes !== undefined && response.settings.doctorNotes !== '') setDoctorNotes(response.settings.doctorNotes);
+          if (response.settings.appointments !== undefined) {
+            try {
+              const appts = typeof response.settings.appointments === 'string'
+                ? JSON.parse(response.settings.appointments)
+                : response.settings.appointments;
+              if (Array.isArray(appts)) setAppointments(appts);
+            } catch {}
+          }
         }
         const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncAt(nowStr);
@@ -1526,8 +1689,10 @@ function InnerPrototype() {
     }
   };
 
-  const syncProfileSettings = () => {
+  const syncProfileSettings = (overrides?: { appointments?: AppointmentItem[] } | unknown) => {
     if (session) {
+      const hasAppts = overrides && typeof overrides === 'object' && !('nativeEvent' in overrides) && 'appointments' in overrides;
+      const activeAppts = hasAppts ? (overrides as { appointments: AppointmentItem[] }).appointments : appointments;
       authRequest(serverUrl, '/api/sync', {
         settings: {
           userName: userName.trim(),
@@ -1540,6 +1705,7 @@ function InnerPrototype() {
           doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
           doctorBloodTestDate,
           doctorNotes: doctorNotes.trim(),
+          appointments: JSON.stringify(activeAppts),
         }
       }, session).catch(() => {});
     }
@@ -2295,57 +2461,186 @@ function InnerPrototype() {
               <span className="status-pill-action">{language === 'en' ? 'Battery / Permissions →' : 'Pil / İzinler →'}</span>
             </div>
 
-            {doctorNextAppointment && (() => {
-              const diff = Math.round((new Date(doctorNextAppointment).getTime() - new Date(today).getTime()) / 86400000);
-              let badgeText = '';
-              if (diff === 0) { badgeText = language === 'en' ? 'Today' : 'Bugün'; }
-              else if (diff === 1) { badgeText = language === 'en' ? 'Tomorrow' : 'Yarın'; }
-              else if (diff > 1) { badgeText = language === 'en' ? `in ${diff} days` : `${diff} gün kaldı`; }
-              else { badgeText = language === 'en' ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`; }
+            {(() => {
+              const activeAppts = appointments.filter(a => !a.completed && a.date)
+                .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')));
+              const isEn = language === 'en';
 
-              const docTitle = doctorName && doctorName.trim() ? doctorName.trim() : (language === 'en' ? 'Doctor Appointment' : 'Doktor Randevusu');
-              const hospText = doctorHospital && doctorHospital.trim() ? ` • ${doctorHospital.trim()}` : (doctorSpecialty ? ` • ${doctorSpecialty.trim()}` : '');
+              if (activeAppts.length === 0 && !doctorNextAppointment) {
+                return (
+                  <div
+                    className="proto-appointment-banner empty"
+                    onClick={() => handleOpenAppointmentEditor()}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: '#101d29',
+                      border: '1px dashed rgba(169, 223, 202, 0.25)',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      marginBottom: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '18px', background: 'rgba(169, 223, 202, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9dfca', flexShrink: 0 }}>
+                        <CalendarDots size={20} weight="bold" />
+                      </div>
+                      <div>
+                        <div style={{ color: '#f5f3f0', fontSize: '13px', fontWeight: 700 }}>
+                          {isEn ? 'No Upcoming Appointments' : 'Yaklaşan Randevu Yok'}
+                        </div>
+                        <div style={{ color: '#adb3bf', fontSize: '11px', marginTop: '2px' }}>
+                          {isEn ? 'Tap to add doctor & lab reminders' : 'Doktor kontrol ve tahlil hatırlatıcısı ekle'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, border: '1px solid rgba(169, 223, 202, 0.3)' }}>
+                      <Plus size={12} weight="bold" />
+                      <span>{isEn ? 'Add' : 'Randevu Ekle'}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              const primaryAppt: AppointmentItem = activeAppts[0] || {
+                id: 'legacy',
+                doctorName: doctorName || '',
+                specialty: doctorSpecialty || '',
+                hospital: doctorHospital || '',
+                date: doctorNextAppointment,
+                time: doctorAppointmentTime || '13:00',
+                hasBloodTest: !!doctorBloodTestDate,
+                bloodTestDate: doctorBloodTestDate,
+                bloodTestFasting: true,
+                bloodTestTime: '08:30',
+                bloodTestNotes: doctorNotes || '',
+                leadOptions: ['1d', '0d'],
+                createdAt: 0,
+                updatedAt: 0,
+              };
+
+              const diff = Math.round((new Date(primaryAppt.date).getTime() - new Date(today).getTime()) / 86400000);
+              let badgeText = '';
+              let badgeBg = 'rgba(52, 211, 153, 0.15)';
+              let badgeColor = '#34d399';
+              if (diff === 0) {
+                badgeText = isEn ? 'Today' : 'Bugün';
+                badgeBg = 'rgba(251, 191, 36, 0.2)';
+                badgeColor = '#fbbf24';
+              } else if (diff === 1) {
+                badgeText = isEn ? 'Tomorrow' : 'Yarın';
+                badgeBg = 'rgba(52, 211, 153, 0.2)';
+                badgeColor = '#34d399';
+              } else if (diff > 1) {
+                badgeText = isEn ? `in ${diff} days` : `${diff} gün kaldı`;
+                badgeBg = 'rgba(56, 189, 248, 0.18)';
+                badgeColor = '#38bdf8';
+              } else {
+                badgeText = isEn ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`;
+                badgeBg = 'rgba(148, 163, 184, 0.15)';
+                badgeColor = '#94a3b8';
+              }
+
+              const docTitle = primaryAppt.doctorName && primaryAppt.doctorName.trim()
+                ? primaryAppt.doctorName.trim()
+                : (primaryAppt.specialty && primaryAppt.specialty.trim()
+                    ? `${primaryAppt.specialty.trim()} ${isEn ? 'Appointment' : 'Randevusu'}`
+                    : (isEn ? 'Doctor Appointment' : 'Doktor Randevusu'));
+              const hospText = primaryAppt.hospital && primaryAppt.hospital.trim()
+                ? ` • ${primaryAppt.hospital.trim()}`
+                : (primaryAppt.specialty && primaryAppt.specialty.trim() && primaryAppt.doctorName
+                    ? ` • ${primaryAppt.specialty.trim()}`
+                    : '');
 
               return (
-                <div
-                  className="proto-appointment-banner"
-                  onClick={() => {
-                    setTab('Ayarlar');
-                    setSettingsSubPage('profile');
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: '#101d29',
-                    border: '1px solid rgba(169, 223, 202, 0.25)',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    marginBottom: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, marginRight: '8px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '18px', background: 'rgba(169, 223, 202, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9dfca' }}>
-                      <CalendarDots size={20} weight="bold" />
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                        <span style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 700 }}>{docTitle}</span>
-                        {hospText && <span style={{ color: '#a9dfca', fontSize: '12px', fontWeight: 500 }}>{hospText}</span>}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                        <span style={{ color: '#adb3bf', fontSize: '12px' }}>{doctorNextAppointment}</span>
-                        <span style={{ background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(169, 223, 202, 0.3)' }}>
-                          ⏰ {doctorAppointmentTime || '13:00'}
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', padding: '0 2px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CalendarDots size={13} weight="bold" color="#a9dfca" />
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#a9dfca', letterSpacing: '0.04em' }}>
+                        {isEn ? 'UPCOMING APPOINTMENTS' : 'YAKLAŞAN RANDEVULAR'}
+                      </span>
+                      {activeAppts.length > 1 && (
+                        <span style={{ background: 'rgba(169, 223, 202, 0.2)', color: '#a9dfca', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '8px' }}>
+                          {activeAppts.length}
                         </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAppointmentEditor()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(169, 223, 202, 0.12)', border: '1px solid rgba(169, 223, 202, 0.25)', borderRadius: '6px', padding: '3px 8px', color: '#a9dfca', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      <Plus size={12} weight="bold" />
+                      <span>{isEn ? 'Add' : 'Randevu Ekle'}</span>
+                    </button>
+                  </div>
+
+                  <div
+                    className="proto-appointment-banner"
+                    onClick={() => {
+                      setTab('Ayarlar');
+                      setSettingsSubPage('profile');
+                    }}
+                    style={{
+                      background: '#101d29',
+                      border: '1px solid rgba(169, 223, 202, 0.25)',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, marginRight: '8px' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '18px', background: 'rgba(169, 223, 202, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9dfca', flexShrink: 0 }}>
+                          <CalendarDots size={20} weight="bold" />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 700 }}>{docTitle}</span>
+                            {hospText && <span style={{ color: '#a9dfca', fontSize: '12px', fontWeight: 500 }}>{hospText}</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                            <span style={{ color: '#adb3bf', fontSize: '12px' }}>{primaryAppt.date}</span>
+                            <span style={{ background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(169, 223, 202, 0.3)' }}>
+                              ⏰ {primaryAppt.time || '13:00'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '8px', background: badgeBg, color: badgeColor, fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                        <span>{badgeText}</span>
+                        <CaretRight size={12} weight="bold" />
                       </div>
                     </div>
+
+                    {primaryAppt.hasBloodTest && primaryAppt.bloodTestDate && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(167, 139, 250, 0.2)', color: '#c4b5fd', fontSize: '11.5px', fontWeight: 600 }}>
+                        <Flask size={14} weight="fill" />
+                        <span>
+                          {primaryAppt.bloodTestDate} {primaryAppt.bloodTestFasting ? (isEn ? '(Aç Karnına Tahlil)' : '(Aç Karnına Tahlil)') : (isEn ? '(Kan Tahlili)' : '(Kan Tahlili)')}
+                        </span>
+                        {primaryAppt.bloodTestTime && (
+                          <span style={{ color: '#94a3b8', fontSize: '11px' }}>⏰ {primaryAppt.bloodTestTime}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '8px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '11px', fontWeight: 700 }}>
-                    <span>{badgeText}</span>
-                    <CaretRight size={12} weight="bold" />
-                  </div>
+
+                  {activeAppts.length > 1 && (
+                    <div
+                      onClick={() => {
+                        setTab('Ayarlar');
+                        setSettingsSubPage('profile');
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px', padding: '6px', borderRadius: '8px', background: 'rgba(16, 29, 41, 0.7)', border: '1px solid rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <span>+{activeAppts.length - 1} {isEn ? 'more appointment in Settings' : 'diğer randevu (Ayarlarda Gör)'}</span>
+                      <CaretRight size={12} />
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -2829,52 +3124,15 @@ function InnerPrototype() {
                     <div className="info-note"><ShieldCheck size={22}/><p>Bu bir etkileşimli prototip. İlaç planınız ve tercihleriniz bu tarayıcıda yerel olarak güvenle saklanır.</p></div>
 
                     <div style={{ textAlign: 'center', marginTop: '16px', marginBottom: '8px', fontSize: '12px', color: '#68778d' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.4 (Web Prototip)</span>
-                      <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>Karekod & Senkronizasyon · Güncel Sürüm</span>
+                      <span style={{ fontWeight: 600, color: 'var(--mint)' }}>Reminder Health v0.2.11 (Web Prototip)</span>
+                      <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>Karekod & Senkronizasyon · Çoklu Randevu & Tahlil</span>
                     </div>
                   </>
                 )}
 
                 {/* SUB PAGE 1: KULLANICI & HEKİM PROFİLİ */}
-                {settingsSubPage === 'profile' && (() => {
-                  let badgeText = '';
-                  let badgeClass = 'mint';
-                  const timeSuffix = doctorAppointmentTime ? ` • ⏰ ${doctorAppointmentTime}` : '';
-                  if (doctorNextAppointment) {
-                    const diff = Math.round((new Date(doctorNextAppointment).getTime() - new Date(today).getTime()) / 86400000);
-                    if (diff === 0) {
-                      badgeText = `${t.doctorAppointmentToday}${timeSuffix}`;
-                      badgeClass = 'warning';
-                    } else if (diff === 1) {
-                      badgeText = `${t.doctorAppointmentTomorrow} (${doctorNextAppointment})${timeSuffix}`;
-                      badgeClass = 'mint';
-                    } else if (diff > 1) {
-                      badgeText = `${diff} ${t.doctorAppointmentDaysLeft} (${doctorNextAppointment})${timeSuffix}`;
-                      badgeClass = 'info';
-                    }
-                  }
-
-                  let bloodBadgeText = '';
-                  let bloodBadgeClass = 'purple';
-                  if (doctorBloodTestDate) {
-                    const bDiff = Math.round((new Date(doctorBloodTestDate).getTime() - new Date(today).getTime()) / 86400000);
-                    if (bDiff === 0) {
-                      bloodBadgeText = t.doctorBloodTestToday;
-                      bloodBadgeClass = 'warning';
-                    } else if (bDiff === 1) {
-                      bloodBadgeText = `${t.doctorBloodTestTomorrow} (${doctorBloodTestDate})`;
-                      bloodBadgeClass = 'purple';
-                    } else if (bDiff > 1) {
-                      bloodBadgeText = `${bDiff} ${t.doctorBloodTestDaysLeft} (${doctorBloodTestDate})`;
-                      bloodBadgeClass = 'info';
-                    } else {
-                      bloodBadgeText = `${Math.abs(bDiff)} ${t.doctorBloodTestDaysAgo} (${doctorBloodTestDate})`;
-                      bloodBadgeClass = 'muted';
-                    }
-                  }
-
-                  return (
-                    <div className="profile-detail-view">
+                {settingsSubPage === 'profile' && (
+                  <div className="profile-detail-view">
                       {/* 1. Kullanıcı Bilgisi */}
                       <div className="settings-section-head">
                         <User size={18} weight="bold" className="settings-section-icon" />
@@ -2977,138 +3235,202 @@ function InnerPrototype() {
                         </div>
                       </div>
 
-                      {/* 3. Randevu & Kontrol */}
-                      <div className="settings-section-head" style={{ marginTop: '20px' }}>
-                        <CalendarDots size={18} weight="bold" className="settings-section-icon" />
-                        <h4>{t.doctorAppointmentSection}</h4>
-                      </div>
-                      <div className="settings-detail-card">
-                        <label className="field-sub-label">{t.doctorAppointmentLabel}</label>
-                        <div className="appointment-picker-row">
-                          <input
-                            type="date"
-                            className="appointment-date-input"
-                            value={doctorNextAppointment}
-                            onChange={(e) => {
-                              setDoctorNextAppointment(e.target.value);
-                              syncProfileSettings();
-                            }}
-                          />
-                          {doctorNextAppointment && (
-                            <button
-                              type="button"
-                              className="appointment-clear-btn"
-                              onClick={() => {
-                                setDoctorNextAppointment('');
-                                syncProfileSettings();
-                              }}
-                              title={t.doctorClearAppointment}
-                            >
-                              <Trash size={16} />
-                            </button>
+                      {/* 3. Randevular & Tahliller (Çoklu Randevu Yönetimi) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '20px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CalendarDots size={18} weight="bold" className="settings-section-icon" />
+                          <h4 style={{ margin: 0 }}>{language === 'en' ? 'APPOINTMENTS & LAB TESTS' : 'RANDEVULAR VE TAHLİLLER'}</h4>
+                          {appointments.length > 0 && (
+                            <span style={{ background: 'rgba(169, 223, 202, 0.2)', color: '#a9dfca', fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '10px' }}>
+                              {appointments.length}
+                            </span>
                           )}
                         </div>
-                        {badgeText && (
-                          <div className={`appointment-badge ${badgeClass}`}>
-                            <span>{badgeText}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAppointmentEditor()}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'rgba(169, 223, 202, 0.15)',
+                            border: '1px solid rgba(169, 223, 202, 0.3)',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            color: '#a9dfca',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Plus size={14} weight="bold" />
+                          <span>{language === 'en' ? 'Add Appointment' : 'Yeni Randevu Ekle'}</span>
+                        </button>
+                      </div>
+
+                      {appointments.length === 0 ? (
+                        <div
+                          onClick={() => handleOpenAppointmentEditor()}
+                          style={{
+                            background: '#101d29',
+                            border: '1px dashed rgba(169, 223, 202, 0.25)',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <CalendarDots size={28} color="#a9dfca" weight="bold" />
+                          <div style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 600 }}>
+                            {language === 'en' ? 'No Appointments Added' : 'Kayıtlı Randevu Bulunmuyor'}
                           </div>
-                        )}
+                          <div style={{ color: '#adb3bf', fontSize: '12px', maxWidth: '280px' }}>
+                            {language === 'en'
+                              ? 'Tap here to add doctor appointments and fasting lab reminders.'
+                              : 'Doktor randevusu ve aç karnına kan verme hatırlatıcısı eklemek için dokunun.'}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--mint)', color: '#081624', padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
+                            <Plus size={14} weight="bold" />
+                            <span>{language === 'en' ? 'Add Appointment' : 'Randevu Ekle'}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="appointment-list-section">
+                          {appointments.map(appt => {
+                            const diff = Math.round((new Date(appt.date).getTime() - new Date(today).getTime()) / 86400000);
+                            let bText = '';
+                            let bBg = 'rgba(52, 211, 153, 0.18)';
+                            let bColor = '#34d399';
+                            if (diff === 0) {
+                              bText = language === 'en' ? 'Today' : 'Bugün';
+                              bBg = 'rgba(251, 191, 36, 0.2)';
+                              bColor = '#fbbf24';
+                            } else if (diff === 1) {
+                              bText = language === 'en' ? 'Tomorrow' : 'Yarın';
+                              bBg = 'rgba(52, 211, 153, 0.2)';
+                              bColor = '#34d399';
+                            } else if (diff > 1) {
+                              bText = language === 'en' ? `in ${diff} days` : `${diff} gün kaldı`;
+                              bBg = 'rgba(56, 189, 248, 0.18)';
+                              bColor = '#38bdf8';
+                            } else {
+                              bText = language === 'en' ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`;
+                              bBg = 'rgba(148, 163, 184, 0.15)';
+                              bColor = '#94a3b8';
+                            }
 
-                        {doctorNextAppointment && (
-                          <>
-                            <div style={{ marginTop: '12px' }}>
-                              <label className="field-sub-label">{t.doctorAppointmentTimeLabel} ({doctorAppointmentTime})</label>
-                              <input
-                                type="time"
-                                className="appointment-date-input"
-                                style={{ width: '100%', marginTop: '4px' }}
-                                value={doctorAppointmentTime}
-                                onChange={(e) => {
-                                  setDoctorAppointmentTime(e.target.value);
-                                  syncProfileSettings();
-                                }}
-                              />
-                            </div>
+                            return (
+                              <div
+                                key={appt.id}
+                                className={`appointment-item-card ${appt.completed ? 'completed' : ''}`}
+                              >
+                                <div className="appointment-item-head">
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                      {appt.specialty && (
+                                        <span className="appointment-specialty-tag">{appt.specialty}</span>
+                                      )}
+                                      <span style={{ color: '#f5f3f0', fontSize: '14px', fontWeight: 700 }}>
+                                        {appt.doctorName || (language === 'en' ? 'Doctor Appointment' : 'Doktor Randevusu')}
+                                      </span>
+                                    </div>
+                                    {appt.hospital && (
+                                      <div style={{ color: '#adb3bf', fontSize: '12px', marginTop: '3px' }}>
+                                        🏥 {appt.hospital}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ background: bBg, color: bColor, padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                    {bText}
+                                  </div>
+                                </div>
 
-                            <div style={{ marginTop: '12px' }}>
-                              <label className="field-sub-label">{t.doctorLeadReminderLabel}</label>
-                              <span style={{ display: 'block', fontSize: '11px', color: '#8899a8', marginBottom: '6px' }}>{t.doctorLeadReminderSub}</span>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {[
-                                  { id: '3d', label: t.leadOpt3d },
-                                  { id: '2d', label: t.leadOpt2d },
-                                  { id: '1d', label: t.leadOpt1d },
-                                  { id: '0d', label: t.leadOpt0d },
-                                ].map(opt => {
-                                  const active = doctorApptLeadOptions.includes(opt.id);
-                                  return (
-                                    <button
-                                      key={opt.id}
-                                      type="button"
-                                      className={`filter-chip ${active ? 'active' : ''}`}
-                                      style={{ fontSize: '11px', padding: '6px 10px' }}
-                                      onClick={() => {
-                                        let nextOpts: string[];
-                                        if (active) nextOpts = doctorApptLeadOptions.filter(x => x !== opt.id);
-                                        else nextOpts = [...doctorApptLeadOptions, opt.id];
-                                        setDoctorApptLeadOptions(nextOpts);
-                                        syncProfileSettings();
-                                      }}
+                                {/* Tarih ve Saat */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f5f3f0', fontSize: '13px', fontWeight: 600 }}>
+                                    <CalendarDots size={14} color="#a9dfca" weight="bold" />
+                                    <span>{appt.date}</span>
+                                  </div>
+                                  <span style={{ background: 'rgba(169, 223, 202, 0.15)', color: '#a9dfca', fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(169, 223, 202, 0.3)' }}>
+                                    ⏰ {appt.time || '13:00'}
+                                  </span>
+                                </div>
+
+                                {/* Randevu İçi Tahlil / Kan Verme Kartı */}
+                                {appt.hasBloodTest && appt.bloodTestDate && (
+                                  <div className="appointment-blood-badge-card">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                      <Flask size={14} weight="fill" color="#c4b5fd" />
+                                      <span style={{ color: '#c4b5fd', fontSize: '12px', fontWeight: 700 }}>
+                                        {language === 'en' ? 'Fasting Lab Test' : 'Aç Karnına Kan Verme'}
+                                      </span>
+                                      <span style={{ color: '#94a3b8', fontSize: '11px' }}>
+                                        • {appt.bloodTestDate} ({appt.bloodTestTime || '08:30'})
+                                      </span>
+                                    </div>
+                                    {appt.bloodTestNotes && (
+                                      <div style={{ color: '#e2e8f0', fontSize: '11px', fontStyle: 'italic', marginTop: '2px' }}>
+                                        💬 {appt.bloodTestNotes}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Notlar */}
+                                {appt.notes && (
+                                  <div style={{ color: '#94a3b8', fontSize: '11.5px' }}>
+                                    📝 {appt.notes}
+                                  </div>
+                                )}
+
+                                {/* Kart Aksiyonları */}
+                                <div className="appointment-actions-row">
+                                  {appt.phone && (
+                                    <a
+                                      href={`tel:${appt.phone.replace(/[^0-9+]/g, '')}`}
+                                      className="appointment-action-btn call"
                                     >
-                                      {active ? '✓ ' : '+ '}{opt.label}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              <div style={{ marginTop: '10px', fontSize: '11px', color: '#8899a8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Bell size={13} color="#a9dfca" />
-                                <span>{language === 'en' ? 'A final reminder notification is sent at 05:00 AM on appointment morning and can be confirmed with one tap.' : 'Randevu günü sabah saat 05:00\'te son bir hatırlatma bildirimi gönderilir ve tek dokunuşla onaylanır.'}</span>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                                      <Phone size={12} weight="fill" />
+                                      <span>{language === 'en' ? 'Call' : 'Ara'}</span>
+                                    </a>
+                                  )}
 
-                      {/* Kan Tahlili / Tetkik Hazırlığı */}
-                      <div className="settings-section-head" style={{ marginTop: '20px' }}>
-                        <Flask size={18} weight="bold" className="settings-section-icon" />
-                        <h4>{t.doctorBloodTestSection}</h4>
-                      </div>
-                      <div className="settings-detail-card">
-                        <label className="field-sub-label">{t.doctorBloodTestLabel}</label>
-                        <span style={{ display: 'block', fontSize: '11px', color: '#8899a8', marginBottom: '8px' }}>
-                          {language === 'en' ? 'Select lab test date; you will be reminded to go fasting that morning.' : 'Randevu öncesi tahlil gününüzü seçin; o sabah aç karnına kan verme uyarısı alırsınız.'}
-                        </span>
-                        <div className="appointment-picker-row">
-                          <input
-                            type="date"
-                            className="appointment-date-input"
-                            value={doctorBloodTestDate}
-                            onChange={(e) => {
-                              setDoctorBloodTestDate(e.target.value);
-                              syncProfileSettings();
-                            }}
-                          />
-                          {doctorBloodTestDate && (
-                            <button
-                              type="button"
-                              className="appointment-clear-btn"
-                              onClick={() => {
-                                setDoctorBloodTestDate('');
-                                syncProfileSettings();
-                              }}
-                              title={t.doctorClearBloodTest}
-                            >
-                              <Trash size={16} />
-                            </button>
-                          )}
+                                  <button
+                                    type="button"
+                                    className="appointment-action-btn edit"
+                                    onClick={() => handleOpenAppointmentEditor(appt)}
+                                  >
+                                    <PencilSimple size={12} weight="bold" />
+                                    <span>{language === 'en' ? 'Edit' : 'Düzenle'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={`appointment-action-btn ${appt.completed ? 'reopen' : 'complete'}`}
+                                    onClick={() => handleToggleCompleteAppointment(appt.id)}
+                                  >
+                                    <Check size={12} weight="bold" />
+                                    <span>{appt.completed ? (language === 'en' ? 'Reopen' : 'Tekrar Aç') : (language === 'en' ? 'Complete' : 'Tamamlandı')}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="appointment-action-btn delete"
+                                    onClick={() => handleDeleteAppointment(appt.id)}
+                                    title={language === 'en' ? 'Delete' : 'Sil'}
+                                  >
+                                    <Trash size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        {bloodBadgeText && (
-                          <div className={`appointment-badge ${bloodBadgeClass}`} style={{ marginTop: '8px' }}>
-                            <span>{bloodBadgeText}</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
 
                       {/* 4. Doktor Notları */}
                       <div className="settings-section-head" style={{ marginTop: '20px' }}>
@@ -3150,8 +3472,7 @@ function InnerPrototype() {
                         </button>
                       </div>
                     </div>
-                  );
-                })()}
+                  )}
 
                 {/* SUB PAGE: DİL / LANGUAGE */}
                 {settingsSubPage === 'language' && (
@@ -4096,7 +4417,582 @@ function InnerPrototype() {
         </div>
       </div>
     )}
+
+    {appointmentEditorOpen && (
+      <AppointmentEditorWebModal
+        open={appointmentEditorOpen}
+        appointment={editingAppointment}
+        onClose={() => {
+          setAppointmentEditorOpen(false);
+          setEditingAppointment(null);
+        }}
+        onSave={handleSaveAppointment}
+        onDelete={handleDeleteAppointment}
+        lang={language}
+      />
+    )}
   </div>;
+}
+
+function AppointmentEditorWebModal({
+  open,
+  appointment,
+  onClose,
+  onSave,
+  onDelete,
+  lang = 'tr',
+}: {
+  open: boolean;
+  appointment: AppointmentItem | null;
+  onClose: () => void;
+  onSave: (saved: AppointmentItem) => void;
+  onDelete?: (id: string) => void;
+  lang?: 'tr' | 'en';
+}) {
+  const isEn = lang === 'en';
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const [doctorName, setDoctorName] = useState(appointment?.doctorName || '');
+  const [specialty, setSpecialty] = useState(appointment?.specialty || (isEn ? 'Internal Med' : 'Dahiliye'));
+  const [hospital, setHospital] = useState(appointment?.hospital || '');
+  const [phone, setPhone] = useState(appointment?.phone || '');
+  const [date, setDate] = useState(appointment?.date || '');
+  const [time, setTime] = useState(appointment?.time === '09:00' ? '13:00' : (appointment?.time || '13:00'));
+  const [leadOptions, setLeadOptions] = useState<string[]>(appointment?.leadOptions || ['1d', '0d']);
+  const [notes, setNotes] = useState(appointment?.notes || '');
+
+  // Integrated Blood Test
+  const [hasBloodTest, setHasBloodTest] = useState(!!appointment?.hasBloodTest);
+  const [bloodTestDate, setBloodTestDate] = useState(appointment?.bloodTestDate || '');
+  const [bloodTestTime, setBloodTestTime] = useState(appointment?.bloodTestTime || '08:30');
+  const [bloodTestFasting, setBloodTestFasting] = useState(appointment?.bloodTestFasting !== undefined ? appointment.bloodTestFasting : true);
+  const [bloodTestNotes, setBloodTestNotes] = useState(appointment?.bloodTestNotes || '');
+
+  const popularSpecialties = isEn
+    ? ['Internal Med', 'Ophthalmology', 'Cardiology', 'Neurology', 'ENT', 'Orthopedics', 'Endocrinology', 'Dental']
+    : ['Dahiliye', 'Göz', 'Kardiyoloji', 'Nöroloji', 'KBB', 'Ortopedi', 'Endokrinoloji', 'Diş'];
+
+  const handleToggleBloodTest = (val: boolean) => {
+    setHasBloodTest(val);
+    if (val && !bloodTestDate) {
+      if (date) {
+        const [y, m, d] = date.split('-').map(Number);
+        const target = new Date(y, m - 1, d - 3);
+        setBloodTestDate(target.toISOString().slice(0, 10));
+      } else {
+        setBloodTestDate(todayStr);
+      }
+    }
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    if (hasBloodTest && !bloodTestDate && newDate) {
+      const [y, m, d] = newDate.split('-').map(Number);
+      const target = new Date(y, m - 1, d - 3);
+      setBloodTestDate(target.toISOString().slice(0, 10));
+    }
+  };
+
+  const handleQuickDateOffset = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const newDate = d.toISOString().slice(0, 10);
+    handleDateChange(newDate);
+  };
+
+  const handleQuickBloodOffset = (daysBefore: number) => {
+    if (date) {
+      const [y, m, d] = date.split('-').map(Number);
+      const target = new Date(y, m - 1, d - daysBefore);
+      setBloodTestDate(target.toISOString().slice(0, 10));
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      setBloodTestDate(d.toISOString().slice(0, 10));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!date) {
+      alert(isEn ? 'Please select an appointment date.' : 'Lütfen randevu tarihini seçiniz.');
+      return;
+    }
+    if (hasBloodTest && !bloodTestDate) {
+      alert(isEn ? 'Please select a lab test date or toggle it off.' : 'Lütfen kan tahlili tarihini seçiniz veya seçeneği kapatınız.');
+      return;
+    }
+
+    const saved: AppointmentItem = {
+      id: appointment?.id || `appt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      doctorName: doctorName.trim(),
+      specialty: specialty.trim(),
+      hospital: hospital.trim(),
+      phone: phone.trim(),
+      date,
+      time: time || '13:00',
+      leadOptions: leadOptions.length > 0 ? leadOptions : ['1d', '0d'],
+      hasBloodTest,
+      bloodTestDate: hasBloodTest ? bloodTestDate : undefined,
+      bloodTestTime: hasBloodTest ? (bloodTestTime || '08:30') : undefined,
+      bloodTestFasting: hasBloodTest ? bloodTestFasting : undefined,
+      bloodTestNotes: hasBloodTest && bloodTestNotes.trim() ? bloodTestNotes.trim() : undefined,
+      notes: notes.trim() || undefined,
+      completed: appointment?.completed || false,
+      createdAt: appointment?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    onSave(saved);
+  };
+
+  return (
+    <div className="appointment-modal-overlay">
+      <div className="appointment-modal-header">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onClose}
+          aria-label={isEn ? 'Close' : 'Kapat'}
+        >
+          <X size={22} />
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <strong style={{ display: 'block', fontSize: '13px', letterSpacing: '0.8px', color: 'var(--mint)' }}>
+            {appointment ? (isEn ? 'EDIT APPOINTMENT' : 'RANDEVUYU DÜZENLE') : (isEn ? 'NEW APPOINTMENT' : 'YENİ RANDEVU EKLE')}
+          </strong>
+          <small style={{ color: '#94a3b8', fontSize: '10.5px' }}>
+            {isEn ? 'Doctor visit & lab preparation' : 'Doktor kontrolü ve tahlil hazırlığı'}
+          </small>
+        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          style={{ background: 'transparent', border: 'none', color: 'var(--mint)', cursor: 'pointer', padding: '4px' }}
+          title={isEn ? 'Save' : 'Kaydet'}
+        >
+          <Check size={24} weight="bold" />
+        </button>
+      </div>
+
+      <form className="appointment-modal-body" onSubmit={handleSubmit}>
+        {/* Uzmanlık / Branş */}
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#adb3bf', marginBottom: '6px' }}>
+            {isEn ? 'Specialty / Department' : 'Uzmanlık / Branş'}
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+            {popularSpecialties.map(spec => (
+              <button
+                key={spec}
+                type="button"
+                className={`filter-chip ${specialty === spec ? 'active' : ''}`}
+                style={{ fontSize: '11px', padding: '5px 10px' }}
+                onClick={() => setSpecialty(spec)}
+              >
+                {specialty === spec ? '✓ ' : ''}{spec}
+              </button>
+            ))}
+          </div>
+          <div className="profile-input-box">
+            <Pill size={18} className="field-icon" />
+            <input
+              type="text"
+              value={specialty}
+              onChange={e => setSpecialty(e.target.value)}
+              placeholder={isEn ? 'e.g. Ophthalmology, Cardiology' : 'Örn. Göz, Kardiyoloji'}
+            />
+          </div>
+        </div>
+
+        {/* Doktor Adı */}
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#adb3bf', marginBottom: '6px' }}>
+            {isEn ? 'Doctor Name' : 'Doktor Adı / Ünvanı'}
+          </label>
+          <div className="profile-input-box">
+            <User size={18} className="field-icon" />
+            <input
+              type="text"
+              value={doctorName}
+              onChange={e => setDoctorName(e.target.value)}
+              placeholder={isEn ? 'e.g. Dr. John Smith' : 'Örn. Prof. Dr. Ahmet Yılmaz'}
+            />
+          </div>
+        </div>
+
+        {/* Hastane / Klinik */}
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#adb3bf', marginBottom: '6px' }}>
+            {isEn ? 'Hospital / Clinic' : 'Hastane / Klinik'}
+          </label>
+          <div className="profile-input-box">
+            <Buildings size={18} className="field-icon" />
+            <input
+              type="text"
+              value={hospital}
+              onChange={e => setHospital(e.target.value)}
+              placeholder={isEn ? 'e.g. City Hospital, Clinic' : 'Örn. Şehir Hastanesi, Acıbadem'}
+            />
+          </div>
+        </div>
+
+        {/* Telefon */}
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#adb3bf', marginBottom: '6px' }}>
+            {isEn ? 'Phone / Contact' : 'İletişim / Telefon'}
+          </label>
+          <div className="profile-input-box">
+            <Phone size={18} className="field-icon" />
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder={isEn ? 'e.g. +90 532 123 45 67' : 'Örn. 0532 123 45 67'}
+            />
+          </div>
+        </div>
+
+        {/* Randevu Tarihi ve Saati */}
+        <div style={{ background: '#101d29', padding: '12px', borderRadius: '12px', border: '1px solid #1c2e40' }}>
+          <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: 'var(--mint)', marginBottom: '8px' }}>
+            📅 {isEn ? 'Appointment Date & Time' : 'Randevu Tarihi ve Saati'}
+          </label>
+          
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ flex: 1 }}>
+              <input
+                type="date"
+                className="appointment-date-input"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+                value={date}
+                onChange={e => handleDateChange(e.target.value)}
+                required
+              />
+            </div>
+            <div style={{ width: '110px' }}>
+              <input
+                type="time"
+                className="appointment-date-input"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+                value={time}
+                onChange={e => setTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Quick Date Pills */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <button
+              type="button"
+              className="filter-chip"
+              style={{ fontSize: '10.5px', padding: '4px 8px' }}
+              onClick={() => handleQuickDateOffset(0)}
+            >
+              {isEn ? 'Today' : 'Bugün'}
+            </button>
+            <button
+              type="button"
+              className="filter-chip"
+              style={{ fontSize: '10.5px', padding: '4px 8px' }}
+              onClick={() => handleQuickDateOffset(1)}
+            >
+              {isEn ? 'Tomorrow' : 'Yarın'}
+            </button>
+            <button
+              type="button"
+              className="filter-chip"
+              style={{ fontSize: '10.5px', padding: '4px 8px' }}
+              onClick={() => handleQuickDateOffset(3)}
+            >
+              +3 {isEn ? 'days' : 'gün'}
+            </button>
+            <button
+              type="button"
+              className="filter-chip"
+              style={{ fontSize: '10.5px', padding: '4px 8px' }}
+              onClick={() => handleQuickDateOffset(7)}
+            >
+              +1 {isEn ? 'week' : 'hafta'}
+            </button>
+            <button
+              type="button"
+              className="filter-chip"
+              style={{ fontSize: '10.5px', padding: '4px 8px' }}
+              onClick={() => handleQuickDateOffset(30)}
+            >
+              +1 {isEn ? 'month' : 'ay'}
+            </button>
+          </div>
+
+          {/* Quick Time Pills */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {['08:30', '09:00', '10:30', '11:00', '13:00', '14:30', '15:30', '16:00'].map(tPreset => (
+              <button
+                key={tPreset}
+                type="button"
+                className={`filter-chip ${time === tPreset ? 'active' : ''}`}
+                style={{ fontSize: '10.5px', padding: '3px 7px' }}
+                onClick={() => setTime(tPreset)}
+              >
+                ⏰ {tPreset}
+              </button>
+            ))}
+          </div>
+
+          {/* Erken Hatırlatma Çipleri */}
+          <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #1a2938' }}>
+            <span style={{ display: 'block', fontSize: '11px', color: '#8e9fac', marginBottom: '6px' }}>
+              🔔 {isEn ? 'Early Reminders' : 'Önceden Hatırlatmalar'}
+            </span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { id: '3d', label: isEn ? '3 days before' : '3 gün önce' },
+                { id: '2d', label: isEn ? '2 days before' : '2 gün önce' },
+                { id: '1d', label: isEn ? '1 day before' : '1 gün önce' },
+                { id: '0d', label: isEn ? 'Day of (05:00 AM)' : 'Randevu günü (05:00)' },
+              ].map(opt => {
+                const active = leadOptions.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`filter-chip ${active ? 'active' : ''}`}
+                    style={{ fontSize: '10.5px', padding: '4px 8px' }}
+                    onClick={() => {
+                      if (active) setLeadOptions(leadOptions.filter(x => x !== opt.id));
+                      else setLeadOptions([...leadOptions, opt.id]);
+                    }}
+                  >
+                    {active ? '✓ ' : '+ '}{opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Randevu İçi Aç Karnına Kan Tahlili Bölümü */}
+        <div style={{
+          background: hasBloodTest ? 'rgba(167, 139, 250, 0.08)' : '#101d29',
+          border: hasBloodTest ? '1px solid rgba(167, 139, 250, 0.4)' : '1px solid #1c2e40',
+          borderRadius: '12px',
+          padding: '12px',
+          transition: 'all 0.2s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Flask size={20} weight={hasBloodTest ? 'fill' : 'bold'} color={hasBloodTest ? '#c4b5fd' : '#8e9fac'} />
+              <div>
+                <strong style={{ display: 'block', fontSize: '13px', color: hasBloodTest ? '#c4b5fd' : '#f5f3f0' }}>
+                  {isEn ? 'Fasting Lab / Blood Test' : 'Aç Karnına Kan Tahlili'}
+                </strong>
+                <small style={{ color: '#8e9fac', fontSize: '11px' }}>
+                  {isEn ? 'Reminder before appointment' : 'Randevu öncesi tetkik ve açlık hatırlatıcısı'}
+                </small>
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={hasBloodTest}
+                onChange={e => handleToggleBloodTest(e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: '#a78bfa', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
+          {hasBloodTest && (
+            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(167, 139, 250, 0.2)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Quick offset chips */}
+              <div>
+                <span style={{ display: 'block', fontSize: '11px', color: '#c4b5fd', marginBottom: '6px' }}>
+                  {isEn ? 'Quick date relative to appointment:' : 'Randevuya göre tahlil günü:'}
+                </span>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="filter-chip"
+                    style={{ fontSize: '10.5px', padding: '4px 8px' }}
+                    onClick={() => handleQuickBloodOffset(3)}
+                  >
+                    3 {isEn ? 'days before' : 'gün önce (Önerilen)'}
+                  </button>
+                  <button
+                    type="button"
+                    className="filter-chip"
+                    style={{ fontSize: '10.5px', padding: '4px 8px' }}
+                    onClick={() => handleQuickBloodOffset(2)}
+                  >
+                    2 {isEn ? 'days before' : 'gün önce'}
+                  </button>
+                  <button
+                    type="button"
+                    className="filter-chip"
+                    style={{ fontSize: '10.5px', padding: '4px 8px' }}
+                    onClick={() => handleQuickBloodOffset(1)}
+                  >
+                    1 {isEn ? 'day before' : 'gün önce'}
+                  </button>
+                  <button
+                    type="button"
+                    className="filter-chip"
+                    style={{ fontSize: '10.5px', padding: '4px 8px' }}
+                    onClick={() => handleQuickBloodOffset(0)}
+                  >
+                    {isEn ? 'Same morning' : 'Aynı sabah'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tahlil Tarihi ve Saati */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#adb3bf', marginBottom: '4px' }}>
+                    {isEn ? 'Lab Date' : 'Tahlil Tarihi'}
+                  </label>
+                  <input
+                    type="date"
+                    className="appointment-date-input"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    value={bloodTestDate}
+                    onChange={e => setBloodTestDate(e.target.value)}
+                    required={hasBloodTest}
+                  />
+                </div>
+                <div style={{ width: '110px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#adb3bf', marginBottom: '4px' }}>
+                    {isEn ? 'Lab Time' : 'Tahlil Saati'}
+                  </label>
+                  <input
+                    type="time"
+                    className="appointment-date-input"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    value={bloodTestTime}
+                    onChange={e => setBloodTestTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Aç Karnına Onayı */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'rgba(167, 139, 250, 0.1)', padding: '8px 10px', borderRadius: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={bloodTestFasting}
+                  onChange={e => setBloodTestFasting(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#a78bfa', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>
+                  {isEn ? 'Must be fasting (Do not eat/drink before test)' : 'Aç karnına gidilecek (Sabah açlık bildirimi gönderilir)'}
+                </span>
+              </label>
+
+              {/* Tahlil Notu */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#adb3bf', marginBottom: '4px' }}>
+                  {isEn ? 'Lab Notes / Instructions' : 'Tahlil Talimatı / Özel Not'}
+                </label>
+                <input
+                  type="text"
+                  className="appointment-date-input"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  value={bloodTestNotes}
+                  onChange={e => setBloodTestNotes(e.target.value)}
+                  placeholder={isEn ? 'e.g. Only water allowed until 08:30' : 'Örn: Sabah 08:30\'a kadar su hariç bir şey yiyip içmeyiniz'}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Genel Notlar */}
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#adb3bf', marginBottom: '6px' }}>
+            {isEn ? 'Appointment Notes / Questions for Doctor' : 'Randevu Notları / Doktora Sorulacaklar'}
+          </label>
+          <textarea
+            className="profile-notes-textarea"
+            rows={3}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder={isEn ? 'Write questions or reminders for your doctor visit...' : 'Doktorunuza sormak istediklerinizi veya kontrol notlarınızı buraya yazabilirsiniz...'}
+          />
+        </div>
+
+        {/* Submit & Cancel & Delete */}
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+          <button
+            type="submit"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              background: 'var(--mint)',
+              color: '#081624',
+              padding: '12px',
+              borderRadius: '10px',
+              fontSize: '14px',
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <Check size={18} weight="bold" />
+            <span>{isEn ? 'Save Appointment' : 'Randevuyu Kaydet'}</span>
+          </button>
+
+          {appointment && onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(isEn ? 'Delete this appointment?' : 'Bu randevuyu silmek istediğinize emin misiniz?')) {
+                  onDelete(appointment.id);
+                  onClose();
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                background: '#361c22',
+                color: '#ff9696',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 700,
+                border: '1px solid #5c2428',
+                cursor: 'pointer'
+              }}
+            >
+              <Trash size={16} />
+              <span>{isEn ? 'Delete' : 'Sil'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: '#152332',
+              color: '#adb3bf',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontWeight: 600,
+              border: '1px solid #203244',
+              cursor: 'pointer'
+            }}
+          >
+            {isEn ? 'Cancel' : 'İptal'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 export default function Prototype() {

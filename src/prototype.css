@@ -1474,6 +1474,148 @@
   opacity: 0.9;
 }
 
+/* --- Appointment Management & Cards --- */
+.appointment-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.appointment-item-card {
+  background: #101d29;
+  border: 1px solid rgba(169, 223, 202, 0.25);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.appointment-item-card.completed {
+  background: #0c1520;
+  border-color: #192634;
+  opacity: 0.75;
+}
+
+.appointment-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.appointment-specialty-tag {
+  background: rgba(169, 223, 202, 0.15);
+  color: #a9dfca;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.appointment-blood-badge-card {
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.appointment-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid #1a2736;
+}
+
+.appointment-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.appointment-action-btn.call {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  text-decoration: none;
+}
+
+.appointment-action-btn.edit {
+  background: #182b3a;
+  color: #38bdf8;
+}
+
+.appointment-action-btn.complete {
+  background: #143532;
+  color: #a9dfca;
+}
+
+.appointment-action-btn.reopen {
+  background: #1f3040;
+  color: #94a3b8;
+}
+
+.appointment-action-btn.delete {
+  background: transparent;
+  color: #f87171;
+  padding: 5px 7px;
+}
+
+/* Appointment Modal */
+.appointment-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 22, 36, 0.96);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.appointment-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #192736;
+  background: #0d1a27;
+}
+
+.appointment-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.appointment-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #192736;
+  background: #081624;
+}
+
+
 
 
 

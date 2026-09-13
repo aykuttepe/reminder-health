@@ -56,6 +56,26 @@ export type DurationInfo = {
   badgeText: string;
 };
 
+export interface AppointmentItem {
+  id: string;
+  doctorName: string;
+  specialty: string;
+  hospital: string;
+  phone?: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm, default "13:00"
+  leadOptions: string[]; // ['3d', '2d', '1d', '0d']
+  hasBloodTest: boolean;
+  bloodTestDate?: string; // YYYY-MM-DD
+  bloodTestTime?: string; // HH:mm, default "08:30"
+  bloodTestFasting?: boolean;
+  bloodTestNotes?: string;
+  notes?: string;
+  completed?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export function calculateEndDate(startDateStr: string, days: number): string {
   const parts = (startDateStr || localDateKey()).split('-').map(Number);
   const d = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
