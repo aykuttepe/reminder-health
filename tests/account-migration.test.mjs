@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import ts from '../mobile-app/node_modules/typescript/lib/typescript.js';
 import * as uuid from 'uuid';
 
-const cloud = 'https://rutin-api.tepe-aykut05.workers.dev';
+const cloud = 'https://api.mytepeapi.com.tr';
 const old = 'http://192.168.1.100:3050';
 const user = {id:'d56ee3d9-9c65-4cc1-994c-ab694fd73a29',name:'Test',legacyOwner:false};
 const snapshot = {doses:[{id:1,name:'Test',stock:12}],learnedMeds:{test:{}},settings:{language:'tr'}};
@@ -35,6 +35,17 @@ function load(root, file, mocks = {}) {
 const plain = value => JSON.parse(JSON.stringify(value));
 for (const root of ['src','mobile-app/src']) {
   const api=load(root,'account.ts');
+  test(`${root}: custom-domain migration preserves the old cloud snapshot and account isolation`,async()=>{
+    const previous=api.accountKey('https://rutin-api.tepe-aykut05.workers.dev',user.id);
+    const store=storage({[bound]:previous});
+    const result=await api.switchAccount(store,cloud,user,snapshot);
+    assert.equal(result.doses[0].stock,12);
+    assert.deepEqual(result.settings,snapshot.settings);
+    assert.deepEqual(JSON.parse(await store.getItem(`reminder_vault:${previous}`)),snapshot);
+    assert.equal(await store.getItem(bound),api.accountKey(cloud,user.id));
+    await api.finishSwitch(store,{doses:'d',learned:'l',settings:'s'});
+    assert.equal(JSON.parse(await store.getItem('d'))[0].stock,12);
+  });
   test(`${root}: migration preserves records, legacy vault and restart journal`,async()=>{
     const oldKey=api.accountKey(old,user.id), next=api.accountKey(cloud,user.id);
     const store=storage({[bound]:oldKey});
@@ -72,7 +83,7 @@ for (const root of ['src','mobile-app/src']) {
     assert.deepEqual(plain(result.doses),[]);
   });
   test(`${root}: same account assertion accepts HTTP/private migration only to cloud`,async()=>{
-    for(const origin of [old,'http://legacy.example:3050','https://10.0.0.2','https://[::1]']){
+    for(const origin of [old,'http://legacy.example:3050','https://10.0.0.2','https://[::1]','https://rutin-api.tepe-aykut05.workers.dev']){
       const store=storage({[bound]:api.accountKey(origin,user.id)});
       await api.assertAccount(store,cloud,user);
       assert.equal(await store.getItem(bound),api.accountKey(cloud,user.id));

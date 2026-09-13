@@ -1,4 +1,4 @@
-import {DEFAULT_SYNC_SERVER_URL, isLegacyServerOrigin} from './syncManager';
+import {DEFAULT_SYNC_SERVER_URL, isLegacyServerOrigin, requestServerJson} from './syncManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import {Platform} from 'react-native';
@@ -12,15 +12,12 @@ export async function authRequest(url:string,endpoint:string,body?:any,session?:
   const migrating = !!saved?.session?.token && origin === DEFAULT_SYNC_SERVER_URL &&
     isLegacyServerOrigin(saved.origin);
   const token = session?.token || (saved?.origin === origin || migrating ? saved?.session?.token : undefined);
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
-  try{
-    const res=await fetch(`${origin}${endpoint}`,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
-    const data=await res.json();if(!res.ok)throw new Error(data.error||'Bağlantı başarısız.');
-    if (migrating && endpoint === '/auth/session' && data.user?.id === saved.session.user.id) {
-      await SecureStore.setItemAsync(key,JSON.stringify({...saved,origin}),{keychainAccessible:SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY});
-    }
-    return data;
-  }finally{clearTimeout(timer);}
+  const data=await requestServerJson<{user?:Session['user']}>(`${origin}${endpoint}`,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+  if (migrating && endpoint === '/auth/session') {
+    if (data.user?.id !== saved.session.user.id) throw new Error('Sunucu geçişinde hesap doğrulanamadı. Yerel kayıtlarınız korunuyor.');
+    await SecureStore.setItemAsync(key,JSON.stringify({...saved,origin}),{keychainAccessible:SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY});
+  }
+  return data;
 }
 const codeKey='reminder_sync_code_v2';
 export async function getStoredSyncCode():Promise<string|null>{return await SecureStore.getItemAsync(codeKey);}
@@ -73,6 +70,8 @@ export async function getSession(url:string):Promise<Session>{
   return result;
 }
 export async function logout(url:string,session:Session){
-  try{return await authRequest(url,'/auth/logout',{},session);}finally{await SecureStore.deleteItemAsync(key);await clearStoredSyncCode();}
+  const result = await authRequest(url,'/auth/logout',{},session);
+  await SecureStore.deleteItemAsync(key);
+  await clearStoredSyncCode();
+  return result;
 }
-

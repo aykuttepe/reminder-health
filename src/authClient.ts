@@ -1,15 +1,12 @@
 import type {Session} from './account';
 import {newId} from './account';
+import {DEFAULT_SYNC_SERVER_URL, requestServerJson} from './syncManager';
 export const localStore={getItem:async(key:string)=>localStorage.getItem(key),setItem:async(key:string,value:string)=>{localStorage.setItem(key,value);}};
 function base(url:string){return new URL(url).origin;}
-export function isSameServer(url:string){try{const b=base(url);return b===window.location.origin||b.includes('workers.dev')||b.includes('192.168.')||b.includes('localhost');}catch{return false;}}
+export function isSameServer(url:string){try{const b=base(url);return b===DEFAULT_SYNC_SERVER_URL||b===window.location.origin||b.includes('workers.dev')||b.includes('192.168.')||b.includes('localhost');}catch{return false;}}
 export async function authRequest(url:string,endpoint:string,body?:any,session?:Session):Promise<any>{
   if(!isSameServer(url))throw new Error('Web eşitlemesi için uygulamayı sunucu adresinden açın.');
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
-  try{
-    const res=await fetch(`${base(url)}${endpoint}`,{method:body===undefined?'GET':'POST',credentials:'include',headers:{'Content-Type':'application/json',...(body===undefined?{}:{'X-CSRF-Token':session?.csrf||'login'})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
-    const data=await res.json();if(!res.ok)throw new Error(data.error||'Bağlantı başarısız.');return data;
-  }finally{clearTimeout(timer);}
+  return requestServerJson(`${base(url)}${endpoint}`,{method:body===undefined?'GET':'POST',credentials:'include',headers:{'Content-Type':'application/json',...(body===undefined?{}:{'X-CSRF-Token':session?.csrf||'login'})},body:body===undefined?undefined:JSON.stringify(body)});
 }
 const codeKey='reminder_sync_code_v2';
 export function getStoredSyncCode():string|null{return localStorage.getItem(codeKey);}
@@ -39,6 +36,7 @@ export async function recover(url:string,recoveryKey:string):Promise<{user:any;c
 }
 export const getSession=(url:string):Promise<Session>=>authRequest(url,'/auth/session');
 export const logout=async(url:string,session:Session)=>{
-  try{return await authRequest(url,'/auth/logout',{},session);}finally{clearStoredSyncCode();}
+  const result = await authRequest(url,'/auth/logout',{},session);
+  clearStoredSyncCode();
+  return result;
 };
-

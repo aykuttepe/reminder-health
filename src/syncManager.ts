@@ -207,7 +207,78 @@ export function validateBackupJSON(jsonStr: string): {
   }
 }
 
-export const DEFAULT_SYNC_SERVER_URL = 'https://rutin-api.tepe-aykut05.workers.dev';
+export const DEFAULT_SYNC_SERVER_URL = 'https://api.mytepeapi.com.tr';
+export const LEGACY_CLOUD_SERVER_URL = 'https://rutin-api.tepe-aykut05.workers.dev';
+
+export class ServerConnectionError extends Error {
+  code: 'timeout' | 'network' | 'http' | 'invalid-response';
+  endpoint: string;
+  status?: number;
+  constructor(
+    message: string,
+    code: ServerConnectionError['code'],
+    endpoint: string,
+    status?: number,
+  ) {
+    super(message);
+    this.name = 'ServerConnectionError';
+    this.code = code;
+    this.endpoint = endpoint;
+    this.status = status;
+  }
+}
+
+// A single deadline covers both transport and body parsing. Never replay writes:
+// a timed-out login or sync may already have committed on the server.
+export async function requestServerJson<T extends object = Record<string, unknown>>(
+  url: string,
+  options: Omit<RequestInit, 'signal'> = {},
+  timeoutMs = 15000,
+): Promise<T> {
+  const endpoint = new URL(url).pathname;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new ServerConnectionError(
+        `Sunucu bağlantısı zaman aşımına uğradı (${timeoutMs / 1000} sn, ${endpoint}). İnternet bağlantısını ve sunucu adresini kontrol edin.`,
+        'timeout', endpoint,
+      ));
+      controller.abort();
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([deadline, (async () => {
+      const response = await fetch(url, {...options, signal: controller.signal});
+      const text = await response.text();
+      let data: unknown;
+      try { data = JSON.parse(text); } catch {
+        throw new ServerConnectionError(
+          `Sunucu geçerli JSON yanıtı vermedi (HTTP ${response.status}, ${endpoint}).`,
+          response.ok ? 'invalid-response' : 'http', endpoint, response.status,
+        );
+      }
+      if (!response.ok) {
+        const message = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
+          ? data.error : 'Sunucu isteği tamamlayamadı.';
+        throw new ServerConnectionError(`${message} (HTTP ${response.status}, ${endpoint})`, 'http', endpoint, response.status);
+      }
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new ServerConnectionError(`Sunucu yanıtı beklenen biçimde değil (${endpoint}).`, 'invalid-response', endpoint);
+      }
+      return data as T;
+    })()]);
+  } catch (error) {
+    if (error instanceof ServerConnectionError) throw error;
+    throw new ServerConnectionError(
+      `Sunucuya güvenli bağlantı kurulamadı (${endpoint}). İnternet bağlantısını ve sunucu adresini kontrol edin.`,
+      'network', endpoint,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 
 export function normalizeServerUrl(rawUrl: string): string {
   let clean = rawUrl.trim().replace(/\/+$/, '');
@@ -223,6 +294,7 @@ export function normalizeServerUrl(rawUrl: string): string {
 export function isLegacyServerOrigin(rawUrl: string): boolean {
   try {
     const url = new URL(rawUrl);
+    if (url.origin === LEGACY_CLOUD_SERVER_URL) return true;
     const host = url.hostname.toLowerCase();
     if (url.protocol === 'http:') return true;
     if (url.protocol !== 'https:') return false;
@@ -299,21 +371,9 @@ export async function syncWithServer(
     headers['Authorization'] = `Bearer ${apiToken.trim()}`;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-  const res = await fetch(`${cleanUrl}/api/sync`, {
+  return requestServerJson<SyncResponsePayload>(`${cleanUrl}/api/sync`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
-    signal: controller.signal,
   });
-  clearTimeout(timeoutId);
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Sunucu Hatası (${res.status}): ${errText || res.statusText}`);
-  }
-
-  return await res.json();
 }

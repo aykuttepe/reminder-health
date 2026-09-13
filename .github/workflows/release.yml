@@ -30,8 +30,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
-          cd mobile-app && npm install
+          npm ci
+          cd mobile-app && npm ci
+
+      - name: Verify connection and account migration before packaging
+        run: |
+          npm run check:runtime
+          npm --prefix mobile-app run typecheck
+          node --test tests/connection-reliability.test.mjs tests/account-migration.test.mjs tests/native-networking.test.mjs tests/sync-connection.test.mjs
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
