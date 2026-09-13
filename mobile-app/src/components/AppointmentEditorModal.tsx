@@ -54,6 +54,7 @@ interface AppointmentEditorModalProps {
   appointment: AppointmentItem | null;
   onClose: () => void;
   onSave: (saved: AppointmentItem) => void;
+  onDelete?: (id: string) => void;
   onOpenCalendar?: (target: 'appointmentDate' | 'appointmentBloodTestDate', title: string) => void;
   externalSelectedDate?: { target: 'appointmentDate' | 'appointmentBloodTestDate'; date: string } | null;
   lang?: 'tr' | 'en';
@@ -64,6 +65,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
   appointment,
   onClose,
   onSave,
+  onDelete,
   onOpenCalendar,
   externalSelectedDate,
   lang = 'tr',
@@ -562,6 +564,18 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
 
           {/* Alt Butonlar */}
           <View style={styles.actionsRow}>
+            {appointment && onDelete && (
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => {
+                  onDelete(appointment.id);
+                  onClose();
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="trash-outline" size={18} color="#ff8585" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
               <Text style={styles.cancelBtnText}>{isEn ? 'Cancel' : 'Vazgeç'}</Text>
             </TouchableOpacity>
@@ -960,6 +974,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 10,
+  },
+  deleteBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
   },
   cancelBtn: {
     flex: 1,

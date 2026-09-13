@@ -733,7 +733,8 @@ function loadStoredSettings(): PrototypeSettings {
     if (saved) {
       const parsed = JSON.parse(saved);
       let initialAppointments: AppointmentItem[] = [];
-      if (parsed.appointments) {
+      const hasStoredAppointments = parsed.appointments !== undefined;
+      if (hasStoredAppointments) {
         try {
           const apptsParsed = typeof parsed.appointments === 'string' ? JSON.parse(parsed.appointments) : parsed.appointments;
           if (Array.isArray(apptsParsed)) {
@@ -741,21 +742,21 @@ function loadStoredSettings(): PrototypeSettings {
           }
         } catch {}
       }
-      if (initialAppointments.length === 0 && (parsed.doctorNextAppointment || parsed.doctorName)) {
+      if (!hasStoredAppointments && parsed.doctorNextAppointment) {
         initialAppointments = [{
           id: 'appt-legacy-1',
           doctorName: parsed.doctorName || '',
           specialty: parsed.doctorSpecialty || 'Göz',
           hospital: parsed.doctorHospital || '',
           phone: parsed.doctorPhone || '',
-          date: parsed.doctorNextAppointment || '2026-12-10',
+          date: parsed.doctorNextAppointment,
           time: parsed.doctorAppointmentTime === '09:00' ? '13:00' : (parsed.doctorAppointmentTime || '13:00'),
           leadOptions: parsed.doctorApptLeadOptions || ['1d', '0d'],
           hasBloodTest: !!parsed.doctorBloodTestDate,
-          bloodTestDate: parsed.doctorBloodTestDate || '2026-12-07',
+          bloodTestDate: parsed.doctorBloodTestDate || '',
           bloodTestFasting: true,
           bloodTestTime: '08:30',
-          bloodTestNotes: parsed.doctorNotes || 'Tahlilleri 3 gün öncesinden yaptır',
+          bloodTestNotes: parsed.doctorNotes || '',
           notes: parsed.doctorNotes || '',
           completed: false,
           createdAt: Date.now(),
@@ -763,6 +764,15 @@ function loadStoredSettings(): PrototypeSettings {
         }];
       }
       parsed.appointments = initialAppointments;
+      if (hasStoredAppointments && initialAppointments.length === 0) {
+        parsed.doctorNextAppointment = '';
+        parsed.doctorBloodTestDate = '';
+        parsed.doctorName = '';
+        parsed.doctorSpecialty = '';
+        parsed.doctorHospital = '';
+        parsed.doctorPhone = '';
+        parsed.doctorNotes = '';
+      }
       return { ...DEFAULT_SETTINGS, ...parsed };
     }
   } catch (e) {
@@ -879,24 +889,24 @@ function InnerPrototype() {
   const [doctorBloodTestDate, setDoctorBloodTestDate] = useState<string>(storedSettings.doctorBloodTestDate || '');
   const [doctorNotes, setDoctorNotes] = useState<string>(storedSettings.doctorNotes || '');
   const [appointments, setAppointments] = useState<AppointmentItem[]>(() => {
-    if (storedSettings.appointments && Array.isArray(storedSettings.appointments) && storedSettings.appointments.length > 0) {
+    if (storedSettings.appointments !== undefined && Array.isArray(storedSettings.appointments)) {
       return storedSettings.appointments;
     }
-    if (storedSettings.doctorNextAppointment || storedSettings.doctorName) {
+    if (storedSettings.appointments === undefined && storedSettings.doctorNextAppointment) {
       return [{
         id: 'appt-legacy-1',
         doctorName: storedSettings.doctorName || '',
         specialty: storedSettings.doctorSpecialty || 'Göz',
         hospital: storedSettings.doctorHospital || '',
         phone: storedSettings.doctorPhone || '',
-        date: storedSettings.doctorNextAppointment || '2026-12-10',
+        date: storedSettings.doctorNextAppointment,
         time: storedSettings.doctorAppointmentTime === '09:00' ? '13:00' : (storedSettings.doctorAppointmentTime || '13:00'),
         leadOptions: storedSettings.doctorApptLeadOptions || ['1d', '0d'],
         hasBloodTest: !!storedSettings.doctorBloodTestDate,
-        bloodTestDate: storedSettings.doctorBloodTestDate || '2026-12-07',
+        bloodTestDate: storedSettings.doctorBloodTestDate || '',
         bloodTestFasting: true,
         bloodTestTime: '08:30',
-        bloodTestNotes: storedSettings.doctorNotes || 'Tahlilleri 3 gün öncesinden yaptır',
+        bloodTestNotes: storedSettings.doctorNotes || '',
         notes: storedSettings.doctorNotes || '',
         completed: false,
         createdAt: Date.now(),
@@ -944,29 +954,78 @@ function InnerPrototype() {
     const updated = appointments.filter(a => a.id !== id);
     setAppointments(updated);
     const active = updated.filter(a => !a.completed).sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))[0];
-    if (active) {
-      setDoctorName(active.doctorName || '');
-      setDoctorSpecialty(active.specialty || '');
-      setDoctorHospital(active.hospital || '');
-      setDoctorPhone(active.phone || '');
-      setDoctorNextAppointment(active.date || '');
-      setDoctorAppointmentTime(active.time || '13:00');
-      setDoctorApptLeadOptions(active.leadOptions || ['1d', '0d']);
-      setDoctorBloodTestDate(active.hasBloodTest ? (active.bloodTestDate || '') : '');
-      setDoctorNotes(active.notes || '');
-    } else {
-      setDoctorNextAppointment('');
-      setDoctorBloodTestDate('');
-    }
+    const newDocName = active?.doctorName || '';
+    const newDocSpecialty = active?.specialty || '';
+    const newDocHospital = active?.hospital || '';
+    const newDocPhone = active?.phone || '';
+    const newNextAppt = active?.date || '';
+    const newApptTime = active?.time || '13:00';
+    const newLeadOptions = active?.leadOptions || ['1d', '0d'];
+    const newBloodDate = active?.hasBloodTest ? (active?.bloodTestDate || '') : '';
+    const newNotes = active?.notes || '';
+
+    setDoctorName(newDocName);
+    setDoctorSpecialty(newDocSpecialty);
+    setDoctorHospital(newDocHospital);
+    setDoctorPhone(newDocPhone);
+    setDoctorNextAppointment(newNextAppt);
+    setDoctorAppointmentTime(newApptTime);
+    setDoctorApptLeadOptions(newLeadOptions);
+    setDoctorBloodTestDate(newBloodDate);
+    setDoctorNotes(newNotes);
+
     setToast({ text: language === 'en' ? 'Appointment deleted' : 'Randevu silindi' });
-    syncProfileSettings({ appointments: updated });
+    syncProfileSettings({
+      appointments: updated,
+      doctorName: newDocName,
+      doctorSpecialty: newDocSpecialty,
+      doctorHospital: newDocHospital,
+      doctorPhone: newDocPhone,
+      doctorNextAppointment: newNextAppt,
+      doctorAppointmentTime: newApptTime,
+      doctorApptLeadOptions: newLeadOptions,
+      doctorBloodTestDate: newBloodDate,
+      doctorNotes: newNotes,
+    });
   };
 
   const handleToggleCompleteAppointment = (id: string) => {
     const updated = appointments.map(a => a.id === id ? { ...a, completed: !a.completed, updatedAt: Date.now() } : a);
     setAppointments(updated);
+    const active = updated.filter(a => !a.completed).sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))[0];
+    const newDocName = active?.doctorName || '';
+    const newDocSpecialty = active?.specialty || '';
+    const newDocHospital = active?.hospital || '';
+    const newDocPhone = active?.phone || '';
+    const newNextAppt = active?.date || '';
+    const newApptTime = active?.time || '13:00';
+    const newLeadOptions = active?.leadOptions || ['1d', '0d'];
+    const newBloodDate = active?.hasBloodTest ? (active?.bloodTestDate || '') : '';
+    const newNotes = active?.notes || '';
+
+    setDoctorName(newDocName);
+    setDoctorSpecialty(newDocSpecialty);
+    setDoctorHospital(newDocHospital);
+    setDoctorPhone(newDocPhone);
+    setDoctorNextAppointment(newNextAppt);
+    setDoctorAppointmentTime(newApptTime);
+    setDoctorApptLeadOptions(newLeadOptions);
+    setDoctorBloodTestDate(newBloodDate);
+    setDoctorNotes(newNotes);
+
     setToast({ text: language === 'en' ? 'Appointment status updated' : 'Randevu durumu güncellendi' });
-    syncProfileSettings({ appointments: updated });
+    syncProfileSettings({
+      appointments: updated,
+      doctorName: newDocName,
+      doctorSpecialty: newDocSpecialty,
+      doctorHospital: newDocHospital,
+      doctorPhone: newDocPhone,
+      doctorNextAppointment: newNextAppt,
+      doctorAppointmentTime: newApptTime,
+      doctorApptLeadOptions: newLeadOptions,
+      doctorBloodTestDate: newBloodDate,
+      doctorNotes: newNotes,
+    });
   };
 
   const [privateMode, setPrivateMode] = useState<boolean>(storedSettings.privateMode);
@@ -1618,17 +1677,17 @@ function InnerPrototype() {
         soundType,
         snoozeMinutes,
       };
-      if (userName && userName.trim()) payloadSettings.userName = userName.trim();
-      if (doctorName && doctorName.trim()) payloadSettings.doctorName = doctorName.trim();
-      if (doctorSpecialty && doctorSpecialty.trim()) payloadSettings.doctorSpecialty = doctorSpecialty.trim();
-      if (doctorHospital && doctorHospital.trim()) payloadSettings.doctorHospital = doctorHospital.trim();
-      if (doctorPhone && doctorPhone.trim()) payloadSettings.doctorPhone = doctorPhone.trim();
-      if (doctorNextAppointment && doctorNextAppointment.trim()) payloadSettings.doctorNextAppointment = doctorNextAppointment.trim();
-      if (doctorAppointmentTime && doctorAppointmentTime.trim()) payloadSettings.doctorAppointmentTime = doctorAppointmentTime.trim();
-      if (doctorApptLeadOptions && doctorApptLeadOptions.length > 0) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
-      if (doctorBloodTestDate && doctorBloodTestDate.trim()) payloadSettings.doctorBloodTestDate = doctorBloodTestDate.trim();
-      if (doctorNotes && doctorNotes.trim()) payloadSettings.doctorNotes = doctorNotes.trim();
-      if (appointments && appointments.length > 0) payloadSettings.appointments = JSON.stringify(appointments);
+      payloadSettings.userName = (userName || '').trim();
+      payloadSettings.doctorName = (doctorName || '').trim();
+      payloadSettings.doctorSpecialty = (doctorSpecialty || '').trim();
+      payloadSettings.doctorHospital = (doctorHospital || '').trim();
+      payloadSettings.doctorPhone = (doctorPhone || '').trim();
+      payloadSettings.doctorNextAppointment = (doctorNextAppointment || '').trim();
+      payloadSettings.doctorAppointmentTime = doctorAppointmentTime || '13:00';
+      payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions || ['1d', '0d']);
+      payloadSettings.doctorBloodTestDate = (doctorBloodTestDate || '').trim();
+      payloadSettings.doctorNotes = (doctorNotes || '').trim();
+      payloadSettings.appointments = JSON.stringify(appointments || []);
 
       const response = await authRequest(serverUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: d.updatedAt || Date.now() })),
@@ -1644,29 +1703,54 @@ function InnerPrototype() {
         }
         if (response.settings) {
           if (response.settings.userName) setUserName(response.settings.userName);
-          if (response.settings.doctorName !== undefined && response.settings.doctorName !== '') setDoctorName(response.settings.doctorName);
-          if (response.settings.doctorSpecialty !== undefined && response.settings.doctorSpecialty !== '') setDoctorSpecialty(response.settings.doctorSpecialty);
-          if (response.settings.doctorHospital !== undefined && response.settings.doctorHospital !== '') setDoctorHospital(response.settings.doctorHospital);
-          if (response.settings.doctorPhone !== undefined && response.settings.doctorPhone !== '') setDoctorPhone(response.settings.doctorPhone);
-          if (response.settings.doctorNextAppointment !== undefined && response.settings.doctorNextAppointment !== '') setDoctorNextAppointment(response.settings.doctorNextAppointment);
-          if (response.settings.doctorAppointmentTime !== undefined && response.settings.doctorAppointmentTime !== '') setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
-          if (response.settings.doctorApptLeadOptions !== undefined) {
-            try {
-              const opts = typeof response.settings.doctorApptLeadOptions === 'string'
-                ? JSON.parse(response.settings.doctorApptLeadOptions)
-                : response.settings.doctorApptLeadOptions;
-              if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
-            } catch {}
-          }
-          if (response.settings.doctorBloodTestDate !== undefined && response.settings.doctorBloodTestDate !== '') setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
-          if (response.settings.doctorNotes !== undefined && response.settings.doctorNotes !== '') setDoctorNotes(response.settings.doctorNotes);
           if (response.settings.appointments !== undefined) {
             try {
               const appts = typeof response.settings.appointments === 'string'
                 ? JSON.parse(response.settings.appointments)
                 : response.settings.appointments;
-              if (Array.isArray(appts)) setAppointments(appts);
+              if (Array.isArray(appts)) {
+                setAppointments(appts);
+                const active = appts.filter(a => !a.completed).sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))[0];
+                if (active) {
+                  setDoctorName(active.doctorName || '');
+                  setDoctorSpecialty(active.specialty || '');
+                  setDoctorHospital(active.hospital || '');
+                  setDoctorPhone(active.phone || '');
+                  setDoctorNextAppointment(active.date || '');
+                  setDoctorAppointmentTime(active.time || '13:00');
+                  setDoctorApptLeadOptions(active.leadOptions || ['1d', '0d']);
+                  setDoctorBloodTestDate(active.hasBloodTest ? (active.bloodTestDate || '') : '');
+                  setDoctorNotes(active.notes || '');
+                } else {
+                  setDoctorName('');
+                  setDoctorSpecialty('');
+                  setDoctorHospital('');
+                  setDoctorPhone('');
+                  setDoctorNextAppointment('');
+                  setDoctorAppointmentTime('13:00');
+                  setDoctorApptLeadOptions(['1d', '0d']);
+                  setDoctorBloodTestDate('');
+                  setDoctorNotes('');
+                }
+              }
             } catch {}
+          } else {
+            if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
+            if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
+            if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
+            if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
+            if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
+            if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
+            if (response.settings.doctorApptLeadOptions !== undefined) {
+              try {
+                const opts = typeof response.settings.doctorApptLeadOptions === 'string'
+                  ? JSON.parse(response.settings.doctorApptLeadOptions)
+                  : response.settings.doctorApptLeadOptions;
+                if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
+              } catch {}
+            }
+            if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
+            if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
           }
         }
         const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1689,22 +1773,45 @@ function InnerPrototype() {
     }
   };
 
-  const syncProfileSettings = (overrides?: { appointments?: AppointmentItem[] } | unknown) => {
+  const syncProfileSettings = (overrides?: Partial<{
+    userName: string;
+    doctorName: string;
+    doctorSpecialty: string;
+    doctorHospital: string;
+    doctorPhone: string;
+    doctorNextAppointment: string;
+    doctorAppointmentTime: string;
+    doctorApptLeadOptions: string[];
+    doctorBloodTestDate: string;
+    doctorNotes: string;
+    appointments: AppointmentItem[];
+  }> | unknown) => {
     if (session) {
-      const hasAppts = overrides && typeof overrides === 'object' && !('nativeEvent' in overrides) && 'appointments' in overrides;
-      const activeAppts = hasAppts ? (overrides as { appointments: AppointmentItem[] }).appointments : appointments;
+      const isObj = overrides && typeof overrides === 'object' && !('nativeEvent' in overrides);
+      const o = isObj ? (overrides as any) : {};
+      const activeUserName = (o.userName !== undefined ? o.userName : userName).trim();
+      const activeDocName = (o.doctorName !== undefined ? o.doctorName : doctorName).trim();
+      const activeDocSpecialty = (o.doctorSpecialty !== undefined ? o.doctorSpecialty : doctorSpecialty).trim();
+      const activeDocHospital = (o.doctorHospital !== undefined ? o.doctorHospital : doctorHospital).trim();
+      const activeDocPhone = (o.doctorPhone !== undefined ? o.doctorPhone : doctorPhone).trim();
+      const activeNextAppt = o.doctorNextAppointment !== undefined ? o.doctorNextAppointment : doctorNextAppointment;
+      const activeApptTime = o.doctorAppointmentTime !== undefined ? o.doctorAppointmentTime : doctorAppointmentTime;
+      const activeLeadOpts = o.doctorApptLeadOptions !== undefined ? o.doctorApptLeadOptions : doctorApptLeadOptions;
+      const activeBloodDate = o.doctorBloodTestDate !== undefined ? o.doctorBloodTestDate : doctorBloodTestDate;
+      const activeNotes = (o.doctorNotes !== undefined ? o.doctorNotes : doctorNotes).trim();
+      const activeAppts = o.appointments !== undefined ? o.appointments : appointments;
       authRequest(serverUrl, '/api/sync', {
         settings: {
-          userName: userName.trim(),
-          doctorName: doctorName.trim(),
-          doctorSpecialty: doctorSpecialty.trim(),
-          doctorHospital: doctorHospital.trim(),
-          doctorPhone: doctorPhone.trim(),
-          doctorNextAppointment,
-          doctorAppointmentTime,
-          doctorApptLeadOptions: JSON.stringify(doctorApptLeadOptions),
-          doctorBloodTestDate,
-          doctorNotes: doctorNotes.trim(),
+          userName: activeUserName,
+          doctorName: activeDocName,
+          doctorSpecialty: activeDocSpecialty,
+          doctorHospital: activeDocHospital,
+          doctorPhone: activeDocPhone,
+          doctorNextAppointment: activeNextAppt,
+          doctorAppointmentTime: activeApptTime,
+          doctorApptLeadOptions: JSON.stringify(activeLeadOpts),
+          doctorBloodTestDate: activeBloodDate,
+          doctorNotes: activeNotes,
           appointments: JSON.stringify(activeAppts),
         }
       }, session).catch(() => {});
@@ -2458,7 +2565,7 @@ function InnerPrototype() {
                 .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')));
               const isEn = language === 'en';
 
-              if (activeAppts.length === 0 && !doctorNextAppointment) {
+              if (activeAppts.length === 0) {
                 return (
                   <div
                     className="proto-appointment-banner empty"

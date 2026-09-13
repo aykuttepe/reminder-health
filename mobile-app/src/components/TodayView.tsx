@@ -107,7 +107,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
 
       {/* Yaklaşan Doktor Randevusu Kartı ve Yönetimi */}
       {(() => {
-        const activeAppts: AppointmentItem[] = (appointments && appointments.length > 0)
+        const activeAppts: AppointmentItem[] = appointments !== undefined
           ? appointments
               .filter(a => !a.completed && a.date)
               .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))

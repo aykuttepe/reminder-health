@@ -1,7 +1,7 @@
 {
-  "version": "0.2.16",
+  "version": "0.2.17",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.16: Tablet ve telefon duyarlı (responsive) tasarım ayrımı, 2 sütunlu ızgara düzeni ve taşma korumaları.",
-  "publishedAt": "2026-09-13T15:05:00Z"
+  "releaseNotes": "v0.2.17: Randevu silme ve veritabanı senkronizasyon kalıcılığı düzeltildi, editör içi silme butonu eklendi.",
+  "publishedAt": "2026-09-13T15:20:00Z"
 }

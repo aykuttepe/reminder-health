@@ -907,7 +907,8 @@ function MainApp() {
           if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
 
           let initialAppointments: AppointmentItem[] = [];
-          if (parsed.appointments) {
+          const hasStoredAppointments = parsed.appointments !== undefined;
+          if (hasStoredAppointments) {
             try {
               const apptsParsed = typeof parsed.appointments === 'string' ? JSON.parse(parsed.appointments) : parsed.appointments;
               if (Array.isArray(apptsParsed)) {
@@ -915,22 +916,22 @@ function MainApp() {
               }
             } catch {}
           }
-          if (initialAppointments.length === 0 && (parsed.doctorNextAppointment || parsed.doctorName)) {
-            // Seamlessly migrate user's existing appointment without data loss
+          if (!hasStoredAppointments && parsed.doctorNextAppointment) {
+            // Seamlessly migrate legacy single-appointment user
             initialAppointments = [{
               id: 'appt-legacy-1',
               doctorName: parsed.doctorName || '',
               specialty: parsed.doctorSpecialty || 'Göz',
               hospital: parsed.doctorHospital || '',
               phone: parsed.doctorPhone || '',
-              date: parsed.doctorNextAppointment || '2026-12-10',
+              date: parsed.doctorNextAppointment,
               time: parsed.doctorAppointmentTime === '09:00' ? '13:00' : (parsed.doctorAppointmentTime || '13:00'),
               leadOptions: parsed.doctorApptLeadOptions || ['1d', '0d'],
               hasBloodTest: !!parsed.doctorBloodTestDate,
-              bloodTestDate: parsed.doctorBloodTestDate || '2026-12-07',
+              bloodTestDate: parsed.doctorBloodTestDate || '',
               bloodTestFasting: true,
               bloodTestTime: '08:30',
-              bloodTestNotes: parsed.doctorNotes || 'Tahlilleri 3 gün öncesinden yaptır',
+              bloodTestNotes: parsed.doctorNotes || '',
               notes: parsed.doctorNotes || '',
               completed: false,
               createdAt: Date.now(),
@@ -938,6 +939,15 @@ function MainApp() {
             }];
           }
           setAppointments(initialAppointments);
+          if (hasStoredAppointments && initialAppointments.length === 0) {
+            setDoctorNextAppointment('');
+            setDoctorBloodTestDate('');
+            setDoctorName('');
+            setDoctorSpecialty('');
+            setDoctorHospital('');
+            setDoctorPhone('');
+            setDoctorNotes('');
+          }
           if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
           if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
           if (parsed.defaultStockThreshold !== undefined) setDefaultStockThreshold(parsed.defaultStockThreshold);
@@ -1599,19 +1609,17 @@ function MainApp() {
         autoCollapseTaken,
         hapticsEnabled,
       };
-      if (userName && userName.trim()) {
-        payloadSettings.userName = userName.trim();
-      }
-      if (doctorName && doctorName.trim()) payloadSettings.doctorName = doctorName.trim();
-      if (doctorSpecialty && doctorSpecialty.trim()) payloadSettings.doctorSpecialty = doctorSpecialty.trim();
-      if (doctorHospital && doctorHospital.trim()) payloadSettings.doctorHospital = doctorHospital.trim();
-      if (doctorPhone && doctorPhone.trim()) payloadSettings.doctorPhone = doctorPhone.trim();
-      if (doctorNextAppointment && doctorNextAppointment.trim()) payloadSettings.doctorNextAppointment = doctorNextAppointment.trim();
-      if (doctorAppointmentTime && doctorAppointmentTime.trim()) payloadSettings.doctorAppointmentTime = doctorAppointmentTime.trim();
-      if (doctorApptLeadOptions && doctorApptLeadOptions.length > 0) payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions);
-      if (doctorBloodTestDate && doctorBloodTestDate.trim()) payloadSettings.doctorBloodTestDate = doctorBloodTestDate.trim();
-      if (doctorNotes && doctorNotes.trim()) payloadSettings.doctorNotes = doctorNotes.trim();
-      if (appointments && appointments.length > 0) payloadSettings.appointments = JSON.stringify(appointments);
+      payloadSettings.userName = (userName || '').trim();
+      payloadSettings.doctorName = (doctorName || '').trim();
+      payloadSettings.doctorSpecialty = (doctorSpecialty || '').trim();
+      payloadSettings.doctorHospital = (doctorHospital || '').trim();
+      payloadSettings.doctorPhone = (doctorPhone || '').trim();
+      payloadSettings.doctorNextAppointment = (doctorNextAppointment || '').trim();
+      payloadSettings.doctorAppointmentTime = doctorAppointmentTime || '13:00';
+      payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions || ['1d', '0d']);
+      payloadSettings.doctorBloodTestDate = (doctorBloodTestDate || '').trim();
+      payloadSettings.doctorNotes = (doctorNotes || '').trim();
+      payloadSettings.appointments = JSON.stringify(appointments || []);
 
       const response = await authRequest(targetUrl, '/api/sync', {
         doses: doses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
@@ -1641,34 +1649,46 @@ function MainApp() {
                 const active = appts.filter(a => !a.completed);
                 const primary = active[0] || appts[0];
                 if (primary) {
-                  if (primary.doctorName) setDoctorName(primary.doctorName);
-                  if (primary.specialty) setDoctorSpecialty(primary.specialty);
-                  if (primary.hospital) setDoctorHospital(primary.hospital);
-                  if (primary.phone) setDoctorPhone(primary.phone);
-                  if (primary.date) setDoctorNextAppointment(primary.date);
-                  if (primary.time) setDoctorAppointmentTime(primary.time);
-                  if (primary.bloodTestDate) setDoctorBloodTestDate(primary.bloodTestDate);
-                  if (primary.notes) setDoctorNotes(primary.notes);
+                  setDoctorName(primary.doctorName || '');
+                  setDoctorSpecialty(primary.specialty || '');
+                  setDoctorHospital(primary.hospital || '');
+                  setDoctorPhone(primary.phone || '');
+                  setDoctorNextAppointment(primary.date || '');
+                  setDoctorAppointmentTime(primary.time || '13:00');
+                  setDoctorApptLeadOptions(primary.leadOptions || ['1d', '0d']);
+                  setDoctorBloodTestDate(primary.bloodTestDate || '');
+                  setDoctorNotes(primary.notes || primary.bloodTestNotes || '');
+                } else {
+                  setDoctorName('');
+                  setDoctorSpecialty('');
+                  setDoctorHospital('');
+                  setDoctorPhone('');
+                  setDoctorNextAppointment('');
+                  setDoctorAppointmentTime('13:00');
+                  setDoctorApptLeadOptions(['1d', '0d']);
+                  setDoctorBloodTestDate('');
+                  setDoctorNotes('');
                 }
               }
             } catch {}
+          } else {
+            if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
+            if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
+            if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
+            if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
+            if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
+            if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
+            if (response.settings.doctorApptLeadOptions !== undefined) {
+              try {
+                const opts = typeof response.settings.doctorApptLeadOptions === 'string'
+                  ? JSON.parse(response.settings.doctorApptLeadOptions)
+                  : response.settings.doctorApptLeadOptions;
+                if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
+              } catch {}
+            }
+            if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
+            if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
           }
-          if (response.settings.doctorName !== undefined && response.settings.doctorName !== '') setDoctorName(response.settings.doctorName);
-          if (response.settings.doctorSpecialty !== undefined && response.settings.doctorSpecialty !== '') setDoctorSpecialty(response.settings.doctorSpecialty);
-          if (response.settings.doctorHospital !== undefined && response.settings.doctorHospital !== '') setDoctorHospital(response.settings.doctorHospital);
-          if (response.settings.doctorPhone !== undefined && response.settings.doctorPhone !== '') setDoctorPhone(response.settings.doctorPhone);
-          if (response.settings.doctorNextAppointment !== undefined && response.settings.doctorNextAppointment !== '') setDoctorNextAppointment(response.settings.doctorNextAppointment);
-          if (response.settings.doctorAppointmentTime !== undefined && response.settings.doctorAppointmentTime !== '') setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
-          if (response.settings.doctorApptLeadOptions !== undefined) {
-            try {
-              const opts = typeof response.settings.doctorApptLeadOptions === 'string'
-                ? JSON.parse(response.settings.doctorApptLeadOptions)
-                : response.settings.doctorApptLeadOptions;
-              if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
-            } catch {}
-          }
-          if (response.settings.doctorBloodTestDate !== undefined && response.settings.doctorBloodTestDate !== '') setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
-          if (response.settings.doctorNotes !== undefined && response.settings.doctorNotes !== '') setDoctorNotes(response.settings.doctorNotes);
           if (response.settings.notifications !== undefined) setNotifications(response.settings.notifications);
           if (response.settings.soundEnabled !== undefined) setSoundEnabled(response.settings.soundEnabled);
           if (response.settings.soundType !== undefined) setSoundType(response.settings.soundType);
@@ -1949,13 +1969,51 @@ function MainApp() {
             setAppointments(updated);
             const activeAppts = updated.filter(a => !a.completed);
             const primary = activeAppts[0] || updated[0];
-            setDoctorNextAppointment(primary?.date || '');
-            setDoctorBloodTestDate(primary?.bloodTestDate || '');
+
+            const newDocName = primary?.doctorName || '';
+            const newDocSpecialty = primary?.specialty || '';
+            const newDocHospital = primary?.hospital || '';
+            const newDocPhone = primary?.phone || '';
+            const newNextAppt = primary?.date || '';
+            const newApptTime = primary?.time || '13:00';
+            const newLeadOptions = primary?.leadOptions || ['1d', '0d'];
+            const newBloodDate = primary?.bloodTestDate || '';
+            const newNotes = primary?.notes || primary?.bloodTestNotes || '';
+
+            setDoctorName(newDocName);
+            setDoctorSpecialty(newDocSpecialty);
+            setDoctorHospital(newDocHospital);
+            setDoctorPhone(newDocPhone);
+            setDoctorNextAppointment(newNextAppt);
+            setDoctorAppointmentTime(newApptTime);
+            setDoctorApptLeadOptions(newLeadOptions);
+            setDoctorBloodTestDate(newBloodDate);
+            setDoctorNotes(newNotes);
+
             syncProfileSettings({
               appointments: updated,
-              doctorNextAppointment: primary?.date || '',
-              doctorBloodTestDate: primary?.bloodTestDate || '',
+              doctorName: newDocName,
+              doctorSpecialty: newDocSpecialty,
+              doctorHospital: newDocHospital,
+              doctorPhone: newDocPhone,
+              doctorNextAppointment: newNextAppt,
+              doctorAppointmentTime: newApptTime,
+              doctorApptLeadOptions: newLeadOptions,
+              doctorBloodTestDate: newBloodDate,
+              doctorNotes: newNotes,
             });
+
+            void syncDoctorAppointmentNotifications({
+              appointments: updated,
+              appointmentDate: newNextAppt,
+              appointmentTime: newApptTime,
+              leadOptions: newLeadOptions,
+              bloodTestDate: newBloodDate,
+              doctorName: newDocName,
+              hospital: newDocHospital,
+              lang: language,
+            });
+
             showToast(language === 'en' ? '🗑️ Appointment deleted' : '🗑️ Randevu silindi');
           },
         },
@@ -1967,7 +2025,53 @@ function MainApp() {
     triggerHaptic();
     const updated = appointments.map(a => a.id === id ? { ...a, completed: !a.completed, updatedAt: Date.now() } : a);
     setAppointments(updated);
-    syncProfileSettings({ appointments: updated });
+    const activeAppts = updated.filter(a => !a.completed);
+    const primary = activeAppts[0];
+
+    const newDocName = primary?.doctorName || '';
+    const newDocSpecialty = primary?.specialty || '';
+    const newDocHospital = primary?.hospital || '';
+    const newDocPhone = primary?.phone || '';
+    const newNextAppt = primary?.date || '';
+    const newApptTime = primary?.time || '13:00';
+    const newLeadOptions = primary?.leadOptions || ['1d', '0d'];
+    const newBloodDate = primary?.bloodTestDate || '';
+    const newNotes = primary?.notes || primary?.bloodTestNotes || '';
+
+    setDoctorName(newDocName);
+    setDoctorSpecialty(newDocSpecialty);
+    setDoctorHospital(newDocHospital);
+    setDoctorPhone(newDocPhone);
+    setDoctorNextAppointment(newNextAppt);
+    setDoctorAppointmentTime(newApptTime);
+    setDoctorApptLeadOptions(newLeadOptions);
+    setDoctorBloodTestDate(newBloodDate);
+    setDoctorNotes(newNotes);
+
+    syncProfileSettings({
+      appointments: updated,
+      doctorName: newDocName,
+      doctorSpecialty: newDocSpecialty,
+      doctorHospital: newDocHospital,
+      doctorPhone: newDocPhone,
+      doctorNextAppointment: newNextAppt,
+      doctorAppointmentTime: newApptTime,
+      doctorApptLeadOptions: newLeadOptions,
+      doctorBloodTestDate: newBloodDate,
+      doctorNotes: newNotes,
+    });
+
+    void syncDoctorAppointmentNotifications({
+      appointments: updated,
+      appointmentDate: newNextAppt,
+      appointmentTime: newApptTime,
+      leadOptions: newLeadOptions,
+      bloodTestDate: newBloodDate,
+      doctorName: newDocName,
+      hospital: newDocHospital,
+      lang: language,
+    });
+
     const target = updated.find(a => a.id === id);
     showToast(target?.completed
       ? (language === 'en' ? '✓ Appointment marked as completed' : '✓ Randevu tamamlandı olarak işaretlendi')
@@ -5161,6 +5265,7 @@ function MainApp() {
           appointment={editingAppointment}
           onClose={() => setAppointmentEditorOpen(false)}
           onSave={handleSaveAppointment}
+          onDelete={handleDeleteAppointment}
           onOpenCalendar={(target, title) => openCalendarPicker(target, title)}
           externalSelectedDate={calendarAppointmentTarget}
           lang={language}
