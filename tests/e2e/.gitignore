@@ -1,0 +1,4 @@
+.venv/
+.appium/
+results/
+__pycache__/

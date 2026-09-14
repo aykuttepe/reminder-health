@@ -1,0 +1,26 @@
+{
+  "name": "reminder-health-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Appium tooling for Reminder Health Android tests",
+  "scripts": {
+    "appium": "node tooling.mjs server",
+    "doctor": "node tooling.mjs doctor",
+    "drivers": "node tooling.mjs drivers",
+    "emulator": "node tooling.mjs emulator",
+    "check:server": ".venv/bin/python -m robot --outputdir results/server server.robot",
+    "test:android": ".venv/bin/python -m robot --outputdir results/android android_smoke.robot",
+    "test:device": ".venv/bin/python -m robot --outputdir results/device android_device_smoke.robot",
+    "test:device-notifications": ".venv/bin/python -m robot --outputdir results/device-notifications android_device_notifications.robot",
+    "test:medication": ".venv/bin/python -m robot --outputdir results/medication medication_flow.robot",
+    "test:persistence": ".venv/bin/python -m robot --outputdir results/persistence medication_persistence.robot",
+    "test:validation": ".venv/bin/python -m robot --outputdir results/validation medication_validation.robot",
+    "test:notification": ".venv/bin/python -m robot --outputdir results/notification notification_test.robot",
+    "test:notification-background": ".venv/bin/python -m robot --outputdir results/notification_background notification_background.robot",
+    "test:all": "npm run check:server && npm run test:android && npm run test:medication && npm run test:persistence && npm run test:validation && npm run test:notification && npm run test:notification-background"
+  },
+  "devDependencies": {
+    "appium": "3.7.0",
+    "appium-uiautomator2-driver": "8.7.0"
+  }
+}
