@@ -183,7 +183,8 @@ için "İlaç İçildi" butonu görünmedi, butona basılmadı: iki senaryo da *
 düzeltmesi telefonda henüz doğrulanmadı. Bir önceki sürümdeki geniş genişletme seçicisi başka bir
 uygulamanın bildirimine tıkladı; seçici artık yalnızca bu uygulamanın hatırlatma satırındaki genişletme
 butonunu hedefler (Samsung'da henüz doğrulanmadı). Aynı koşuda silinen ilaçların tekrar bildirimleri
-gelmeye devam etti; bu hata 0.2.23'te düzeltildi.
+gelmeye devam etti; bu hata düzeltildi ve telefona gidecek sürüm 0.2.24 olarak yayınlandı
+(v0.2.23 etiketi aynı düzeltmeleri içerir; telefona önce silme düzeltmesi olmayan yerel bir 0.2.23 kurulmuştu).
 
 1. Planlı hatırlatma gecikmesi ölçülür, "İlaç İçildi" test stoğunu 30 → 29 yapar, +3 dk tekrar gelmez.
 2. İşaretlenmeyen dozun ilk tekrarı gelir (tekrar ayarının açık olduğunu kanıtlar), uygulama süreci
