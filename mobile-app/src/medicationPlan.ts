@@ -322,6 +322,8 @@ export function normalizeDoseDay(dose: Dose, date = localDateKey()): Dose {
 }
 
 export function isDoseActive(dose: Dose, date: string): boolean {
+  // Deleted medicines stay in the list as sync tombstones and must never be scheduled.
+  if (dose.deletedAt) return false;
   const duration = getDurationInfo(dose, date);
   return !dose.paused && duration.hasStarted && !duration.isExpired && getCycleInfo(dose, date).isActiveToday;
 }

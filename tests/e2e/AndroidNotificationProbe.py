@@ -151,6 +151,101 @@ class AndroidNotificationProbe:
             time.sleep(0.5)
         raise AssertionError("No fresh native test-med-main notification within 15 seconds.")
 
+    @staticmethod
+    def _active_records(dump):
+        """Tag -> post time for this package's active notifications; contents are never read."""
+        section = dump.partition("  Notification List:")[2]
+        if not section:
+            raise AssertionError("Unsupported dumpsys format: Notification List missing.")
+        section = re.split(r"(?m)^  (?=\S)", section, maxsplit=1)[0]
+        records = {}
+        for block in re.split(r"(?m)^    (?=NotificationRecord\()", section):
+            header = block.splitlines()[0] if block.splitlines() else ""
+            tag = re.search(r"tag=(\S+) ", header)
+            stamp = re.search(r"mUpdateTimeMs=(\d+)", block)
+            if f"pkg={AndroidNotificationProbe.PACKAGE} " in header and tag and stamp:
+                records[tag[1]] = int(stamp[1])
+        return records
+
+    def _records(self):
+        return self._active_records(self._shell("dumpsys", "notification"))
+
+    @keyword
+    def phone_schedule_target(self, minutes_ahead=3):
+        """Phone-clock slot at least `minutes_ahead` whole minutes away; refuses to cross midnight."""
+        date, hour, minute, second, epoch = self._shell("date", "+%Y-%m-%d_%H_%M_%S_%s").strip().split("_")
+        hour, minute, second, epoch = int(hour), int(minute), int(second), int(epoch)
+        total = hour * 60 + minute + int(minutes_ahead) + (1 if second > 40 else 0)
+        if total >= 24 * 60 - 5:
+            raise AssertionError("Target slot is too close to midnight; rerun after 00:00.")
+        return {"hour": f"{total // 60:02d}", "minute": f"{total % 60:02d}", "date": date,
+                "time": f"{total // 60:02d}:{total % 60:02d}",
+                "epoch_ms": (epoch - second + (total - hour * 60 - minute) * 60) * 1000}
+
+    @keyword
+    def phone_epoch_ms(self):
+        return self._device_time()
+
+    @keyword
+    def wait_for_phone_reminder(self, date, time_str, slot_epoch_ms, kind="main", keep_awake=True):
+        """Waits for `dose-*-<date>-<time>-<kind>` and returns (tag, post time). Pokes user activity
+        while waiting so the screen does not time out into a PIN lock; no setting is changed."""
+        pattern = re.compile(rf"^dose-.+-{re.escape(date)}-{re.escape(time_str)}-{re.escape(kind)}$")
+        deadline = time.monotonic() + max(30, (int(slot_epoch_ms) - self._device_time()) / 1000 + 120)
+        while time.monotonic() < deadline:
+            matches = {tag: ms for tag, ms in self._records().items() if pattern.match(tag)}
+            if matches:
+                tag, posted = max(matches.items(), key=lambda item: item[1])
+                logger.info(f"Reminder {tag} posted {posted - int(slot_epoch_ms)} ms after its slot.")
+                return tag, posted
+            if keep_awake:
+                self._shell("input", "keyevent", "224")
+            time.sleep(5)
+        raise AssertionError(f"No {kind} reminder for {date} {time_str} was posted.")
+
+    @keyword
+    def only_test_reminder_should_be_active(self, tag):
+        """Refuses to tap an action while a reminder for any other dose/slot is in the shade."""
+        slot = tag.rsplit("-", 1)[0]
+        for suffix in ("-repeat",):
+            if slot.endswith(suffix):
+                slot = slot[: -len(suffix)]
+        records = self._records()
+        ours = [other for other in records if other.startswith(slot + "-")]
+        others = [other for other in records if other not in ours and not other.startswith("test-med")]
+        if not ours:
+            raise AssertionError("The test reminder is no longer active.")
+        if others:
+            raise AssertionError(f"{len(others)} other reminder(s) active; not tapping to protect real doses.")
+
+    @keyword
+    def expand_phone_notification_shade(self):
+        self._shell("cmd", "statusbar", "expand-notifications")
+
+    @keyword
+    def collapse_phone_status_bar(self):
+        self._shell("cmd", "statusbar", "collapse")
+
+    @keyword
+    def phone_reminder_tags(self, pattern="dose-*"):
+        regex = re.compile("^" + re.escape(pattern).replace(r"\*", ".*") + "$")
+        return [tag for tag in self._records() if regex.match(tag)]
+
+    @keyword
+    def kill_reminder_process_on_phone(self):
+        """Background-only kill, like Android reclaiming memory; notifications stay posted."""
+        if self._driver().query_app_state(self.PACKAGE) == 4:
+            raise AssertionError("Refusing to kill Reminder while it is in the foreground.")
+        self._shell("am", "kill", self.PACKAGE)
+        time.sleep(1)
+        if self._pid():
+            raise AssertionError("Reminder process survived am kill.")
+
+    def _pid(self):
+        result = subprocess.run([self.adb, "-s", self.udid, "shell", "pidof", self.PACKAGE],
+                                capture_output=True, text=True, timeout=15)
+        return result.stdout.strip()
+
     @keyword
     def restore_phone_after_notification_test(self):
         if self._locked():

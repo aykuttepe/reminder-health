@@ -46,6 +46,9 @@ import {
   buildNotificationContent,
   addNotificationResponseListener,
   addNotificationReceivedListener,
+  createNotificationResponseGate,
+  takeLaunchNotificationResponse,
+  type NotificationActionResponse,
   URGENT_REPEAT_CHANNEL_ID,
   NOTIFICATION_CATEGORY_MED_ACTIONS,
   ACTION_TAKEN,
@@ -741,6 +744,11 @@ function MainApp() {
   const dosesRef = useRef(doses);
   dosesRef.current = doses;
 
+  // Listeners are registered once; route them through a ref so actions use current settings.
+  const notificationResponseHandler = useRef<(res: NotificationActionResponse) => void>(() => {});
+  const [notificationResponseGate] = useState(() =>
+    createNotificationResponseGate(res => notificationResponseHandler.current(res)));
+
   const soundSettingsRef = useRef({
     enabled: notifications,
     soundEnabled,
@@ -788,6 +796,26 @@ function MainApp() {
     return () => unsub();
   }, []);
 
+  notificationResponseHandler.current = res => {
+    const { actionId, doseId, timeStr, date, isAppointment } = res;
+    if (isAppointment) {
+      if (actionId === ACTION_APPT_DONE || !actionId) {
+        showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
+      }
+      return;
+    }
+    const dose = dosesRef.current.find(d => d.id === doseId);
+    if (!dose) return;
+    const time = timeStr || dose.time;
+    const doseDate = date ?? localDateKey();
+    if (!(dose.times?.length ? dose.times : [dose.time]).includes(time)) return;
+    if (actionId === ACTION_TAKEN || actionId === ACTION_SKIP) {
+      applyRecord(dose.id, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped');
+    } else if (actionId === ACTION_SNOOZE) {
+      void snoozeDose(dose, time, doseDate);
+    }
+  };
+
   // Initialize Notifications and Request Permissions
   useEffect(() => {
     let mounted = true;
@@ -804,25 +832,7 @@ function MainApp() {
       return status === 'taken' || status === 'skipped';
     });
 
-    const removeListener = addNotificationResponseListener(res => {
-      const { actionId, doseId, timeStr, date, isAppointment, title, body } = res;
-      if (isAppointment) {
-        if (actionId === ACTION_APPT_DONE || !actionId) {
-          showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
-        }
-        return;
-      }
-      const dose = dosesRef.current.find(d => d.id === doseId);
-      if (!dose) return;
-      const time = timeStr || dose.time;
-      const doseDate = date ?? localDateKey();
-      if (!(dose.times?.length ? dose.times : [dose.time]).includes(time)) return;
-      if (actionId === ACTION_TAKEN || actionId === ACTION_SKIP) {
-        applyRecord(dose.id, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped');
-      } else if (actionId === ACTION_SNOOZE) {
-        void snoozeDose(dose, time, doseDate);
-      }
-    });
+    const removeListener = addNotificationResponseListener(res => notificationResponseGate.push(res));
 
     const removeReceivedListener = addNotificationReceivedListener(payload => {
       const dose = dosesRef.current.find(d => d.id === payload.doseId);
@@ -990,6 +1000,14 @@ function MainApp() {
     setDoses(previous => previous.map(d => normalizeDoseDay(d, today)));
     setSelectedHistoryDate(today);
   }, [today, hydrated]);
+
+  // Doses are loaded now: replay actions queued during launch, including the one that opened the app.
+  useEffect(() => {
+    if (!hydrated) return;
+    const launchResponse = takeLaunchNotificationResponse();
+    if (launchResponse) notificationResponseGate.push(launchResponse);
+    notificationResponseGate.open();
+  }, [hydrated]);
 
   // Save to Storage
   useEffect(() => {
