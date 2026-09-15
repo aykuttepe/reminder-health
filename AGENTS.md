@@ -83,4 +83,11 @@ When any text-entry control loses focus, dismiss the simulated keyboard. If the 
 - Preserve local `data/` and `server/data/` directories; they are ignored by Git and must not be deleted during checks.
 - Always commit and push changes to Git (GitHub repository `aykuttepe/reminder-health`) whenever the app or server is updated, and tag new releases so that GitHub Releases and the in-app update mechanism stay in sync.
 
+- Notification actions must survive a cold start: responses are queued until stored doses hydrate and the launching response is read once via `takeLaunchNotificationResponse` (`mobile-app/src/notifications.ts`), then handled through a ref so the current language and haptics settings apply. Android had killed the app in the Samsung test and the taps were silently dropped before this.
+- Deleted medicines stay in the list as sync tombstones; `isDoseActive` refuses them so the planner cannot keep reminding for 30 days after deletion. Already posted notifications are not dismissed by deletion.
+- History lists past days' planned but unmarked doses as "Kaydedilmedi" with "Aldım"/"Atladım" (`buildHistorySlots`, `includeUnrecorded`). Without this a record reverted after midnight vanished from every screen. Today's pending doses stay out of History because the Today tab already lists them.
+- Recorded rows expose correction as a muted "Düzelt" label next to the status icon plus one hint above the list; the repeated per-row sentence read as part of the record. The confirmation dialog keeps the "Yanlış işaretledim" wording. E2E suites tap these rows by their `Kaydı düzelt` accessibility label.
+- Marking a past dose taken debits stock at the moment of marking, not on the dose's own date; there is no date-aware stock correction yet.
+- Version 0.2.26 is committed but deliberately not tagged: the owner asked to accumulate History work before the next release. Releases up to v0.2.25 are published, and it was installed on the phone over USB.
+
 - Native networking uses the React Native XMLHttpRequest-backed fetch installed in `mobile-app/src/networking.ts` after Expo initialization. Keep this bootstrap before App imports; do not rely solely on an environment flag for release builds.

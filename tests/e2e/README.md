@@ -3,6 +3,22 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Geçmiş ekranı düzeltmeleri — 16 Eylül 2026 (v0.2.25, v0.2.26)
+
+- **v0.2.25:** Gece yarısından sonra Geçmiş ekranından geri alınan dün dozu hiçbir ekranda görünmüyordu
+  (Bugün yalnızca bugünü listeler, Geçmiş "bekliyor" satırlarını eliyordu). Geçmiş günler artık o günün
+  planlı ama işaretlenmemiş dozlarını "Kaydedilmedi" olarak "Aldım"/"Atladım" düğmeleriyle gösteriyor.
+  Satır üretimi `medicationPlan.buildHistorySlots` içine taşındı; **3 yeni birim testi** (duraklatılmış,
+  süresi bitmiş, gün aşırı ve silinmiş ilaçlar kayıtsız satır üretmez; bugünün bekleyen dozları Geçmiş'te
+  tekrarlanmaz). Emulator `test:all` zinciri **11/11 passed**.
+- **v0.2.26:** Alınan doz satırlarındaki yeşil "Yanlış işaretledim" yazısı durum bilgisi gibi okunuyordu;
+  yerine durum simgesinin yanında soluk "Düzelt" etiketi ve liste başında tek ipucu geldi. Onay penceresinin
+  başlığı aynı kaldı. `medication_undo.robot` ve `notification_actions.robot` artık satırın
+  `Kaydı düzelt` erişilebilirlik etiketine dokunuyor: **1/1** ve **3/3 passed** (soğuk açılış dahil).
+- Her iki sürümde mobil birim testleri **35/35**, kök paket **67/67**, typecheck ve runtime bütünlük
+  kontrolü (28 dosya) geçti. Veri biçimi değişmedi: kayıtlar mevcut `doseRecords` yapısına yazılır,
+  sunucu şeması (user_version 4) ve `server/` kodu değişmedi.
+
 ## Bildirim aksiyonları ve gerçek plan saati — 15 Eylül 2026 (v0.2.22)
 
 - Android **15 / API 35** (`emulator-5554`), kurulu **0.2.22 / versionCode 23**. Tüm senaryolar
