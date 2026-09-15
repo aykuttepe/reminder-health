@@ -1,7 +1,7 @@
 {
-  "version": "0.2.25",
+  "version": "0.2.26",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.25: Geçmiş ekranı artık o günün kaydedilmemiş dozlarını da gösteriyor; geri alınan bir kayıt kaybolmuyor, \"Aldım\" veya \"Atladım\" ile düzeltilebiliyor.",
-  "publishedAt": "2026-09-15T23:20:00Z"
+  "releaseNotes": "v0.2.26: Alınan doz satırlarındaki \"Yanlış işaretledim\" yazısı, sağdaki küçük \"Düzelt\" düğmesiyle değiştirildi; liste başında tek bir ipucu gösteriliyor.",
+  "publishedAt": "2026-09-16T00:00:00Z"
 }

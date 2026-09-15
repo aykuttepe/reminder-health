@@ -484,6 +484,11 @@ export const TodayView: React.FC<TodayViewProps> = ({
       {/* Taken doses list */}
       {expandedTaken && takenSlots.length > 0 && (
         <View style={styles.takenList}>
+          <Text style={styles.listHint}>
+            {language === 'en'
+              ? 'Tap a record to correct it.'
+              : 'Bir kaydı düzeltmek için üzerine dokunun.'}
+          </Text>
           {takenSlots.map((slot) => (
             <TouchableOpacity key={slot.slotId} style={styles.doseRow}
               testID={`revert-today-${slot.slotId}`} accessibilityRole="button"
@@ -497,11 +502,14 @@ export const TodayView: React.FC<TodayViewProps> = ({
                 <Text style={styles.doseRowSub}>
                   {slot.todayAmount} · {getMealLabel(slot.dose.mealCondition)} · {language === 'en' ? 'Taken' : 'Alındı'}
                 </Text>
-                <Text style={{ color: '#a9dfca', fontSize: 13, marginTop: 6 }}>
-                  {language === 'en' ? 'Marked by mistake' : 'Yanlış işaretledim'}
-                </Text>
               </View>
-              <Ionicons name="checkmark-circle" size={22} color="#a9dfca" />
+              <View style={styles.rowTrailing}>
+                <Ionicons name="checkmark-circle" size={22} color="#a9dfca" />
+                <View style={styles.correctChip}>
+                  <Ionicons name="create-outline" size={12} color="#adb3bf" />
+                  <Text style={styles.correctChipText}>{language === 'en' ? 'Correct' : 'Düzelt'}</Text>
+                </View>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -713,6 +721,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#101d29',
     borderRadius: 10,
     paddingHorizontal: 12,
+  },
+  rowTrailing: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  correctChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  correctChipText: {
+    color: '#adb3bf',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  listHint: {
+    color: '#8899a8',
+    fontSize: 12,
+    paddingTop: 10,
   },
   appointmentBanner: {
     backgroundColor: '#101d29',

@@ -82,6 +82,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             })}
       </Text>
 
+      {historySlots.some((slot) => slot.status !== 'pending') && (
+        <Text style={styles.listHint}>
+          {language === 'en'
+            ? 'Tap a record to correct it.'
+            : 'Bir kaydı düzeltmek için üzerine dokunun.'}
+        </Text>
+      )}
+
       {historySlots.length > 0 ? (
         historySlots.map((slot) => slot.status === 'pending' ? (
           <View key={slot.slotId} style={styles.doseRow} testID={`record-history-${slot.slotId}`}>
@@ -130,15 +138,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                   ? 'Skipped'
                   : 'Atlandı'}
               </Text>
-              <Text style={{ color: '#a9dfca', fontSize: 13, marginTop: 6 }}>
-                {language === 'en' ? 'Marked by mistake' : 'Yanlış işaretledim'}
-              </Text>
             </View>
-            <Ionicons
-              name={slot.status === 'taken' ? 'checkmark-circle' : 'close-circle'}
-              size={20}
-              color={slot.status === 'taken' ? '#a9dfca' : '#e6ba93'}
-            />
+            <View style={styles.rowTrailing}>
+              <Ionicons
+                name={slot.status === 'taken' ? 'checkmark-circle' : 'close-circle'}
+                size={20}
+                color={slot.status === 'taken' ? '#a9dfca' : '#e6ba93'}
+              />
+              <View style={styles.correctChip}>
+                <Ionicons name="create-outline" size={12} color="#adb3bf" />
+                <Text style={styles.correctChipText}>{language === 'en' ? 'Correct' : 'Düzelt'}</Text>
+              </View>
+            </View>
           </TouchableOpacity>
         ))
       ) : (
@@ -275,6 +286,25 @@ const styles = StyleSheet.create({
     color: '#e6ba93',
     fontSize: 13,
     fontWeight: '600',
+  },
+  rowTrailing: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  correctChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  correctChipText: {
+    color: '#adb3bf',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  listHint: {
+    color: '#8899a8',
+    fontSize: 12,
+    marginBottom: 6,
   },
   quietEmpty: {
     color: '#adb3bf',

@@ -37,8 +37,8 @@ Taken Action Records Dose Reduces Stock And Can Be Undone
     Click Element    ${TAB_TODAY}
     Wait Until Page Contains Element    android=new UiSelector().textContains("Alınan Dozlar")    15s
     Click Element    android=new UiSelector().textContains("Alınan Dozlar")
-    Wait Until Page Contains Element    android=new UiSelector().text("Yanlış işaretledim")    10s
-    Click Element    android=new UiSelector().text("Yanlış işaretledim")
+    Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)    10s
+    Click Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)
     Wait Until Page Contains    Bu kayıt geri alınacak    10s
     Click Element    android=new UiSelector().resourceId("android:id/button1")
     Stock Should Be    30
