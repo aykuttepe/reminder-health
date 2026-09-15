@@ -27,7 +27,7 @@ function load(root, file, mocks = {}) {
       if(name in mocks)return mocks[name];
       if(name==='uuid')return uuid;
       if(name==='expo-crypto')return {randomUUID:uuid.v4};
-      return load(root,name+'.ts',mocks);
+      return load(root,name.endsWith('.ts') ? name : name+'.ts',mocks);
     }
   },{filename});
   return exports;

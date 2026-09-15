@@ -727,6 +727,8 @@ export function buildMedicationSchedule(
       for (const time of new Set(dose.times?.length ? dose.times : [dose.time])) {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) continue;
         if (slotStatus(dose, time, date) !== 'pending') continue;
+        // Correcting yesterday must not generate a new cross-midnight reminder today.
+        if (date < today && dose.doseRecords?.[date]?.[time]?.status === 'pending') continue;
         if (snoozedSlots.has(`${dose.id}|${date}|${time}`)) continue;
         const slotAmount = (dose.slotAmounts?.[time]?.trim()) || getCycleInfo(dose, date).todayAmount;
         const [hour, minute] = time.split(':').map(Number);

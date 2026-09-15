@@ -55,6 +55,15 @@ const dose = (patch = {}) => ({ id: 1, name: 'İlaç A', amount: '1 tablet', tim
 const options = { enabled: true, privateMode: false, repeatNagEnabled: true, repeatNagCount: 3 };
 const dayRequests = (requests, day) => requests.filter(r => r.content.data.date === day);
 
+test('correcting yesterday never schedules a fresh reminder today for the corrected slot', () => {
+  const api = setup('2026-09-08T00:01:00');
+  const taken = api.updateDoseSlot(dose({ time: '23:59', stock: 20 }), '23:59', '2026-09-07', 'taken');
+  const corrected = api.updateDoseSlot(taken, '23:59', '2026-09-07', 'pending');
+  const requests = api.buildMedicationSchedule([corrected], options, api.now());
+  assert.equal(dayRequests(requests, '2026-09-07').length, 0);
+  assert.ok(dayRequests(requests, '2026-09-08').length > 0);
+});
+
 test('partial scheduling reports only confirmed alarms and retries missing requests', async () => {
   const api = setup();
   const schedule = api.native.scheduleNotificationAsync;
@@ -356,4 +365,3 @@ test('calculateStockProjection correctly estimates daily consumption, remaining 
   assert.equal(pGood.daysRemaining, 30);
   assert.equal(pGood.statusTier, 'good');
 });
-

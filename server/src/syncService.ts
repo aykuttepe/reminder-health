@@ -1,7 +1,8 @@
+import { assertDoseRecords, mergeDoseRecords, materializeDoseRecords } from './doseRecords.js';
 import { RutinDatabase } from './db.js';
 import { doseId, HttpError } from './identity.js';
 const settingKeys = new Set(['userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language','doctorName','doctorSpecialty','doctorHospital','doctorPhone','doctorNextAppointment','doctorNotes','doctorAppointmentTime','doctorApptLeadOptions','doctorBloodTestDate','appointments']);
-const doseKeys = new Set(['id','name','amount','time','times','slotAmounts','status','paused','snooze','mealCondition','form','instructions','stock','stockThreshold','defaultStock','frequencyType','cyclePhase1Days','cyclePhase1Amount','cyclePhase2Days','cyclePhase2Amount','cycleStartDate','durationMode','durationDays','startDate','endDate','statusDate','slotStatuses','dailyStatuses','gtin','expiryDate','updatedAt','deletedAt']);
+const doseKeys = new Set(['id','name','amount','time','times','slotAmounts','status','paused','snooze','mealCondition','form','instructions','stock','stockThreshold','defaultStock','frequencyType','cyclePhase1Days','cyclePhase1Amount','cyclePhase2Days','cyclePhase2Amount','cycleStartDate','durationMode','durationDays','startDate','endDate','statusDate','slotStatuses','dailyStatuses','doseRecords','gtin','expiryDate','updatedAt','deletedAt']);
 function record(value: any) { return !!value && typeof value === 'object' && !Array.isArray(value); }
 export class SyncService {
   constructor(private db: RutinDatabase) {}
@@ -15,6 +16,9 @@ export class SyncService {
       let id: string;
       try { id = doseId(userId, d.id); } catch { throw new HttpError(400, 'Geçersiz ilaç kimliği.'); }
       for (const key of ['updatedAt','deletedAt']) if (d[key] != null && (!Number.isSafeInteger(d[key]) || d[key] < 0)) throw new HttpError(400, 'Geçersiz kayıt zamanı.');
+      if (d.doseRecords !== undefined) {
+        try { assertDoseRecords(d.doseRecords); } catch { throw new HttpError(400, 'Geçersiz doz kayıtları.'); }
+      }
       const clean = Object.fromEntries(Object.entries(d).filter(([k]) => doseKeys.has(k)));
       return { ...clean, id, updatedAt: d.updatedAt || Date.now() } as any;
     });
@@ -49,8 +53,10 @@ export class SyncService {
             merged.slotStatuses = older.statusDate === newest.statusDate ? combine(older.slotStatuses, newest.slotStatuses) : newest.slotStatuses;
             merged.dailyStatuses = { ...older.dailyStatuses, ...newest.dailyStatuses };
             for (const day of Object.keys(older.dailyStatuses || {})) merged.dailyStatuses[day] = combine(older.dailyStatuses[day], newest.dailyStatuses?.[day]);
+            merged.doseRecords = mergeDoseRecords(older.doseRecords, newest.doseRecords);
           }
         }
+        if (!merged.deletedAt && merged.doseRecords) merged = materializeDoseRecords(merged);
         this.db.saveDose(userId, merged); current.set(merged.id, merged);
       }
       const existingLearned = this.db.getAllLearnedMeds(userId);

@@ -17,7 +17,8 @@
     "test:validation": ".venv/bin/python -m robot --outputdir results/validation medication_validation.robot",
     "test:notification": ".venv/bin/python -m robot --outputdir results/notification notification_test.robot",
     "test:notification-background": ".venv/bin/python -m robot --outputdir results/notification_background notification_background.robot",
-    "test:all": "npm run check:server && npm run test:android && npm run test:medication && npm run test:persistence && npm run test:validation && npm run test:notification && npm run test:notification-background"
+    "test:undo": ".venv/bin/python -m robot --outputdir results/undo medication_undo.robot",
+    "test:all": "npm run check:server && npm run test:android && npm run test:medication && npm run test:undo && npm run test:persistence && npm run test:validation && npm run test:notification && npm run test:notification-background"
   },
   "devDependencies": {
     "appium": "3.7.0",

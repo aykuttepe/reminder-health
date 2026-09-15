@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from '../mobile-app/node_modules/typescript/lib/typescript.js';
+import * as doseRecords from '../mobile-app/src/doseRecords.ts';
 
 function setup(platform = 'android') {
   const requests = [];
@@ -36,6 +37,7 @@ function setup(platform = 'android') {
   context.require=name=>{
     if(name==='react-native')return {Platform:{OS:platform}};
     if(name==='whatwg-fetch')return polyfill;
+    if(name==='./doseRecords.ts')return doseRecords;
     throw Error(name);
   };
   function load(file){

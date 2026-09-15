@@ -166,7 +166,7 @@ test('catalog lookup resolves GTIN barcodes and text search without authenticati
   // 5. Version endpoint
   const resVersion = await call('/api/version');
   assert.equal(resVersion.r.status, 200);
-  assert.equal(resVersion.data.version, '0.2.3');
+  assert.equal(resVersion.data.version, '0.2.5');
   assert.equal(resVersion.data.apkUrl, '/app-release.apk');
 });
 

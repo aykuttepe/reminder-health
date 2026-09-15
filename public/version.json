@@ -1,7 +1,7 @@
 {
-  "version": "0.2.21",
+  "version": "0.2.22",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.21: Sunucu bağlantısı ve senkronizasyon güvenilirliği iyileştirildi; timeout ve oturum geçişleri daha kararlı hale getirildi.",
-  "publishedAt": "2026-09-13T20:25:35Z"
+  "releaseNotes": "v0.2.22: Yanlış işaretlenen dozlar için 10 saniyelik geri alma, Bugün ve Geçmiş ekranlarından kayıt düzeltme; stok iadesi ve eşitleme koruması.",
+  "publishedAt": "2026-09-15T18:00:00Z"
 }

@@ -1,3 +1,5 @@
+import { validDoseRecord, type DoseRecords } from './doseRecords';
+
 export function localDateKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -39,6 +41,7 @@ export type Dose = {
   endDate?: string;
   statusDate?: string;
   dailyStatuses?: Record<string, Record<string, Dose['status']>>;
+  doseRecords?: DoseRecords;
   slotStatuses?: Record<string, 'pending' | 'taken' | 'skipped'>;
   gtin?: string;
   expiryDate?: string;
@@ -299,6 +302,8 @@ export function getCycleInfo(dose: Dose, targetDateStr = localDateKey(), lang: '
 }
 
 export function slotStatus(dose: Dose, time: string, date = localDateKey()): Dose['status'] {
+  const record = dose.doseRecords?.[date]?.[time];
+  if (validDoseRecord(record)) return record.status;
   if (dose.statusDate !== date) return dose.dailyStatuses?.[date]?.[time] ?? 'pending';
   return dose.slotStatuses?.[time] ?? (time === dose.time ? dose.status : 'pending');
 }
@@ -329,14 +334,22 @@ export function getSlotAmount(dose: Dose, time: string, date = localDateKey()): 
 }
 
 export function updateDoseSlot(dose: Dose, time: string, date: string, status: Dose['status']): Dose {
-  const current = {...normalizeDoseDay(dose), updatedAt: Date.now()};
+  if (dose.deletedAt || slotStatus(dose, time, date) === status) return dose;
+  const stamp = Math.max(Date.now(), (dose.updatedAt ?? 0) + 1,
+    (dose.doseRecords?.[date]?.[time]?.updatedAt ?? 0) + 1);
+  const current = {...normalizeDoseDay(dose), updatedAt: stamp};
   const previous = slotStatus(current, time, date);
   const slotAmtStr = (current.slotAmounts?.[time]?.trim())
     ? current.slotAmounts[time].trim()
     : getCycleInfo(current, date).todayAmount;
   const amount = parseDoseAmount(slotAmtStr);
-  const delta = (previous === 'taken' ? amount : 0) - (status === 'taken' ? amount : 0);
-  const stock = Math.max(0, Math.round(((current.stock ?? 0) + delta) * 10) / 10);
+  const saved = current.doseRecords?.[date]?.[time];
+  const refunded = previous === 'taken' ? (validDoseRecord(saved) ? saved.stockDebited : amount) : 0;
+  const available = Math.max(0, (current.stock ?? 0) + refunded);
+  const stockDebited = status === 'taken' ? Math.min(available, amount) : 0;
+  const stock = Math.round((available - stockDebited) * 10) / 10;
+  current.doseRecords = { ...current.doseRecords, [date]: { ...current.doseRecords?.[date],
+    [time]: { status, updatedAt: stamp, stockDebited } } };
   if (date !== current.statusDate) {
     return { ...current, stock, dailyStatuses: { ...current.dailyStatuses,
       [date]: { ...current.dailyStatuses?.[date], [time]: status } } };
@@ -446,4 +459,3 @@ export function calculateStockProjection(
     progressPercent,
   };
 }
-

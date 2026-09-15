@@ -20,6 +20,7 @@ export interface HistoryViewProps {
   selectedHistoryDate: string;
   setSelectedHistoryDate: (date: string) => void;
   historySlots: Pick<ScheduledSlot, 'dose' | 'time' | 'status' | 'todayAmount' | 'slotId'>[];
+  onRevertRecord: (slot: HistoryViewProps['historySlots'][number]) => void;
   takenSlots: ScheduledSlot[];
   todaySlots: ScheduledSlot[];
   today: string;
@@ -32,6 +33,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   selectedHistoryDate,
   setSelectedHistoryDate,
   historySlots,
+  onRevertRecord,
   takenSlots,
   todaySlots,
   today,
@@ -79,7 +81,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
       {historySlots.length > 0 ? (
         historySlots.map((slot) => (
-          <View key={slot.slotId} style={styles.doseRow}>
+          <TouchableOpacity key={slot.slotId} style={styles.doseRow}
+            testID={`revert-history-${slot.slotId}`} accessibilityRole="button"
+            accessibilityLabel={`${slot.dose.name}, ${slot.time}, ${language === 'en' ? 'Correct record' : 'Kaydı düzelt'}`}
+            onPress={() => onRevertRecord(slot)}>
             <Text style={styles.doseRowTime}>{slot.time}</Text>
             <View style={styles.doseRowMain}>
               <Text style={styles.doseRowName}>{slot.dose.name}</Text>
@@ -93,13 +98,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                   ? 'Skipped'
                   : 'Atlandı'}
               </Text>
+              <Text style={{ color: '#a9dfca', fontSize: 13, marginTop: 6 }}>
+                {language === 'en' ? 'Marked by mistake' : 'Yanlış işaretledim'}
+              </Text>
             </View>
             <Ionicons
               name={slot.status === 'taken' ? 'checkmark-circle' : 'close-circle'}
               size={20}
               color={slot.status === 'taken' ? '#a9dfca' : '#e6ba93'}
             />
-          </View>
+          </TouchableOpacity>
         ))
       ) : (
         <Text style={styles.quietEmpty}>

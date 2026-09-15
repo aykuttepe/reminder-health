@@ -2,6 +2,8 @@
  * Rutin Çevrimdışı Öncelikli (Offline-First) Akıllı Senkronizasyon ve Yedekleme Motoru.
  */
 
+import { mergeDoseRecords, type DoseRecords } from './doseRecords.ts';
+
 export interface SyncDose {
   id: string | number;
   name: string;
@@ -29,6 +31,7 @@ export interface SyncDose {
   statusDate?: string;
   slotStatuses?: Record<string, 'pending' | 'taken' | 'skipped'>;
   dailyStatuses?: Record<string, Record<string, 'pending' | 'taken' | 'skipped'>>;
+  doseRecords?: DoseRecords;
   gtin?: string;
   expiryDate?: string;
   updatedAt?: number; // Epoch ms timestamp
@@ -139,6 +142,20 @@ export function smartMergeDoses(
       mergedDailyStatuses[day] = merged;
     }
     base.dailyStatuses = mergedDailyStatuses;
+    base.doseRecords = mergeDoseRecords(local.doseRecords, remote.doseRecords);
+    for (const [date, slots] of Object.entries(base.doseRecords)) {
+      for (const [time, record] of Object.entries(slots)) {
+        if (date === base.statusDate) {
+          base.slotStatuses = { ...base.slotStatuses, [time]: record.status };
+        } else {
+          base.dailyStatuses[date] = { ...base.dailyStatuses[date], [time]: record.status };
+        }
+      }
+    }
+    if (base.statusDate && base.slotStatuses) {
+      base.status = (base.times?.length ? base.times : [base.time])
+        .every(time => base.slotStatuses?.[time] === 'taken') ? 'taken' : 'pending';
+    }
     map.set(base.id, base);
   }
 

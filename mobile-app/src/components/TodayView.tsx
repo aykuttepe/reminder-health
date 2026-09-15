@@ -34,6 +34,7 @@ export interface TodayViewProps {
   takeSlot: (slot: ScheduledSlot) => void;
   snoozeDose: (dose: Dose, time: string, today: string, minutes: number) => void;
   skipSlot: (slot: ScheduledSlot) => void;
+  onRevertRecord: (slot: ScheduledSlot) => void;
   triggerHaptic: () => void;
   openEditor: (dose?: Dose) => void;
   onNavigateSettings: () => void;
@@ -76,6 +77,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
   takeSlot,
   snoozeDose,
   skipSlot,
+  onRevertRecord,
   triggerHaptic,
   openEditor,
   onNavigateSettings,
@@ -483,7 +485,10 @@ export const TodayView: React.FC<TodayViewProps> = ({
       {expandedTaken && takenSlots.length > 0 && (
         <View style={styles.takenList}>
           {takenSlots.map((slot) => (
-            <View key={slot.slotId} style={styles.doseRow}>
+            <TouchableOpacity key={slot.slotId} style={styles.doseRow}
+              testID={`revert-today-${slot.slotId}`} accessibilityRole="button"
+              accessibilityLabel={`${slot.dose.name}, ${slot.time}, ${language === 'en' ? 'Correct record' : 'Kaydı düzelt'}`}
+              onPress={() => onRevertRecord(slot)}>
               <Text style={[styles.doseRowTime, { color: '#627282' }]}>{slot.time}</Text>
               <View style={styles.doseRowMain}>
                 <Text style={[styles.doseRowName, { color: '#8899a8', textDecorationLine: 'line-through' }]}>
@@ -492,9 +497,12 @@ export const TodayView: React.FC<TodayViewProps> = ({
                 <Text style={styles.doseRowSub}>
                   {slot.todayAmount} · {getMealLabel(slot.dose.mealCondition)} · {language === 'en' ? 'Taken' : 'Alındı'}
                 </Text>
+                <Text style={{ color: '#a9dfca', fontSize: 13, marginTop: 6 }}>
+                  {language === 'en' ? 'Marked by mistake' : 'Yanlış işaretledim'}
+                </Text>
               </View>
               <Ionicons name="checkmark-circle" size={22} color="#a9dfca" />
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}

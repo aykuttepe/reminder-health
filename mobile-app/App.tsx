@@ -66,6 +66,7 @@ import { AppointmentEditorModal } from './src/components/AppointmentEditorModal'
 import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
+import { changeDoseRecord, undoDoseRecord } from './src/doseUndo';
 import { CatalogMedicine } from './src/data/medCatalog';
 import { checkForAppUpdates, UpdateCheckResult, CURRENT_APP_VERSION } from './src/updateChecker';
 import {
@@ -376,7 +377,10 @@ function MainApp() {
   const [durationDays, setDurationDays] = useState<string>('7');
   const [startDate, setStartDate] = useState<string>(localDateKey);
   const [toastText, setToastText] = useState<string | null>(null);
-  const [previousState, setPreviousState] = useState<Dose[] | null>(null);
+  const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accountEpoch = useRef(0);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // ITS Barcode & Camera Scanner State
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -814,12 +818,7 @@ function MainApp() {
       const doseDate = date ?? localDateKey();
       if (!(dose.times?.length ? dose.times : [dose.time]).includes(time)) return;
       if (actionId === ACTION_TAKEN || actionId === ACTION_SKIP) {
-        cancelDoseRepeatNotifications(dose.id, time, doseDate).catch(console.error);
-        setDoses(previous => previous.map(d => d.id === dose.id
-          ? updateDoseSlot(d, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped') : d));
-        showToast(actionId === ACTION_TAKEN
-          ? (language === 'en' ? '✅ Dose confirmed as taken' : '✅ İlaç bildirimi onaylandı')
-          : (language === 'en' ? 'Dose skipped' : 'İlaç atlandı'));
+        applyRecord(dose.id, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped');
       } else if (actionId === ACTION_SNOOZE) {
         void snoozeDose(dose, time, doseDate);
       }
@@ -1303,32 +1302,62 @@ function MainApp() {
   }).filter(slot => slot.status !== 'pending').sort((a, b) => a.time.localeCompare(b.time));
 
 
-  const showToast = (text: string, prev?: Dose[]) => {
+  const showToast = (text: string, undo?: () => void) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToastText(text);
-    if (prev) setPreviousState(prev);
-    setTimeout(() => setToastText(null), 4000);
+    setUndoAction(() => undo ?? null);
+    toastTimer.current = setTimeout(() => { setToastText(null); setUndoAction(null); }, undo ? 10000 : 4000);
   };
 
-  const changeDose = (id: string | number, patch: Partial<Dose>, msg: string) => {
-    const prev = doses;
-    setDoses(ds => ds.map(d => d.id === id ? { ...d, ...patch, updatedAt: Date.now() } : d));
-    showToast(msg, prev);
-  };
-
-  const applySlot = (slot: ScheduledSlot, status: Dose['status']) => {
+  const applyRecord = (doseId: Dose['id'], time: string, date: string, status: Dose['status'], offerUndo = true) => {
+    if (switchingAccount.current) return;
+    const dose = dosesRef.current.find(item => item.id === doseId && !item.deletedAt);
+    if (!dose) return;
+    const result = changeDoseRecord(dosesRef.current, doseId, date, time, status);
+    if (!result.undo) return;
     triggerHaptic();
-    const previous = doses;
-    const date = localDateKey();
-    logger.breadcrumb(`Doz eylemi: ${slot.dose.name} (${slot.time}) -> ${status}`);
-    setDoses(current => current.map(d => d.id === slot.doseId ? updateDoseSlot(d, slot.time, date, status) : d));
-    if (status !== 'pending') cancelDoseRepeatNotifications(slot.doseId, slot.time).catch(err => {
-      logger.warn('Notifications', `Tekrar bildirimi iptal edilemedi: ${slot.dose.name}`, { error: String(err) });
+    dosesRef.current = result.doses;
+    setDoses(result.doses);
+    if (status !== 'pending') cancelDoseRepeatNotifications(doseId, time, date).catch(err => {
+      logger.warn('Notifications', 'Tekrar bildirimi iptal edilemedi', { error: String(err) });
     });
-    showToast(`${slot.dose.name} (${slot.time}) ${status === 'taken' ? (language === 'en' ? 'taken' : 'alındı') : status === 'skipped' ? (language === 'en' ? 'skipped' : 'atlandı') : (language === 'en' ? 'record reverted' : 'kaydı geri alındı')}`, previous);
+    const token = result.undo;
+    const epoch = accountEpoch.current;
+    showToast(`${dose.name} (${time}) ${status === 'taken' ? (language === 'en' ? 'marked as taken' : 'alındı olarak işaretlendi') : status === 'skipped' ? (language === 'en' ? 'skipped' : 'atlandı') : (language === 'en' ? 'record reverted' : 'kaydı geri alındı')}`, offerUndo ? () => {
+      if (accountEpoch.current !== epoch || switchingAccount.current) return;
+      const next = undoDoseRecord(dosesRef.current, token);
+      if (next === dosesRef.current) {
+        showToast(language === 'en' ? 'This record changed. Check History.' : 'Bu kayıt değişmiş. Geçmiş ekranından kontrol edin.');
+        return;
+      }
+      dosesRef.current = next;
+      setDoses(next);
+      showToast(language === 'en' ? 'Record reverted; stock corrected.' : 'Kayıt geri alındı; stok düzeltildi.');
+    } : undefined);
   };
-  const takeSlot = (slot: ScheduledSlot) => applySlot(slot, 'taken');
-  const skipSlot = (slot: ScheduledSlot) => applySlot(slot, 'skipped');
-  const revertSlot = (slot: ScheduledSlot) => applySlot(slot, 'pending');
+  const takeSlot = (slot: ScheduledSlot) => applyRecord(slot.doseId, slot.time, localDateKey(), 'taken');
+  const skipSlot = (slot: ScheduledSlot) => applyRecord(slot.doseId, slot.time, localDateKey(), 'skipped');
+  const confirmRevertRecord = (doseId: Dose['id'], time: string, date: string) => {
+    const dose = dosesRef.current.find(item => item.id === doseId && !item.deletedAt);
+    if (!dose || slotStatus(dose, time, date) === 'pending') return;
+    const epoch = accountEpoch.current;
+    const expected = dose.doseRecords?.[date]?.[time]?.updatedAt;
+    const expectedStatus = slotStatus(dose, time, date);
+    Keyboard.dismiss();
+    Alert.alert(language === 'en' ? 'Marked by mistake' : 'Yanlış işaretledim',
+      `${dose.name}\n${formatLocalizedDate(date, language)} · ${time}\n\n${language === 'en'
+        ? 'This record will be reverted and stock corrected. This only changes the app record.'
+        : 'Bu kayıt geri alınacak, stok düzeltilecek. Bu işlem yalnızca uygulamadaki kaydı değiştirir.'}`,
+      [{ text: t.cancel, style: 'cancel' }, { text: language === 'en' ? 'Revert record' : 'Kaydı geri al', onPress: () => {
+        if (epoch !== accountEpoch.current || switchingAccount.current) return;
+        const latest = dosesRef.current.find(item => item.id === doseId && !item.deletedAt);
+        if (!latest || slotStatus(latest, time, date) !== expectedStatus || latest.doseRecords?.[date]?.[time]?.updatedAt !== expected) {
+          showToast(language === 'en' ? 'This record changed. Please check again.' : 'Bu kayıt değişmiş. Tekrar kontrol edin.');
+          return;
+        }
+        applyRecord(doseId, time, date, 'pending', false);
+      } }]);
+  };
 
   const updateStock = (id: string | number, newStock: number) => {
     triggerHaptic();
@@ -1497,10 +1526,15 @@ function MainApp() {
           style: 'destructive',
           onPress: () => {
             logger.breadcrumb(`İlaç silindi: id=${id}`);
-            const prev = doses;
-            setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt: Date.now(), updatedAt: Date.now() } : d));
+            const deletedAt = Date.now();
+            const epoch = accountEpoch.current;
+            setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt, updatedAt: deletedAt } : d));
             setEditorOpen(false);
-            showToast(t.toastMedDeleted, prev);
+            showToast(t.toastMedDeleted, () => {
+              if (accountEpoch.current !== epoch || switchingAccount.current) return;
+              setDoses(ds => ds.map(d => d.id === id && d.deletedAt === deletedAt
+                ? { ...d, deletedAt: undefined, updatedAt: Date.now() } : d));
+            });
           },
         },
       ]
@@ -1539,6 +1573,9 @@ function MainApp() {
 
   const bindAccount = async (next: Session) => {
     switchingAccount.current = true;
+    accountEpoch.current += 1;
+    setToastText(null);
+    setUndoAction(null);
     try {
       const before = doses;
       const snapshot = await switchAccount(localStore, serverUrl, next.user, accountSnapshot());
@@ -1581,7 +1618,7 @@ function MainApp() {
       if (snapshot.settings.autoCollapseTaken !== undefined) setAutoCollapseTaken(snapshot.settings.autoCollapseTaken);
       if (snapshot.settings.showAppointmentCard !== undefined) setShowAppointmentCard(snapshot.settings.showAppointmentCard);
       if (snapshot.settings.hapticsEnabled !== undefined) setHapticsEnabled(snapshot.settings.hapticsEnabled);
-      setPreviousState(null);
+      setUndoAction(null);
       setActiveBannerNotification(null);
       setLastSyncAt(null);
       setSession(next);
@@ -2275,12 +2312,9 @@ function MainApp() {
                     const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
                     const targetTime = activeBannerNotification.time || targetDose?.time;
                     if (targetDose) {
-                      cancelDoseRepeatNotifications(targetDose.id, targetTime, activeBannerNotification.date).catch(console.error);
-                      setDoses(previous => previous.map(d => d.id === targetDose.id
-                        ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'taken') : d));
+                      applyRecord(targetDose.id, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey(), 'taken');
                     }
                     setActiveBannerNotification(null);
-                    showToast(language === 'en' ? '✅ Dose confirmed as taken' : '✅ İlaç alındı olarak onaylandı');
                   }}
                 >
                   <Ionicons name="checkmark-circle" size={15} color="#081624" />
@@ -2310,12 +2344,9 @@ function MainApp() {
                     const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
                     const targetTime = activeBannerNotification.time || targetDose?.time;
                     if (targetDose) {
-                      cancelDoseRepeatNotifications(targetDose.id, targetTime, activeBannerNotification.date).catch(console.error);
-                      setDoses(previous => previous.map(d => d.id === targetDose.id
-                        ? updateDoseSlot(d, targetTime || d.time, activeBannerNotification.date ?? localDateKey(), 'skipped') : d));
+                      applyRecord(targetDose.id, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey(), 'skipped');
                     }
                     setActiveBannerNotification(null);
-                    showToast(language === 'en' ? '❌ Marked as skipped' : '❌ İlaç atlandı olarak işaretlendi');
                   }}
                 >
                   <Ionicons name="close-circle-outline" size={15} color="#f87171" />
@@ -2381,6 +2412,7 @@ function MainApp() {
               takeSlot={takeSlot}
               snoozeDose={snoozeDose}
               skipSlot={skipSlot}
+              onRevertRecord={(slot) => confirmRevertRecord(slot.doseId, slot.time, today)}
               triggerHaptic={triggerHaptic}
               openEditor={openEditor}
               onNavigateSettings={() => setTab('Ayarlar')}
@@ -2436,6 +2468,7 @@ function MainApp() {
               selectedHistoryDate={selectedHistoryDate}
               setSelectedHistoryDate={setSelectedHistoryDate}
               historySlots={historySlots}
+              onRevertRecord={(slot) => confirmRevertRecord(slot.dose.id, slot.time, selectedHistoryDate)}
               takenSlots={takenSlots}
               todaySlots={todaySlots}
               today={today}
@@ -4767,8 +4800,12 @@ function MainApp() {
         {toastText && (
           <View style={styles.toast}>
             <Text style={styles.toastText} numberOfLines={2}>{toastText}</Text>
-            {previousState && (
-              <TouchableOpacity onPress={() => { setDoses(previousState.map(d => normalizeDoseDay(d))); setToastText(null); }}>
+            {undoAction && (
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t.undo} hitSlop={12} onPress={() => {
+                const action = undoAction;
+                if (toastTimer.current) clearTimeout(toastTimer.current);
+                setToastText(null); setUndoAction(null); action();
+              }}>
                 <Text style={styles.toastUndo}>{t.undo}</Text>
               </TouchableOpacity>
             )}
