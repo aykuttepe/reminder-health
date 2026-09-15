@@ -6,7 +6,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScheduledSlot } from '../medicationPlan';
+import { HistorySlot, ScheduledSlot } from '../medicationPlan';
 
 export interface HistoryDay {
   date: string;
@@ -19,8 +19,10 @@ export interface HistoryViewProps {
   pastWeekHistory: HistoryDay[];
   selectedHistoryDate: string;
   setSelectedHistoryDate: (date: string) => void;
-  historySlots: Pick<ScheduledSlot, 'dose' | 'time' | 'status' | 'todayAmount' | 'slotId'>[];
-  onRevertRecord: (slot: HistoryViewProps['historySlots'][number]) => void;
+  historySlots: HistorySlot[];
+  onRevertRecord: (slot: HistorySlot) => void;
+  /** Records a dose that was planned that day but never marked. */
+  onRecordSlot: (slot: HistorySlot, status: 'taken' | 'skipped') => void;
   takenSlots: ScheduledSlot[];
   todaySlots: ScheduledSlot[];
   today: string;
@@ -34,6 +36,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   setSelectedHistoryDate,
   historySlots,
   onRevertRecord,
+  onRecordSlot,
   takenSlots,
   todaySlots,
   today,
@@ -80,7 +83,36 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       </Text>
 
       {historySlots.length > 0 ? (
-        historySlots.map((slot) => (
+        historySlots.map((slot) => slot.status === 'pending' ? (
+          <View key={slot.slotId} style={styles.doseRow} testID={`record-history-${slot.slotId}`}>
+            <Text style={styles.doseRowTime}>{slot.time}</Text>
+            <View style={styles.doseRowMain}>
+              <Text style={styles.doseRowName}>{slot.dose.name}</Text>
+              <Text style={styles.doseRowSub}>
+                {slot.todayAmount} · {language === 'en' ? 'Not recorded' : 'Kaydedilmedi'}
+              </Text>
+              <View style={styles.recordActions}>
+                <TouchableOpacity
+                  style={[styles.recordBtn, styles.recordBtnTaken]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${slot.dose.name}, ${slot.time}, ${language === 'en' ? 'Mark as taken' : 'Aldım olarak işaretle'}`}
+                  onPress={() => onRecordSlot(slot, 'taken')}
+                >
+                  <Text style={styles.recordBtnTakenText}>{language === 'en' ? 'Taken' : 'Aldım'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recordBtn, styles.recordBtnSkipped]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${slot.dose.name}, ${slot.time}, ${language === 'en' ? 'Mark as skipped' : 'Atladım olarak işaretle'}`}
+                  onPress={() => onRecordSlot(slot, 'skipped')}
+                >
+                  <Text style={styles.recordBtnSkippedText}>{language === 'en' ? 'Skipped' : 'Atladım'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <Ionicons name="ellipse-outline" size={20} color="#adb3bf" />
+          </View>
+        ) : (
           <TouchableOpacity key={slot.slotId} style={styles.doseRow}
             testID={`revert-history-${slot.slotId}`} accessibilityRole="button"
             accessibilityLabel={`${slot.dose.name}, ${slot.time}, ${language === 'en' ? 'Correct record' : 'Kaydı düzelt'}`}
@@ -214,6 +246,35 @@ const styles = StyleSheet.create({
     color: '#adb3bf',
     fontSize: 12,
     marginTop: 2,
+  },
+  recordActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  recordBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  recordBtnTaken: {
+    backgroundColor: '#1a3c36',
+    borderColor: '#a9dfca',
+  },
+  recordBtnTakenText: {
+    color: '#a9dfca',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  recordBtnSkipped: {
+    backgroundColor: '#2a2320',
+    borderColor: '#e6ba93',
+  },
+  recordBtnSkippedText: {
+    color: '#e6ba93',
+    fontSize: 13,
+    fontWeight: '600',
   },
   quietEmpty: {
     color: '#adb3bf',

@@ -108,7 +108,7 @@ import { getTranslations, type Language } from './src/i18n/translations';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
-  formatStock, getCycleInfo, getCalendarDayDiff,
+  formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots,
   type MealCondition, type MedicineForm, type FrequencyType, type Dose, type ScheduledSlot, type AppointmentItem,
 } from './src/medicationPlan';
 export * from './src/medicationPlan';
@@ -1313,11 +1313,9 @@ function MainApp() {
 
   const takenSlots = todaySlots.filter(s => s.status === 'taken');
   const recordedSlots = todaySlots.filter(s => s.status !== 'pending');
-  const historySlots = doses.flatMap(dose => {
-    const times = new Set([...(dose.times?.length ? dose.times : [dose.time]), ...Object.keys(dose.dailyStatuses?.[selectedHistoryDate] ?? {})]);
-    return [...times].map(time => ({ dose, time, status: slotStatus(dose, time, selectedHistoryDate),
-      todayAmount: getCycleInfo(dose, selectedHistoryDate, language).todayAmount, slotId: `${dose.id}_${time}` }));
-  }).filter(slot => slot.status !== 'pending').sort((a, b) => a.time.localeCompare(b.time));
+  // Past days also list doses that were never marked, so a reverted record stays correctable.
+  const historySlots = buildHistorySlots(doses, selectedHistoryDate,
+    { includeUnrecorded: selectedHistoryDate < today, lang: language });
 
 
   const showToast = (text: string, undo?: () => void) => {
@@ -2487,6 +2485,7 @@ function MainApp() {
               setSelectedHistoryDate={setSelectedHistoryDate}
               historySlots={historySlots}
               onRevertRecord={(slot) => confirmRevertRecord(slot.dose.id, slot.time, selectedHistoryDate)}
+              onRecordSlot={(slot, status) => applyRecord(slot.dose.id, slot.time, selectedHistoryDate, status)}
               takenSlots={takenSlots}
               todaySlots={todaySlots}
               today={today}

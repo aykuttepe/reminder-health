@@ -15,7 +15,7 @@ function load(file) {
   vm.runInNewContext(source, { exports, Date, console, require: load }, { filename });
   return exports;
 }
-const { localDateKey, updateDoseSlot, slotStatus, normalizeDoseDay } = load('medicationPlan');
+const { localDateKey, updateDoseSlot, slotStatus, normalizeDoseDay, buildHistorySlots } = load('medicationPlan');
 const { changeDoseRecord, undoDoseRecord } = load('doseUndo');
 const { smartMergeDoses } = load('syncManager');
 const today = localDateKey();
@@ -81,4 +81,46 @@ test('explicit undo survives stale taken sync in both merge directions and JSON 
     assert.equal(merged[0].slotStatuses['09:00'], 'pending');
     assert.equal(merged[0].stock, 30);
   }
+});
+
+const historyDose = (patch = {}) => ({ id: 'h1', name: 'Geçmiş İlacı', amount: '1 tablet',
+  time: '09:00', times: ['09:00', '21:00'], status: 'pending', statusDate: '2026-09-15', stock: 30, ...patch });
+
+test('reverting yesterday keeps the dose listed as unrecorded so it can be corrected', () => {
+  const taken = updateDoseSlot(historyDose(), '09:00', '2026-09-15', 'taken');
+  const reverted = updateDoseSlot(taken, '09:00', '2026-09-15', 'pending');
+  assert.equal(slotStatus(reverted, '09:00', '2026-09-15'), 'pending');
+
+  const past = buildHistorySlots([reverted], '2026-09-15', { includeUnrecorded: true });
+  assert.deepEqual(past.map(slot => [slot.time, slot.status]), [['09:00', 'pending'], ['21:00', 'pending']]);
+  assert.equal(past[0].todayAmount, '1 tablet');
+
+  // Today's screen already lists pending doses, so History must not duplicate them.
+  assert.deepEqual(buildHistorySlots([reverted], '2026-09-15').map(slot => slot.time), []);
+});
+
+test('history lists recorded slots and hides unrecorded ones for inactive medicines', () => {
+  const recorded = updateDoseSlot(historyDose(), '21:00', '2026-09-15', 'skipped');
+  const rows = buildHistorySlots([recorded], '2026-09-15', { includeUnrecorded: true });
+  assert.deepEqual(rows.map(slot => [slot.time, slot.status]), [['09:00', 'pending'], ['21:00', 'skipped']]);
+
+  // A deleted medicine no longer accepts records, so it is marked deleted after the fact.
+  for (const patch of [{ paused: true }, { durationMode: 'days', startDate: '2026-09-01', durationDays: 2 },
+    { frequencyType: 'alternate', cycleStartDate: '2026-09-14' }, { deletedAfterRecord: true }]) {
+    const { deletedAfterRecord, ...dosePatch } = patch;
+    const marked = updateDoseSlot(historyDose(dosePatch), '21:00', '2026-09-15', 'skipped');
+    const inactive = deletedAfterRecord ? { ...marked, deletedAt: Date.now() } : marked;
+    const listed = buildHistorySlots([inactive], '2026-09-15', { includeUnrecorded: true });
+    assert.deepEqual(listed.map(slot => [slot.time, slot.status]), [['21:00', 'skipped']],
+      `unrecorded slots must stay hidden for ${JSON.stringify(patch)}`);
+  }
+});
+
+test('history keeps slot amounts and legacy records that are no longer in the plan', () => {
+  // Legacy per-day statuses apply to days other than the dose's own statusDate.
+  const dose = historyDose({ times: ['09:00'], slotAmounts: { '09:00': '2 tablet' },
+    statusDate: '2026-09-16', dailyStatuses: { '2026-09-15': { '13:00': 'taken' } } });
+  const rows = buildHistorySlots([dose], '2026-09-15', { includeUnrecorded: true });
+  assert.deepEqual(rows.map(slot => [slot.time, slot.status, slot.todayAmount]),
+    [['09:00', 'pending', '2 tablet'], ['13:00', 'taken', '1 tablet']]);
 });
