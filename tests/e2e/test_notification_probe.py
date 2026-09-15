@@ -37,5 +37,23 @@ class NotificationEvidenceTests(unittest.TestCase):
             AndroidNotificationProbe._notification_time("Permission denied")
 
 
+class PhoneReminderGuardTests(unittest.TestCase):
+    def probe_with(self, *tags):
+        probe = AndroidNotificationProbe("R6GL5000NTV")
+        dump = "  Notification List:\n" + "".join(record(tag=tag) for tag in tags)
+        probe._records = lambda: AndroidNotificationProbe._active_records(dump)
+        return probe
+
+    def test_same_slot_main_and_repeat_allow_tapping(self):
+        slot = "dose-a-2026-09-16-00:05"
+        self.probe_with(f"{slot}-main", f"{slot}-repeat-1", "test-med-main").only_test_reminder_should_be_active(f"{slot}-repeat-1")
+
+    def test_another_dose_or_slot_blocks_tapping(self):
+        slot = "dose-a-2026-09-16-00:05"
+        for other in ("dose-real-2026-09-16-00:05-main", "dose-a-2026-09-16-00:06-main"):
+            with self.assertRaisesRegex(AssertionError, "not tapping"):
+                self.probe_with(f"{slot}-main", other).only_test_reminder_should_be_active(f"{slot}-main")
+
+
 if __name__ == "__main__":
     unittest.main()

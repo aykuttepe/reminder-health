@@ -321,7 +321,35 @@ export function normalizeDoseDay(dose: Dose, date = localDateKey()): Dose {
 
 }
 
+export type HistorySlot = {
+  slotId: string;
+  dose: Dose;
+  time: string;
+  status: Dose['status'];
+  todayAmount: string;
+};
+
+/** One day's dose rows for the History screen. With `includeUnrecorded`, slots that were planned
+ * that day but never marked are kept as 'pending' so a reverted record can be corrected instead
+ * of disappearing from every screen. */
+export function buildHistorySlots(doses: Dose[], date: string,
+  options: { includeUnrecorded?: boolean; lang?: 'tr' | 'en' } = {}): HistorySlot[] {
+  return doses.flatMap(dose => {
+    const planned = dose.times?.length ? dose.times : [dose.time];
+    const times = new Set([...planned, ...Object.keys(dose.dailyStatuses?.[date] ?? {}),
+      ...Object.keys(dose.doseRecords?.[date] ?? {})]);
+    return [...times].map(time => ({ slotId: `${dose.id}_${time}`, dose, time,
+      status: slotStatus(dose, time, date),
+      todayAmount: (dose.slotAmounts?.[time]?.trim()) || getCycleInfo(dose, date, options.lang).todayAmount }));
+  }).filter(slot => slot.status !== 'pending'
+    || (!!options.includeUnrecorded && isDoseActive(slot.dose, date)
+      && (slot.dose.times?.length ? slot.dose.times : [slot.dose.time]).includes(slot.time)))
+    .sort((a, b) => a.time.localeCompare(b.time));
+}
+
 export function isDoseActive(dose: Dose, date: string): boolean {
+  // Deleted medicines stay in the list as sync tombstones and must never be scheduled.
+  if (dose.deletedAt) return false;
   const duration = getDurationInfo(dose, date);
   return !dose.paused && duration.hasStarted && !duration.isExpired && getCycleInfo(dose, date).isActiveToday;
 }

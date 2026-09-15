@@ -3,6 +3,48 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Bildirim aksiyonları ve gerçek plan saati — 15 Eylül 2026 (v0.2.22)
+
+- Android **15 / API 35** (`emulator-5554`), kurulu **0.2.22 / versionCode 23**. Tüm senaryolar
+  `fastReset` ile temiz veriyle çalışır; fiziksel cihazı `EmulatorNotificationProbe.py` reddeder.
+- `notification_actions.robot` (ayarlardaki test bildirimi ilk ilacın kimliği ve saatini taşır,
+  bu yüzden butonlar planlı hatırlatmayla aynı `App.tsx` işleyicisine gider):
+  - "✅ İlaç İçildi" (uygulama arka planda): stok 30 → 29, Geçmiş'te "Alındı"; Bugün ekranından
+    "Yanlış işaretledim" ile stok 30'a iade edildi — **passed**.
+  - "❌ Atla": Geçmiş'te "Atlandı", stok 30 kaldı — **passed**.
+  - "⏱️ 3 Dk Ertele": `dose-*-snooze` bildirimi 3 dakika sonra butonlarıyla geldi; oradan
+    "İlaç İçildi" stoğu 29'a düşürdü — **passed**.
+  - Uygulama süreci `am kill` ile öldürüldükten sonra "✅ İlaç İçildi": ilk APK'da doz kaydedilmedi
+    (Bugün "1 dozdan 0'ı alındı", stok 30; üç koşuda tekrarlandı, kanıt
+    `results/notification-actions-cold/`). Neden: yanıt, doz listesi yüklenmeden işleniyor ve
+    uygulamayı açan yanıt ayrıca okunmuyordu.
+  - **Düzeltme** (`mobile-app/App.tsx`, `src/notifications.ts`): yanıtlar doz listesi yüklenene
+    kadar sırada tutulur, ardından `getLastNotificationResponse` ile birlikte bir kez işlenir;
+    işleyici güncel dil/titreşim ayarlarını ref üzerinden kullanır. Düzeltilmiş APK'da soğuk açılış
+    testi **4/4 passed** ("1 dozdan 1'i alındı", stok 29; `results/notification-actions-fix-cold-r*`).
+    Paketin diğer üç testi aynı APK'da **passed** (`results/notification-actions-fix/`).
+  - Süreç öldürüldükten sonra UiAutomator bir süre launcher ağacını raporlayabildiği için panel
+    `cmd statusbar expand-notifications` ile yeniden denenerek açılır.
+- **Silinen ilaç hatırlatmaya devam ediyordu** (fiziksel cihaz testinde bulundu): silinen ilaçlar senkron
+  için `deletedAt` işaretiyle listede kalıyor, bildirim planlayıcısı bu işarete bakmadığı için 30 günlük
+  plan boyunca ana ve tekrar hatırlatmaları kurulmaya devam ediyordu. Telefonda silinmiş test dozları için
+  `repeat-10`'a kadar bildirim geldi. Düzeltme `mobile-app/src/medicationPlan.ts` `isDoseActive`;
+  birim testi düzeltmeden önce başarısız, sonra **passed**; `notification_schedule.robot` içindeki
+  "Deleted Medication Stops Reminding" emulator'da **passed** (ilaç silindikten sonra slotunda bildirim yok).
+  Ekrana düşmüş eski bildirimler silme ile kapanmaz; yalnızca yeni hatırlatmalar engellenir.
+- `notification_schedule.robot` (emulator saatinden 3 dakika sonrasına planlanan gerçek doz,
+  ekran kapalı ve uygulama arka planda):
+  - Ana hatırlatma planlanan dakikadan **52 ms** (düzeltme sonrası tekrar: **54 ms**) sonra sisteme düştü; "İlaç İçildi" stoğu 29'a
+    düşürdü ve +3 dk tekrar bildirimi gelmedi — **passed**.
+  - Kontrol: işaretlenmeyen dozda ilk tekrar +3 dk'dan **162 ms** (tekrar: **169 ms**) sonra geldi, stok 30 kaldı —
+    **passed**. Böylece "tekrar gelmedi" sonucu boşuna geçmiyor.
+  - Gecikme `dumpsys notification` içindeki `mUpdateTimeMs` ile ölçülür; ekran kapalıdır ama
+    emulator'da PIN yoktur, Doze/pil optimizasyonu altındaki teslim bu ölçümün kapsamı dışındadır.
+- Ayrıştırıcı birim testleri: `npm --prefix tests/e2e run test:probe` — **7 test passed**.
+- `test:all` zinciri düzeltilmiş APK'da tekrar **11 test, 11 passed** verdi (önceki koşu 20:51–20:54,
+  aynı sonuç). Mobil unit testleri **31 passed** (2'si yeni), kök paket **67 passed**, runtime
+  bütünlük kontrolü **28 korunan dosya** geçti.
+
 ## Son tekrar — 15 Eylül 2026 (v0.2.22)
 
 - Android **15 / API 35** (`emulator-5554` / Pixel 7), kurulu release binary **0.2.22 / versionCode 23**.
@@ -117,6 +159,37 @@ doğrular; APK yüklemez. İlk testler **0.2.20**, son kayıtlı smoke testi **0
 `test:all` fiziksel cihaz için değildir. Aşağıdaki emulator senaryolarının çoğu
 `noReset=false` ile uygulama verisini siler; bunları kişisel telefona yönlendirmeyin.
 
+## Fiziksel cihazda gerçek hatırlatma ve bildirim butonları (veri değiştirir)
+
+Yalnızca cihaz sahibinin onayıyla çalıştırılır. Telefon USB ile bağlı, kilidi açık ve Appium
+çalışırken, gece yarısına en az 20 dakika varken:
+
+```bash
+ANDROID_UDID=R6GL5000NTV npm --prefix tests/e2e run test:device-medication-actions
+```
+
+Gerçek hesaba `E2E Test A silinecek` ve `E2E Test B silinecek` adlı iki ilaç ekler; senkron açıksa
+bunlar sunucuya da gider. Ayarlardaki test bildirimini kullanmaz (o bildirim listedeki ilk gerçek
+ilacı hedefler). Bildirim butonuna basmadan önce uygulamanın başka bir doz için aktif hatırlatması
+varsa test durur. Stok, ilacın kendi düzenleme ekranındaki "Kalan Stok (adet)" alanından okunur;
+düzenleyici kaydetmeden kapatılır. Test başarısız olsa bile yalnızca bu koşunun eklediği ilaçlar
+sonunda silinir. Ekran görüntüsü veya UI dökümü kaydedilmez. Bekleme sırasında ekranın PIN
+kilidine düşmemesi için yalnızca `KEYCODE_WAKEUP` gönderilir; hiçbir ayar değiştirilmez.
+
+Son durum (16 Eylül 2026 00:22–00:40, Samsung SM-A376B, Android 16, 0.2.23): gerçek hatırlatmalar
+uygulama arka plandayken slotundan **76–300 ms**, ilk tekrarlar **86–134 ms** sonra sisteme düştü;
+test stoğu doğru okundu ve test ilaçları her testten sonra silindi. One UI bildirimleri grupladığı
+için "İlaç İçildi" butonu görünmedi, butona basılmadı: iki senaryo da **failed** ve soğuk açılış
+düzeltmesi telefonda henüz doğrulanmadı. Bir önceki sürümdeki geniş genişletme seçicisi başka bir
+uygulamanın bildirimine tıkladı; seçici artık yalnızca bu uygulamanın hatırlatma satırındaki genişletme
+butonunu hedefler (Samsung'da henüz doğrulanmadı). Aynı koşuda silinen ilaçların tekrar bildirimleri
+gelmeye devam etti; bu hata düzeltildi ve telefona gidecek sürüm 0.2.24 olarak yayınlandı
+(v0.2.23 etiketi aynı düzeltmeleri içerir; telefona önce silme düzeltmesi olmayan yerel bir 0.2.23 kurulmuştu).
+
+1. Planlı hatırlatma gecikmesi ölçülür, "İlaç İçildi" test stoğunu 30 → 29 yapar, +3 dk tekrar gelmez.
+2. İşaretlenmeyen dozun ilk tekrarı gelir (tekrar ayarının açık olduğunu kanıtlar), uygulama süreci
+   `am kill` ile kapatılır ve bildirimden "İlaç İçildi" yine kaydedilir.
+
 ## Fiziksel cihaz bildirim testi
 
 Telefon USB ile bağlı, kilidi açık ve Appium çalışırken repository kökünden:
@@ -188,6 +261,21 @@ Background native bildirim teslimi:
 npm --prefix tests/e2e run test:notification-background
 ```
 
+Bildirim butonları (İlaç İçildi, Atla, Ertele, süreç öldürüldükten sonra İlaç İçildi; ~8 dk):
+
+```bash
+npm --prefix tests/e2e run test:notification-actions
+```
+
+Gerçek plan saatinde teslim ve tekrar bildirimi (~12 dk; gece yarısına 5 dakikadan az kala çalışmaz):
+
+```bash
+npm --prefix tests/e2e run test:notification-schedule
+```
+
+Bu iki paket `test:all` zincirine eklenmedi: soğuk açılış senaryosu bilinen hata nedeniyle
+düzeltmeden önce başarısızdı ve plan testi uzun sürüyor; eklenmesi ayrı bir karardır.
+
 Sunucu, smoke, ilaç, kalıcılık, validasyon, foreground ve background bildirim testlerini tek seferde çalıştırmak için:
 
 ```bash
@@ -211,8 +299,9 @@ düzenleme kalıcılığı, onaylı silme,
 foreground banner ve Android notification shade'de bildirimin bulunması
 doğrulandı. Foreground test, JavaScript callback'i de banner ürettiği için tek
 başına native teslim kanıtı değildir. Arka plan testinin bekleme ve uygulama
-durumu kontrolleri düzeltildi. Sonraki adım gerçek ilaç planı saatinde teslimi
-ve bildirim aksiyonlarının geçmiş/stok etkisini ayrı test verileriyle ölçmektir. Emulator'da
+durumu kontrolleri düzeltildi. Gerçek plan saatinde teslim ve bildirim aksiyonlarının
+geçmiş/stok etkisi artık `notification_schedule.robot` ve `notification_actions.robot` ile
+ölçülüyor; soğuk açılışta kaybolan "İlaç İçildi" aksiyonu emulator'da düzeltildi. Emulator'da
 gözlenen UiAutomator2 screenshot/Binder hatası da henüz kalıcı olarak çözülmedi.
 
 Bu ortam uygulama veya sync sunucusunu değiştirmez. Test hesabı ve sync test

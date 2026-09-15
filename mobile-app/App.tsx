@@ -46,6 +46,9 @@ import {
   buildNotificationContent,
   addNotificationResponseListener,
   addNotificationReceivedListener,
+  createNotificationResponseGate,
+  takeLaunchNotificationResponse,
+  type NotificationActionResponse,
   URGENT_REPEAT_CHANNEL_ID,
   NOTIFICATION_CATEGORY_MED_ACTIONS,
   ACTION_TAKEN,
@@ -105,7 +108,7 @@ import { getTranslations, type Language } from './src/i18n/translations';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
-  formatStock, getCycleInfo, getCalendarDayDiff,
+  formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots,
   type MealCondition, type MedicineForm, type FrequencyType, type Dose, type ScheduledSlot, type AppointmentItem,
 } from './src/medicationPlan';
 export * from './src/medicationPlan';
@@ -741,6 +744,11 @@ function MainApp() {
   const dosesRef = useRef(doses);
   dosesRef.current = doses;
 
+  // Listeners are registered once; route them through a ref so actions use current settings.
+  const notificationResponseHandler = useRef<(res: NotificationActionResponse) => void>(() => {});
+  const [notificationResponseGate] = useState(() =>
+    createNotificationResponseGate(res => notificationResponseHandler.current(res)));
+
   const soundSettingsRef = useRef({
     enabled: notifications,
     soundEnabled,
@@ -788,6 +796,26 @@ function MainApp() {
     return () => unsub();
   }, []);
 
+  notificationResponseHandler.current = res => {
+    const { actionId, doseId, timeStr, date, isAppointment } = res;
+    if (isAppointment) {
+      if (actionId === ACTION_APPT_DONE || !actionId) {
+        showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
+      }
+      return;
+    }
+    const dose = dosesRef.current.find(d => d.id === doseId);
+    if (!dose) return;
+    const time = timeStr || dose.time;
+    const doseDate = date ?? localDateKey();
+    if (!(dose.times?.length ? dose.times : [dose.time]).includes(time)) return;
+    if (actionId === ACTION_TAKEN || actionId === ACTION_SKIP) {
+      applyRecord(dose.id, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped');
+    } else if (actionId === ACTION_SNOOZE) {
+      void snoozeDose(dose, time, doseDate);
+    }
+  };
+
   // Initialize Notifications and Request Permissions
   useEffect(() => {
     let mounted = true;
@@ -804,25 +832,7 @@ function MainApp() {
       return status === 'taken' || status === 'skipped';
     });
 
-    const removeListener = addNotificationResponseListener(res => {
-      const { actionId, doseId, timeStr, date, isAppointment, title, body } = res;
-      if (isAppointment) {
-        if (actionId === ACTION_APPT_DONE || !actionId) {
-          showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
-        }
-        return;
-      }
-      const dose = dosesRef.current.find(d => d.id === doseId);
-      if (!dose) return;
-      const time = timeStr || dose.time;
-      const doseDate = date ?? localDateKey();
-      if (!(dose.times?.length ? dose.times : [dose.time]).includes(time)) return;
-      if (actionId === ACTION_TAKEN || actionId === ACTION_SKIP) {
-        applyRecord(dose.id, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped');
-      } else if (actionId === ACTION_SNOOZE) {
-        void snoozeDose(dose, time, doseDate);
-      }
-    });
+    const removeListener = addNotificationResponseListener(res => notificationResponseGate.push(res));
 
     const removeReceivedListener = addNotificationReceivedListener(payload => {
       const dose = dosesRef.current.find(d => d.id === payload.doseId);
@@ -990,6 +1000,14 @@ function MainApp() {
     setDoses(previous => previous.map(d => normalizeDoseDay(d, today)));
     setSelectedHistoryDate(today);
   }, [today, hydrated]);
+
+  // Doses are loaded now: replay actions queued during launch, including the one that opened the app.
+  useEffect(() => {
+    if (!hydrated) return;
+    const launchResponse = takeLaunchNotificationResponse();
+    if (launchResponse) notificationResponseGate.push(launchResponse);
+    notificationResponseGate.open();
+  }, [hydrated]);
 
   // Save to Storage
   useEffect(() => {
@@ -1295,11 +1313,9 @@ function MainApp() {
 
   const takenSlots = todaySlots.filter(s => s.status === 'taken');
   const recordedSlots = todaySlots.filter(s => s.status !== 'pending');
-  const historySlots = doses.flatMap(dose => {
-    const times = new Set([...(dose.times?.length ? dose.times : [dose.time]), ...Object.keys(dose.dailyStatuses?.[selectedHistoryDate] ?? {})]);
-    return [...times].map(time => ({ dose, time, status: slotStatus(dose, time, selectedHistoryDate),
-      todayAmount: getCycleInfo(dose, selectedHistoryDate, language).todayAmount, slotId: `${dose.id}_${time}` }));
-  }).filter(slot => slot.status !== 'pending').sort((a, b) => a.time.localeCompare(b.time));
+  // Past days also list doses that were never marked, so a reverted record stays correctable.
+  const historySlots = buildHistorySlots(doses, selectedHistoryDate,
+    { includeUnrecorded: selectedHistoryDate < today, lang: language });
 
 
   const showToast = (text: string, undo?: () => void) => {
@@ -2469,6 +2485,7 @@ function MainApp() {
               setSelectedHistoryDate={setSelectedHistoryDate}
               historySlots={historySlots}
               onRevertRecord={(slot) => confirmRevertRecord(slot.dose.id, slot.time, selectedHistoryDate)}
+              onRecordSlot={(slot, status) => applyRecord(slot.dose.id, slot.time, selectedHistoryDate, status)}
               takenSlots={takenSlots}
               todaySlots={todaySlots}
               today={today}
