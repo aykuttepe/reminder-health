@@ -6,13 +6,15 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HistorySlot, ScheduledSlot } from '../medicationPlan';
+import { DayAdherence, DaySummary, HistorySlot } from '../medicationPlan';
 
 export interface HistoryDay {
   date: string;
   label: string;
   dayNum: number;
   isToday: boolean;
+  summary: DaySummary;
+  adherence: DayAdherence;
 }
 
 export interface HistoryViewProps {
@@ -23,8 +25,9 @@ export interface HistoryViewProps {
   onRevertRecord: (slot: HistorySlot) => void;
   /** Records a dose that was planned that day but never marked. */
   onRecordSlot: (slot: HistorySlot, status: 'taken' | 'skipped') => void;
-  takenSlots: ScheduledSlot[];
-  todaySlots: ScheduledSlot[];
+  /** Taken versus due doses over the strip's seven days; today's unmarked doses are not due. */
+  weekAdherence: { taken: number; due: number };
+  selectedDaySummary: DaySummary;
   today: string;
   language: 'tr' | 'en';
   dateFromKey: (key: string) => Date;
@@ -37,8 +40,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   historySlots,
   onRevertRecord,
   onRecordSlot,
-  takenSlots,
-  todaySlots,
+  weekAdherence,
+  selectedDaySummary,
   today,
   language,
   dateFromKey,
@@ -51,21 +54,43 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           <Text style={styles.adherencePillText}>{language === 'en' ? 'Last 7 Days' : 'Son 7 Gün'}</Text>
         </View>
         <Text style={styles.adherenceSub}>
-          {language === 'en'
-            ? `${takenSlots.length} / ${todaySlots.length} doses taken today`
-            : `${takenSlots.length} / ${todaySlots.length} doz bugün alındı`}
+          {weekAdherence.due === 0
+            ? language === 'en'
+              ? 'No doses due in the last 7 days.'
+              : 'Son 7 günde takip edilecek doz yok.'
+            : language === 'en'
+            ? `${Math.round((weekAdherence.taken / weekAdherence.due) * 100)}% · ${weekAdherence.taken} / ${weekAdherence.due} doses taken`
+            : `%${Math.round((weekAdherence.taken / weekAdherence.due) * 100)} · ${weekAdherence.taken} / ${weekAdherence.due} doz alındı`}
         </Text>
         <View style={styles.weekStrip}>
           {pastWeekHistory.map((day) => (
             <TouchableOpacity
               key={day.date}
               style={[styles.weekPill, selectedHistoryDate === day.date && styles.weekPillActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`${day.label} ${day.dayNum}, ${day.summary.total === 0
+                ? (language === 'en' ? 'no doses planned' : 'planlı doz yok')
+                : language === 'en'
+                ? `${day.summary.taken} of ${day.summary.total} taken`
+                : `${day.summary.total} dozun ${day.summary.taken} tanesi alındı`}`}
               onPress={() => setSelectedHistoryDate(day.date)}
             >
               <Text style={styles.weekPillLabel}>{day.label}</Text>
               <Text style={styles.weekPillNum}>{day.dayNum}</Text>
-              <View style={[styles.weekDot, day.isToday ? styles.dotToday : styles.dotComplete]} />
+              <View style={[styles.weekDot, dotStyles[day.adherence]]} />
             </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.legendRow}>
+          {([
+            ['complete', language === 'en' ? 'All taken' : 'Tamamı'],
+            ['partial', language === 'en' ? 'Partly' : 'Kısmen'],
+            ['missed', language === 'en' ? 'Missed' : 'Kaçırıldı'],
+          ] as const).map(([state, label]) => (
+            <View key={state} style={styles.legendItem}>
+              <View style={[styles.weekDot, dotStyles[state]]} />
+              <Text style={styles.legendText}>{label}</Text>
+            </View>
           ))}
         </View>
       </View>
@@ -81,6 +106,23 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               year: 'numeric',
             })}
       </Text>
+      {selectedDaySummary.total > 0 && (
+        <Text style={styles.daySummary}>
+          {[
+            language === 'en'
+              ? `Taken ${selectedDaySummary.taken} / ${selectedDaySummary.total}`
+              : `Alınan ${selectedDaySummary.taken} / ${selectedDaySummary.total}`,
+            selectedDaySummary.skipped > 0
+              ? (language === 'en' ? `Skipped ${selectedDaySummary.skipped}` : `Atlanan ${selectedDaySummary.skipped}`)
+              : null,
+            selectedDaySummary.unrecorded > 0
+              ? selectedHistoryDate === today
+                ? (language === 'en' ? `Pending ${selectedDaySummary.unrecorded}` : `Bekleyen ${selectedDaySummary.unrecorded}`)
+                : (language === 'en' ? `Not recorded ${selectedDaySummary.unrecorded}` : `Kaydedilmedi ${selectedDaySummary.unrecorded}`)
+              : null,
+          ].filter(Boolean).join(' · ')}
+        </Text>
+      )}
 
       {historySlots.some((slot) => slot.status !== 'pending') && (
         <Text style={styles.listHint}>
@@ -161,6 +203,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   );
 };
 
+// Dot per day: mint all taken, amber partly, red missed, hollow ring while today is still open.
+const dotStyles = StyleSheet.create({
+  none: { backgroundColor: '#2a3a4a' },
+  complete: { backgroundColor: '#a9dfca' },
+  partial: { backgroundColor: '#e6ba93' },
+  missed: { backgroundColor: '#ff9696' },
+  open: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#a9dfca' },
+});
+
 const styles = StyleSheet.create({
   adherenceCard: {
     backgroundColor: '#152332',
@@ -217,11 +268,24 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  dotComplete: {
-    backgroundColor: '#a9dfca',
+  legendRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 12,
   },
-  dotToday: {
-    backgroundColor: '#e6ba93',
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendText: {
+    color: '#8899a8',
+    fontSize: 11,
+  },
+  daySummary: {
+    color: '#adb3bf',
+    fontSize: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
     color: '#adb3bf',

@@ -1,7 +1,7 @@
 {
-  "version": "0.2.26",
+  "version": "0.2.27",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.26: Alınan doz satırlarındaki \"Yanlış işaretledim\" yazısı, sağdaki küçük \"Düzelt\" düğmesiyle değiştirildi; liste başında tek bir ipucu gösteriliyor.",
-  "publishedAt": "2026-09-16T00:00:00Z"
+  "releaseNotes": "v0.2.27: Geçmiş ekranında günler uyuma göre renkleniyor (tamamı, kısmen, kaçırıldı), \"Son 7 Gün\" gerçek 7 günlük oranı gösteriyor ve seçilen gün için özet satırı var. Doz satırlarında \"Düzelt\" düğmesi. Uygulamaya eklenmeden önceki günler kaçırılmış sayılmıyor.",
+  "publishedAt": "2026-09-16T18:00:00Z"
 }

@@ -3,7 +3,7 @@
     "name": "Reminder Health",
     "slug": "reminder-health",
     "scheme": "reminderhealth",
-    "version": "0.2.26",
+    "version": "0.2.27",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -27,7 +27,7 @@
         "WAKE_LOCK",
         "CAMERA"
       ],
-      "versionCode": 27
+      "versionCode": 28
     },
     "web": {
       "favicon": "./assets/favicon.png"

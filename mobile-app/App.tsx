@@ -108,7 +108,7 @@ import { getTranslations, type Language } from './src/i18n/translations';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
-  formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots,
+  formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots, summarizeDay, dayAdherence, adherenceOverDays,
   type MealCondition, type MedicineForm, type FrequencyType, type Dose, type ScheduledSlot, type AppointmentItem,
 } from './src/medicationPlan';
 export * from './src/medicationPlan';
@@ -341,13 +341,18 @@ function MainApp() {
   const pastWeekHistory = Array.from({ length: 7 }, (_, index) => {
     const date = dateFromKey(today);
     date.setDate(date.getDate() - 6 + index);
+    const key = localDateKey(date);
+    const summary = summarizeDay(doses, key);
     return {
-      date: localDateKey(date),
+      date: key,
       dayNum: date.getDate(),
       label: date.toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { weekday: 'short' }),
       isToday: index === 6,
+      summary,
+      adherence: dayAdherence(summary, index === 6),
     };
   });
+  const weekAdherence = adherenceOverDays(pastWeekHistory, today);
   const [selectedHistoryDate, setSelectedHistoryDate] = useState(localDateKey);
   const [expandedTaken, setExpandedTaken] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -2486,8 +2491,8 @@ function MainApp() {
               historySlots={historySlots}
               onRevertRecord={(slot) => confirmRevertRecord(slot.dose.id, slot.time, selectedHistoryDate)}
               onRecordSlot={(slot, status) => applyRecord(slot.dose.id, slot.time, selectedHistoryDate, status)}
-              takenSlots={takenSlots}
-              todaySlots={todaySlots}
+              weekAdherence={weekAdherence}
+              selectedDaySummary={summarizeDay(doses, selectedHistoryDate)}
               today={today}
               language={language}
               dateFromKey={dateFromKey}

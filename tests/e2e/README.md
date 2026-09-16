@@ -3,6 +3,22 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Geçmiş uyum görünümü — 16 Eylül 2026 (v0.2.27)
+
+- Hafta şeridi noktaları gün uyumunu gösteriyor (tamamı / kısmen / kaçırıldı, bugün sürerken boş halka,
+  plan yoksa soluk); "Son 7 Gün" kartı gerçek 7 günlük oranı, seçilen gün başlığı özet satırını gösteriyor.
+  İlacın uygulamada ilk izlendiği günden önceki günler kayıtsız satır veya kaçırılmış doz üretmiyor.
+- Mobil birim testleri **38/38** (3 yeni: izlenmeden önceki günler, gün özeti/uyum durumu, bugünün
+  işaretlenmemiş dozlarının orana girmemesi), kök paket **67/67**, typecheck ve runtime kontrolü geçti.
+- Emulator'da iki ilaç ve bir alınmış dozla Geçmiş ekranı gözle doğrulandı: önceki günler "planlı doz yok",
+  bugün boş halka, kart "%100 · 1 / 1 doz alındı", gün özeti "Alınan 1 / 2 · Bekleyen 1". Geçmiş günlerin
+  kısmen/kaçırıldı renkleri emulator tarihini değiştirmeden üretilemediği için yalnızca birim testleriyle
+  doğrulandı.
+- `test:all` ilk koşuda emulator açılışından hemen sonra smoke testinde takıldı (İlaçlarım ekran
+  görüntüsünden sonra hiçbir öğe bulunamadı, logcat'te uygulama hatası yok; bilinen UiAutomator2
+  kararsızlığı). Smoke tek başına **4/4**, ardından tüm zincir **11/11 passed**;
+  `notification_actions.robot` hızlı testleri **3/3 passed**.
+
 ## Geçmiş ekranı düzeltmeleri — 16 Eylül 2026 (v0.2.25, v0.2.26)
 
 - **v0.2.25:** Gece yarısından sonra Geçmiş ekranından geri alınan dün dozu hiçbir ekranda görünmüyordu

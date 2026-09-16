@@ -15,7 +15,7 @@ function load(file) {
   vm.runInNewContext(source, { exports, Date, console, require: load }, { filename });
   return exports;
 }
-const { localDateKey, updateDoseSlot, slotStatus, normalizeDoseDay, buildHistorySlots } = load('medicationPlan');
+const { localDateKey, updateDoseSlot, slotStatus, normalizeDoseDay, buildHistorySlots, summarizeDay, dayAdherence, adherenceOverDays } = load('medicationPlan');
 const { changeDoseRecord, undoDoseRecord } = load('doseUndo');
 const { smartMergeDoses } = load('syncManager');
 const today = localDateKey();
@@ -123,4 +123,38 @@ test('history keeps slot amounts and legacy records that are no longer in the pl
   const rows = buildHistorySlots([dose], '2026-09-15', { includeUnrecorded: true });
   assert.deepEqual(rows.map(slot => [slot.time, slot.status, slot.todayAmount]),
     [['09:00', 'pending', '2 tablet'], ['13:00', 'taken', '1 tablet']]);
+});
+
+test('days before a back-dated medicine was tracked are not listed as unrecorded', () => {
+  const added = historyDose({ startDate: '2026-09-01', statusDate: '2026-09-15' });
+  assert.deepEqual(buildHistorySlots([added], '2026-09-14', { includeUnrecorded: true }), []);
+  assert.equal(buildHistorySlots([added], '2026-09-15', { includeUnrecorded: true }).length, 2);
+  // Once the app rolled over from an earlier day, that day is tracked too.
+  const rolled = normalizeDoseDay(historyDose({ startDate: '2026-09-01', statusDate: '2026-09-13' }), '2026-09-15');
+  assert.equal(buildHistorySlots([rolled], '2026-09-13', { includeUnrecorded: true }).length, 2);
+  assert.deepEqual(buildHistorySlots([rolled], '2026-09-12', { includeUnrecorded: true }), []);
+});
+
+test('day summary and adherence state reflect taken, skipped and unmarked doses', () => {
+  const taken = updateDoseSlot(historyDose(), '09:00', '2026-09-15', 'taken');
+  const both = updateDoseSlot(taken, '21:00', '2026-09-15', 'skipped');
+  // Results come from the vm realm; spread them so strict equality compares values only.
+  assert.deepEqual({ ...summarizeDay([taken], '2026-09-15') }, { total: 2, taken: 1, skipped: 0, unrecorded: 1 });
+  assert.deepEqual({ ...summarizeDay([both], '2026-09-15') }, { total: 2, taken: 1, skipped: 1, unrecorded: 0 });
+
+  const day = (patch) => ({ total: 2, taken: 0, skipped: 0, unrecorded: 0, ...patch });
+  assert.equal(dayAdherence(day({ total: 0 }), false), 'none');
+  assert.equal(dayAdherence(day({ taken: 2 }), false), 'complete');
+  assert.equal(dayAdherence(day({ taken: 1, unrecorded: 1 }), true), 'open');
+  assert.equal(dayAdherence(day({ taken: 1, unrecorded: 1 }), false), 'partial');
+  assert.equal(dayAdherence(day({ skipped: 2 }), false), 'missed');
+  assert.equal(dayAdherence(day({ unrecorded: 2 }), true), 'open');
+});
+
+test('multi-day adherence does not count today\'s unmarked doses as missed', () => {
+  const yesterday = updateDoseSlot(historyDose({ statusDate: '2026-09-14' }), '09:00', '2026-09-14', 'taken');
+  const today = normalizeDoseDay(updateDoseSlot(yesterday, '09:00', '2026-09-15', 'taken'), '2026-09-15');
+  // 14th: one of two taken; 15th: one taken and 21:00 still open.
+  const days = ['2026-09-14', '2026-09-15'].map(date => ({ date, summary: summarizeDay([today], date) }));
+  assert.deepEqual({ ...adherenceOverDays(days, '2026-09-15') }, { taken: 2, due: 3 });
 });
