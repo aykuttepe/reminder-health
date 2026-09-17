@@ -3,6 +3,15 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Bildirim gövdesi, randevu ertelemesi, silinen ilaç — 17 Eylül 2026 (v0.2.30)
+
+- `notification_actions.robot` yeni senaryolar: süreç öldürüldükten sonra bildirim gövdesine dokunma
+  uygulama içi şeridi açar (değişiklikten önce **failed**, sonra **passed**); ilaç silinince paneldeki
+  bildirimi kalkar (önceki APK'da **failed**, sonra **passed**). Hızlı paket **5/5 passed**. Uygulama
+  canlıyken gövde testi, ayarlardaki test bildirimi şeridi kendi JS zamanlayıcısıyla açtığı için kaldırıldı.
+- Randevu ertelemesi yalnızca birim testleriyle doğrulandı (randevu hatırlatmaları saatler/günler önce
+  çalar). Mobil birim testleri **43/43**.
+
 ## Samsung elle testleri — 17 Eylül 2026 (v0.2.28, v0.2.29)
 
 Samsung SM-A376B, Android 16, **hesap bağlı ve senkron açık**. Testleri kullanıcı elle yaptı; sistem
