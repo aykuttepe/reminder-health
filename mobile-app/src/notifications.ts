@@ -533,33 +533,35 @@ export type NotificationActionResponse = {
   isBloodTest?: boolean;
   title?: string;
   body?: string;
+  /** Identifies one interaction so a launch response and its listener event are handled once. */
+  key?: string;
 };
+
+function parseNotificationResponse(res: Notifications.NotificationResponse): NotificationActionResponse {
+  const data = res.notification.request.content.data as any;
+  return {
+    actionId: res.actionIdentifier,
+    doseId: data?.doseId !== undefined ? notificationId(data.doseId) : undefined,
+    timeStr: data?.time as string | undefined,
+    date: data?.date,
+    isRepeat: data?.isRepeat as boolean | undefined,
+    isAppointment: data?.isAppointment,
+    appointmentDate: data?.appointmentDate,
+    appointmentTime: data?.appointmentTime,
+    leadOption: data?.leadOption,
+    isBloodTest: data?.isBloodTest,
+    title: res.notification.request.content.title ?? undefined,
+    body: res.notification.request.content.body ?? undefined,
+    key: `${res.notification.request.identifier}|${res.actionIdentifier}|${res.notification.date}`,
+  };
+}
 
 export function addNotificationResponseListener(
   listener: (response: NotificationActionResponse) => void
 ): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener(res => {
     try {
-      const actionId = res.actionIdentifier;
-      const data = res.notification.request.content.data as any;
-      const doseId = data?.doseId !== undefined ? notificationId(data.doseId) : undefined;
-      const timeStr = data?.time as string | undefined;
-      const isRepeat = data?.isRepeat as boolean | undefined;
-
-      listener({
-        actionId,
-        doseId,
-        timeStr,
-        date: data?.date,
-        isRepeat,
-        isAppointment: data?.isAppointment,
-        appointmentDate: data?.appointmentDate,
-        appointmentTime: data?.appointmentTime,
-        leadOption: data?.leadOption,
-        isBloodTest: data?.isBloodTest,
-        title: res.notification.request.content.title ?? undefined,
-        body: res.notification.request.content.body ?? undefined,
-      });
+      listener(parseNotificationResponse(res));
     } catch (err) {
       console.log('Notification response listener error:', err);
     }
@@ -567,6 +569,41 @@ export function addNotificationResponseListener(
 
   return () => {
     sub.remove();
+  };
+}
+
+/** Returns and clears the response that launched the app, so a later launch cannot replay it. */
+export function takeLaunchNotificationResponse(): NotificationActionResponse | null {
+  try {
+    const res = Notifications.getLastNotificationResponse();
+    if (!res) return null;
+    Notifications.clearLastNotificationResponse();
+    return parseNotificationResponse(res);
+  } catch (err) {
+    console.log('Launch notification response unavailable:', err);
+    return null;
+  }
+}
+
+/** Holds action responses until stored doses are loaded. A notification action that cold-starts
+ * the app arrives before hydration and would otherwise find no dose and be dropped. */
+export function createNotificationResponseGate(handle: (response: NotificationActionResponse) => void) {
+  const seen = new Set<string>();
+  let queue: NotificationActionResponse[] | null = [];
+  return {
+    push(response: NotificationActionResponse) {
+      if (response.key) {
+        if (seen.has(response.key)) return;
+        seen.add(response.key);
+      }
+      if (queue) queue.push(response);
+      else handle(response);
+    },
+    open() {
+      const pending = queue ?? [];
+      queue = null;
+      pending.forEach(handle);
+    },
   };
 }
 

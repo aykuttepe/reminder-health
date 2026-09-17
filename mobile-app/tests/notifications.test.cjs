@@ -28,6 +28,15 @@ function setup(now = '2026-09-07T12:00:00', platform = 'android') {
     async getPresentedNotificationsAsync() { return []; },
     async dismissNotificationAsync() {},
     async cancelAllScheduledNotificationsAsync() { throw new Error('Global cancellation must not be used'); },
+    // TypeScript's namespace import copies these functions, so state lives on `native`, not `this`.
+    lastResponse: null,
+    responseListeners: [],
+    getLastNotificationResponse() { return native.lastResponse; },
+    clearLastNotificationResponse() { native.lastResponse = null; },
+    addNotificationResponseReceivedListener(listener) {
+      native.responseListeners.push(listener);
+      return { remove: () => { native.responseListeners = native.responseListeners.filter(l => l !== listener); } };
+    },
   };
   const cache = new Map();
   function load(file) {
@@ -116,6 +125,21 @@ test('expired and paused medicines produce no alarms', () => {
   for (const patch of [{ paused: true }, { durationMode: 'days', startDate: '2026-09-01', durationDays: 2 }]) {
     assert.equal(api.buildMedicationSchedule([dose(patch)], options, api.now()).length, 0);
   }
+});
+
+test('deleted medicines stop scheduling and their pending reminders and snoozes are cancelled', async () => {
+  const api = setup();
+  const live = dose({ time: '14:30' });
+  await api.syncMedicationNotifications([live], options);
+  await api.snoozeNotification({ ...live, statusDate: '2026-09-07' }, 3);
+  assert.ok([...api.pending.keys()].some(id => id.endsWith('-main')));
+  assert.ok([...api.pending.keys()].some(id => id.endsWith('-snooze')));
+
+  const deleted = { ...live, deletedAt: Date.now(), updatedAt: Date.now() };
+  assert.equal(api.buildMedicationSchedule([deleted], options, api.now()).length, 0);
+  const summary = await api.syncMedicationNotifications([deleted], options);
+  assert.equal(summary.count, 0);
+  assert.deepEqual([...api.pending.keys()], [], 'a tombstoned medicine must not keep reminding');
 });
 
 test('alternate/cycle plans skip off days and retain the next active day', () => {
@@ -364,4 +388,41 @@ test('calculateStockProjection correctly estimates daily consumption, remaining 
   assert.equal(pGood.dailyConsumption, 1);
   assert.equal(pGood.daysRemaining, 30);
   assert.equal(pGood.statusTier, 'good');
+});
+
+const actionResponse = (actionIdentifier, patch = {}) => ({
+  actionIdentifier,
+  notification: { date: 1789500600000, request: { identifier: 'dose-7-2026-09-07-14:00-main',
+    content: { title: 'İlaç Vakti', body: '', data: { doseId: 7, time: '14:00', date: '2026-09-07' } } } },
+  ...patch,
+});
+
+test('cold-start action is held until doses load, then handled once despite listener and launch replay', () => {
+  const api = setup();
+  const handled = [];
+  const gate = api.createNotificationResponseGate(res => handled.push(res));
+  api.addNotificationResponseListener(res => gate.push(res));
+  const response = actionResponse('ACTION_TAKEN');
+  api.native.lastResponse = response;
+  api.native.responseListeners.forEach(listener => listener(response));
+  assert.equal(handled.length, 0, 'actions before hydration must wait for stored doses');
+
+  const launch = api.takeLaunchNotificationResponse();
+  assert.equal(api.native.lastResponse, null, 'launch response is cleared so a later launch cannot replay it');
+  gate.push(launch);
+  gate.open();
+  assert.deepEqual(handled.map(r => [r.actionId, r.doseId, r.timeStr, r.date]), [['ACTION_TAKEN', 7, '14:00', '2026-09-07']]);
+
+  api.native.responseListeners.forEach(listener => listener(response));
+  assert.equal(handled.length, 1, 'the same interaction is never applied twice');
+  const later = actionResponse('ACTION_SKIP', { notification: { ...response.notification, date: 1789500700000 } });
+  api.native.responseListeners.forEach(listener => listener(later));
+  assert.deepEqual(handled.map(r => r.actionId), ['ACTION_TAKEN', 'ACTION_SKIP'], 'after hydration actions apply immediately');
+});
+
+test('launch without a notification response and an unavailable native API return null', () => {
+  const api = setup();
+  assert.equal(api.takeLaunchNotificationResponse(), null);
+  api.native.getLastNotificationResponse = () => { throw new Error('not linked'); };
+  assert.equal(api.takeLaunchNotificationResponse(), null);
 });

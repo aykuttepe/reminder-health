@@ -1,8 +1,8 @@
 *** Settings ***
 Documentation    Verifies the undo flow and visible correction options on Android emulator:
 ...              1. Toast Undo immediately refunds stock and restores pending slot.
-...              2. Today screen "Yanlış işaretledim" correction refunds stock and restores pending slot.
-...              3. History screen "Yanlış işaretledim" correction refunds stock and restores pending slot.
+...              2. Today screen record correction ("Düzelt") refunds stock and restores pending slot.
+...              3. History screen record correction refunds stock and restores pending slot.
 Library          AppiumLibrary    run_on_failure=No Operation
 Suite Setup      Open Clean Reminder Application
 Suite Teardown   Close All Applications
@@ -13,7 +13,7 @@ ${MEDICATION}    Undo Test İlacı
 
 *** Test Cases ***
 Verify Complete Undo Flow And Correction Options
-    [Documentation]    Verifies Toast Undo, Today screen "Yanlış işaretledim", and History screen "Yanlış işaretledim" all refund stock correctly.
+    [Documentation]    Verifies Toast Undo and the Today/History record corrections all refund stock correctly.
     # Step 1: Add new medication with 30 pills
     Click Element    android=new UiSelector().descriptionContains(", İlaçlarım").clickable(true)
     Wait Until Page Contains    Tedavi Planı    15s
@@ -77,10 +77,10 @@ Verify Complete Undo Flow And Correction Options
     Wait Until Page Contains    Bugün    15s
     Wait Until Page Contains Element    android=new UiSelector().textContains("Alınan Dozlar")    10s
     Click Element    android=new UiSelector().textContains("Alınan Dozlar")
-    Wait Until Page Contains Element    android=new UiSelector().text("Yanlış işaretledim")    10s
+    Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)    10s
 
-    # Step 9: Click "Yanlış işaretledim" on Today screen and confirm in dialog
-    Click Element    android=new UiSelector().text("Yanlış işaretledim")
+    # Step 9: Tap the taken record row on Today ("Düzelt") and confirm in dialog
+    Click Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)
     Wait Until Page Contains    Bu kayıt geri alınacak    10s
     Click Element    android=new UiSelector().resourceId("android:id/button1")
 
@@ -111,13 +111,13 @@ Verify Complete Undo Flow And Correction Options
     Wait Until Page Contains Element    android=new UiSelector().text("29")    15s
     Page Should Contain Text    29
 
-    # Step 13: Go to History tab and verify "Yanlış işaretledim"
+    # Step 13: Go to History tab and verify the record row is correctable
     Click Element    android=new UiSelector().descriptionContains(", Geçmiş").clickable(true)
     Wait Until Page Contains    Bugünün Kayıtları    15s
-    Wait Until Page Contains Element    android=new UiSelector().text("Yanlış işaretledim")    10s
+    Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)    10s
 
-    # Step 14: Click "Yanlış işaretledim" in History and confirm in dialog
-    Click Element    android=new UiSelector().text("Yanlış işaretledim")
+    # Step 14: Tap the record row in History and confirm in dialog
+    Click Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)
     Wait Until Page Contains    Bu kayıt geri alınacak    10s
     Click Element    android=new UiSelector().resourceId("android:id/button1")
 

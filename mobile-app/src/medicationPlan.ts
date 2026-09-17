@@ -321,7 +321,70 @@ export function normalizeDoseDay(dose: Dose, date = localDateKey()): Dose {
 
 }
 
+export type HistorySlot = {
+  slotId: string;
+  dose: Dose;
+  time: string;
+  status: Dose['status'];
+  todayAmount: string;
+};
+
+/** One day's dose rows for the History screen. With `includeUnrecorded`, slots that were planned
+ * that day but never marked are kept as 'pending' so a reverted record can be corrected instead
+ * of disappearing from every screen. */
+export function buildHistorySlots(doses: Dose[], date: string,
+  options: { includeUnrecorded?: boolean; lang?: 'tr' | 'en' } = {}): HistorySlot[] {
+  return doses.flatMap(dose => {
+    const planned = dose.times?.length ? dose.times : [dose.time];
+    const times = new Set([...planned, ...Object.keys(dose.dailyStatuses?.[date] ?? {}),
+      ...Object.keys(dose.doseRecords?.[date] ?? {})]);
+    return [...times].map(time => ({ slotId: `${dose.id}_${time}`, dose, time,
+      status: slotStatus(dose, time, date),
+      todayAmount: (dose.slotAmounts?.[time]?.trim()) || getCycleInfo(dose, date, options.lang).todayAmount }));
+  }).filter(slot => slot.status !== 'pending'
+    || (!!options.includeUnrecorded && isDoseActive(slot.dose, date) && trackedOn(slot.dose, date)
+      && (slot.dose.times?.length ? slot.dose.times : [slot.dose.time]).includes(slot.time)))
+    .sort((a, b) => a.time.localeCompare(b.time));
+}
+
+/** A back-dated start date must not turn days before the app knew the medicine into missed doses.
+ * The first tracked day is the earliest status day or record kept for the dose. */
+function trackedOn(dose: Dose, date: string): boolean {
+  const days = [dose.statusDate, ...Object.keys(dose.dailyStatuses ?? {}), ...Object.keys(dose.doseRecords ?? {})]
+    .filter((day): day is string => !!day);
+  return days.length === 0 || date >= days.reduce((first, day) => (day < first ? day : first));
+}
+
+export type DaySummary = { total: number; taken: number; skipped: number; unrecorded: number };
+export type DayAdherence = 'none' | 'complete' | 'partial' | 'missed' | 'open';
+
+export function summarizeDay(doses: Dose[], date: string): DaySummary {
+  const slots = buildHistorySlots(doses, date, { includeUnrecorded: true });
+  return {
+    total: slots.length,
+    taken: slots.filter(slot => slot.status === 'taken').length,
+    skipped: slots.filter(slot => slot.status === 'skipped').length,
+    unrecorded: slots.filter(slot => slot.status === 'pending').length,
+  };
+}
+
+/** Today stays 'open' while doses are unmarked; skipped doses count as not taken. */
+export function dayAdherence(summary: DaySummary, isToday: boolean): DayAdherence {
+  if (summary.total === 0) return 'none';
+  if (summary.taken === summary.total) return 'complete';
+  if (isToday && summary.unrecorded > 0) return 'open';
+  return summary.taken === 0 ? 'missed' : 'partial';
+}
+
+/** Taken versus due doses over already summarized days; today's unmarked doses are not due yet. */
+export function adherenceOverDays(days: { date: string; summary: DaySummary }[], today: string): { taken: number; due: number } {
+  return days.reduce((sum, { date, summary }) => ({ taken: sum.taken + summary.taken,
+    due: sum.due + summary.total - (date === today ? summary.unrecorded : 0) }), { taken: 0, due: 0 });
+}
+
 export function isDoseActive(dose: Dose, date: string): boolean {
+  // Deleted medicines stay in the list as sync tombstones and must never be scheduled.
+  if (dose.deletedAt) return false;
   const duration = getDurationInfo(dose, date);
   return !dose.paused && duration.hasStarted && !duration.isExpired && getCycleInfo(dose, date).isActiveToday;
 }
