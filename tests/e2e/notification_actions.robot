@@ -5,6 +5,7 @@ Documentation    Verifies Android notification action buttons against the first 
 ...              3. "3 Dk Ertele" delivers a snooze notification with action buttons.
 ...              4. "İlaç İçildi" still records the dose after the app process was killed.
 ...              5. Tapping the notification body after a kill offers the dose in the in-app banner.
+...              6. Deleting the medicine dismisses its notification already shown in the shade.
 ...              The settings test notification carries the first medication's id and time,
 ...              so its actions follow the same App.tsx handler as scheduled reminders.
 Library          AppiumLibrary    run_on_failure=No Operation
@@ -110,7 +111,29 @@ Tapping Notification Body After Process Kill Offers Dose Actions
     Reminder Should Reach Foreground
     Take Dose From In-App Banner
 
+Deleting Medication Clears Its Shown Notification
+    [Documentation]    Deleting a medicine stops future reminders; the one already in the shade must go too.
+    Add Medication And Verify Stock    ${MEDICATION}
+    Deliver Test Notification In Background
+    Press Keycode    4
+    Activate Application    com.itmarti.reminder
+    Wait Until Page Contains Element    ${TAB_MEDS}    15s
+    Click Element    ${TAB_MEDS}
+    Wait Until Page Contains    Tedavi Planı    15s
+    Click Element    android=new UiSelector().text("Tedavi Planı")
+    Click Element    android=new UiSelector().text("${MEDICATION}")
+    ${delete}=    Set Variable    android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().text("İlacı Sil"))
+    Wait Until Page Contains Element    ${delete}    15s
+    Click Element    ${delete}
+    Wait Until Page Contains    Bu ilacı silmek istediğinizden emin misiniz?    10s
+    Click Element    android=new UiSelector().resourceId("android:id/button1")
+    Wait Until Keyword Succeeds    10s    1s    Test Notification Should Be Gone
+
 *** Keywords ***
+Test Notification Should Be Gone
+    ${tags}=    Active Reminder Notification Tags
+    Should Not Contain    ${tags}    test-med-main
+
 Take Dose From In-App Banner
     Wait Until Page Contains Element    ${TAB_TODAY}    30s
     # The launch account check can hold queued responses briefly; the banner follows once it settles.

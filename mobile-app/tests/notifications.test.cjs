@@ -25,8 +25,14 @@ function setup(now = '2026-09-07T12:00:00', platform = 'android') {
     },
     async getAllScheduledNotificationsAsync() { await Promise.resolve(); return [...pending.values()]; },
     async cancelScheduledNotificationAsync(id) { await Promise.resolve(); operations.push(['cancel', id]); pending.delete(id); },
-    async getPresentedNotificationsAsync() { return []; },
-    async dismissNotificationAsync() {},
+    presented: [],
+    categories: {},
+    async getPresentedNotificationsAsync() { return native.presented; },
+    async dismissNotificationAsync(id) {
+      operations.push(['dismiss', id]);
+      native.presented = native.presented.filter(item => item.request.identifier !== id);
+    },
+    async setNotificationCategoryAsync(id, actions) { native.categories[id] = actions; },
     async cancelAllScheduledNotificationsAsync() { throw new Error('Global cancellation must not be used'); },
     // TypeScript's namespace import copies these functions, so state lives on `native`, not `this`.
     lastResponse: null,
@@ -448,4 +454,48 @@ test('launch without a notification response and an unavailable native API retur
   assert.equal(api.takeLaunchNotificationResponse(), null);
   api.native.getLastNotificationResponse = () => { throw new Error('not linked'); };
   assert.equal(api.takeLaunchNotificationResponse(), null);
+});
+
+test('appointment reminders offer 1 h and 3 h snooze buttons that open the app to schedule them', async () => {
+  const api = setup();
+  await api.initNotifications();
+  const actions = api.native.categories[api.NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS] ?? [];
+  // Categories are built in the vm realm; copy the ids so strict equality compares values only.
+  assert.deepEqual([...actions.map(a => a.identifier)], [api.ACTION_APPT_SNOOZE_1H, api.ACTION_APPT_SNOOZE_3H, api.ACTION_APPT_DONE]);
+  for (const action of actions.slice(0, 2)) assert.equal(action.options.opensAppToForeground, true);
+});
+
+test('a snoozed appointment reminder keeps its appointment, actions and timing', async () => {
+  const api = setup();
+  await api.snoozeDoctorAppointmentNotification(60, { title: '🗓️ Yarın Doktor Randevunuz Var!', body: 'Yarın 10:00',
+    appointmentId: 'a1', appointmentDate: '2026-09-10', appointmentTime: '10:00' });
+  const [snooze] = [...api.pending.values()];
+  assert.match(snooze.identifier, /^appt-snooze-a1-/);
+  assert.equal(snooze.content.categoryIdentifier, api.NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS);
+  assert.equal(snooze.content.data.isAppointment, true);
+  assert.equal(snooze.content.data.appointmentId, 'a1');
+  assert.equal(snooze.content.title, '🗓️ Yarın Doktor Randevunuz Var!');
+  assert.equal(new Date(snooze.trigger.date).getTime(), api.now().getTime() + 60 * 60000);
+});
+
+test('appointment resync keeps snoozes of active appointments and drops the others', async () => {
+  const api = setup();
+  const appt = (id, patch = {}) => ({ id, doctorName: 'Ayşe', specialty: '', hospital: '', date: '2026-09-10',
+    time: '10:00', leadOptions: ['1d'], hasBloodTest: false, createdAt: 1, updatedAt: 1, ...patch });
+  for (const id of ['a1', 'a2', 'a3']) await api.snoozeDoctorAppointmentNotification(180, { appointmentId: id });
+  await api.syncDoctorAppointmentNotifications({ appointments: [appt('a1'), appt('a2', { completed: true })], lang: 'tr' });
+  const ids = [...api.pending.keys()];
+  assert.equal(ids.filter(id => id.startsWith('appt-snooze-a1-')).length, 1, 'active appointment keeps its snooze');
+  assert.equal(ids.filter(id => /^appt-snooze-a[23]-/.test(id)).length, 0, 'completed and deleted appointments lose theirs');
+  assert.ok(ids.includes('appt-a1-lead-1d'));
+});
+
+test('deleting a medicine dismisses its reminders already shown in the shade', async () => {
+  const api = setup();
+  const shown = (identifier, doseId) => ({ request: { identifier, content: { data: { doseId, time: '09:00' } } } });
+  api.native.presented = [shown('dose-7-2026-09-07-09:00-repeat-2', 7), shown('dose-8-2026-09-07-09:00-main', 8),
+    shown('appt-a1-lead-1d', undefined)];
+  await api.dismissDoseNotifications(7);
+  assert.deepEqual(api.native.presented.map(item => item.request.identifier),
+    ['dose-8-2026-09-07-09:00-main', 'appt-a1-lead-1d']);
 });

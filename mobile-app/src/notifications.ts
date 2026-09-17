@@ -430,6 +430,17 @@ export async function initNotifications(): Promise<void> {
       ]);
 
       await Notifications.setNotificationCategoryAsync(NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS, [
+        // Snoozing schedules a new reminder from JS, so the app has to be started for it.
+        {
+          identifier: ACTION_APPT_SNOOZE_1H,
+          buttonTitle: '⏱️ 1 Saat Ertele',
+          options: { opensAppToForeground: true },
+        },
+        {
+          identifier: ACTION_APPT_SNOOZE_3H,
+          buttonTitle: '⏱️ 3 Saat Ertele',
+          options: { opensAppToForeground: true },
+        },
         {
           identifier: ACTION_APPT_DONE,
           buttonTitle: '✅ Anlaşıldı',
@@ -527,6 +538,7 @@ export type NotificationActionResponse = {
   date?: string;
   isRepeat?: boolean;
   isAppointment?: boolean;
+  appointmentId?: string;
   appointmentDate?: string;
   appointmentTime?: string;
   leadOption?: string;
@@ -546,6 +558,7 @@ function parseNotificationResponse(res: Notifications.NotificationResponse): Not
     date: data?.date,
     isRepeat: data?.isRepeat as boolean | undefined,
     isAppointment: data?.isAppointment,
+    appointmentId: data?.appointmentId,
     appointmentDate: data?.appointmentDate,
     appointmentTime: data?.appointmentTime,
     leadOption: data?.leadOption,
@@ -666,6 +679,23 @@ export async function playTestSound(
  * Also dismisses any already delivered notifications from the notification tray.
  * Called immediately when the dose is confirmed (taken or skipped).
  */
+/** Clears a medicine's reminders already shown in the shade; planning drops its future ones on deletion. */
+export function dismissDoseNotifications(doseId: string | number): Promise<void> {
+  return serializeNotifications(async () => {
+    try {
+      const presented = await Notifications.getPresentedNotificationsAsync();
+      for (const item of presented) {
+        const data = item.request?.content?.data;
+        if (data?.doseId !== undefined && String(notificationId(data.doseId)) === String(doseId)) {
+          await Notifications.dismissNotificationAsync(item.request.identifier);
+        }
+      }
+    } catch (err) {
+      console.log('dismissDoseNotifications error:', err);
+    }
+  });
+}
+
 export function cancelDoseRepeatNotifications(doseId: string | number, timeStr?: string, date = localDateKey()): Promise<void> {
   return serializeNotifications(async () => {
     try {
@@ -1073,20 +1103,25 @@ export function cancelDoctorAppointmentNotifications(): Promise<void> {
 }
 
 export function snoozeDoctorAppointmentNotification(
-  minutes = 60,
-  title?: string,
-  body?: string
+  minutes: number,
+  source: { title?: string; body?: string; appointmentId?: string; appointmentDate?: string;
+    appointmentTime?: string; leadOption?: string; isBloodTest?: boolean },
 ): Promise<void> {
   return serializeNotifications(async () => {
     try {
       const fireAt = Date.now() + Math.max(10, minutes * 60) * 1000;
+      // The appointment id lets resync keep this snooze only while the appointment is still active.
       await Notifications.scheduleNotificationAsync({
-        identifier: `appt-snooze-${Date.now()}`,
+        identifier: `appt-snooze-${source.appointmentId ?? 'unknown'}-${Date.now()}`,
         content: {
-          title: title || '🗓️ Randevu Hatırlatması (Ertelendi)',
-          body: body || 'Randevunuz için erteleme süresi doldu.',
+          title: source.title || '🗓️ Randevu Hatırlatması (Ertelendi)',
+          body: source.body || 'Randevunuz için erteleme süresi doldu.',
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.HIGH,
+          categoryIdentifier: NOTIFICATION_CATEGORY_APPOINTMENT_ACTIONS,
+          data: { isAppointment: true, isSnooze: true, fireAt, appointmentId: source.appointmentId,
+            appointmentDate: source.appointmentDate, appointmentTime: source.appointmentTime,
+            leadOption: source.leadOption, isBloodTest: source.isBloodTest },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -1105,16 +1140,6 @@ export function syncDoctorAppointmentNotifications(
 ): Promise<void> {
   return serializeNotifications(async () => {
     try {
-      // 1. Cancel previous appointment and lab reminders
-      const existing = await Notifications.getAllScheduledNotificationsAsync();
-      for (const item of existing) {
-        if (item.identifier.startsWith('appt-')) {
-          try {
-            await Notifications.cancelScheduledNotificationAsync(item.identifier);
-          } catch {}
-        }
-      }
-
       const { lang = 'tr' } = params;
       const isEn = lang === 'en';
 
@@ -1141,6 +1166,18 @@ export function syncDoctorAppointmentNotifications(
             updatedAt: Date.now(),
           },
         ];
+      }
+
+      // Rebuild lead and lab reminders from scratch; a snooze the user chose stays while its appointment is active.
+      const activeIds = new Set(itemsToSchedule.map(item => String(item.id)));
+      const existing = await Notifications.getAllScheduledNotificationsAsync();
+      for (const item of existing) {
+        if (!item.identifier.startsWith('appt-')) continue;
+        const snoozedAppointment = item.identifier.startsWith('appt-snooze-') ? item.content?.data?.appointmentId : undefined;
+        if (snoozedAppointment !== undefined && activeIds.has(String(snoozedAppointment))) continue;
+        try {
+          await Notifications.cancelScheduledNotificationAsync(item.identifier);
+        } catch {}
       }
 
       // 3. Schedule for each appointment

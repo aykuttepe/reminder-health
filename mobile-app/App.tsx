@@ -40,6 +40,7 @@ import {
   openBatteryOptimizationSettings,
   openExactAlarmSettings,
   cancelDoseRepeatNotifications,
+  dismissDoseNotifications,
   cancelAllRepeatNotifications,
   registerDoseStatusChecker,
   snoozeNotification,
@@ -806,7 +807,12 @@ function MainApp() {
   notificationResponseHandler.current = res => {
     const { actionId, doseId, timeStr, date, isAppointment } = res;
     if (isAppointment) {
-      if (actionId === ACTION_APPT_DONE || !actionId) {
+      if (actionId === ACTION_APPT_SNOOZE_1H || actionId === ACTION_APPT_SNOOZE_3H) {
+        const hours = actionId === ACTION_APPT_SNOOZE_1H ? 1 : 3;
+        snoozeDoctorAppointmentNotification(hours * 60, res).then(() => {
+          showToast(language === 'en' ? `⏱️ Appointment reminder snoozed for ${hours} h` : `⏱️ Randevu hatırlatması ${hours} saat ertelendi`);
+        }).catch(error => logger.error('Notifications', 'Randevu erteleme hatası', error));
+      } else if (actionId === ACTION_APPT_DONE || !actionId) {
         showToast(language === 'en' ? '✅ Appointment reminder confirmed' : '✅ Randevu hatırlatması onaylandı');
       }
       return;
@@ -1560,6 +1566,8 @@ function MainApp() {
             const deletedAt = Date.now();
             const epoch = accountEpoch.current;
             setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt, updatedAt: deletedAt } : d));
+            // Planning drops future reminders; already shown ones would otherwise stay in the shade.
+            dismissDoseNotifications(id).catch(() => {});
             setEditorOpen(false);
             showToast(t.toastMedDeleted, () => {
               if (accountEpoch.current !== epoch || switchingAccount.current) return;
