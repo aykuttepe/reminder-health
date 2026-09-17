@@ -1,7 +1,7 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.1",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.1.1: Ayar sayfalarında uzun açıklama yazıları anahtarların altına giriyordu, düzeltildi (örneğin Gizlilik & Kilit Ekranı). Duraklatılmış, süresi bitmiş veya henüz başlamamış ilaçlar artık kritik stok uyarısı üretmiyor.",
-  "publishedAt": "2026-09-17T18:30:00Z"
+  "releaseNotes": "v1.2.1: Ayar sayfalarında uzun açıklama yazıları anahtarların altına giriyordu, düzeltildi (örneğin Gizlilik & Kilit Ekranı). Duraklatılmış, süresi bitmiş veya henüz başlamamış ilaçlar artık kritik stok uyarısı üretmiyor. 1.2.0 ile gelen otomatik eşitleme değişiklikleri korunuyor.",
+  "publishedAt": "2026-09-17T20:40:00Z"
 }
