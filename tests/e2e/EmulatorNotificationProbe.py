@@ -95,6 +95,40 @@ class EmulatorNotificationProbe:
         self._shell("input", "keyevent", "224")
         self._shell("wm", "dismiss-keyguard")
 
+    @staticmethod
+    def _alarm_times(dump):
+        """Scheduled wall-clock times of this package's pending alarms, sorted, minute precision."""
+        blocks = re.findall(
+            rf"(?ms)^\s+(?:RTC_WAKEUP|RTC|ELAPSED_WAKEUP|ELAPSED) #\d+: Alarm\{{[^}}]*{re.escape(EmulatorNotificationProbe.PACKAGE)}\}}"
+            r".*?(?=^\s+(?:RTC_WAKEUP|RTC|ELAPSED_WAKEUP|ELAPSED) #|\Z)", dump)
+        times = []
+        for block in blocks:
+            when = re.search(r"origWhen=(\d{4}-\d{2}-\d{2} \d{2}:\d{2})", block)
+            if not when:
+                raise AssertionError("Unsupported dumpsys alarm format: origWhen missing.")
+            times.append(when[1])
+        return sorted(times)
+
+    @keyword
+    def reminder_alarm_times(self):
+        times = self._alarm_times(self._shell("dumpsys", "alarm"))
+        logger.info(f"Pending reminder alarms: {times}")
+        return times
+
+    @keyword
+    def device_date(self, days_from_today=0):
+        """Emulator-local calendar date shifted by whole days, as YYYY-MM-DD."""
+        return self._shell("date", "-d", f"@$(( $(date +%s) + {int(days_from_today)} * 86400 ))", "+%Y-%m-%d").strip()
+
+    @keyword
+    def swipe_screen_up(self):
+        """Injected touch swipe; UiAutomator scroll gestures do not move some settings pages."""
+        self._shell("input", "swipe", "540", "1900", "540", "700", "400")
+
+    @keyword
+    def device_hour_minute(self):
+        return self._shell("date", "+%H:%M").strip()
+
     @keyword
     def active_reminder_notification_tags(self):
         tags = self._tags(self._shell("dumpsys", "notification"))

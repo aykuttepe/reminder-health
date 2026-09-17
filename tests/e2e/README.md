@@ -3,6 +3,21 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Randevu yaşam döngüsü — 17 Eylül 2026
+
+- `notification_appointments.robot` (`npm --prefix tests/e2e run test:appointments`): yarına randevu ekle →
+  bugün 20:00 ve yarın 05:00 alarmları; tarihi 1 hafta sonraya taşı → alarmlar yeni tarihlere geçer;
+  tamamla → alarm kalmaz; tekrar aç → geri gelir; sil → alarm kalmaz — **passed**. Alarmlar
+  `dumpsys alarm` içindeki `origWhen` değerlerinden okunur; uygulama temiz başlatıldığı için tüm
+  alarmlar randevuya aittir. 19:58'den sonra aynı akşam hatırlatması beklenemeyeceği için test atlanır.
+  Alarmlar Appium oturumu açıkken okunmalı: oturum kapanırken uygulama durdurulur ve alarmlar silinir.
+- **Bulunan hata:** Randevu formu React Native'in `SafeAreaView`'ini kullanıyordu (Android'de etkisiz);
+  edge-to-edge Android'de başlık durum çubuğunun altında kaldı ve ✕ / Kaydet düğmelerine basılamadı.
+  `react-native-safe-area-context` ile düzeltildi; düzeltmeden önce Kaydet formu kapatmıyordu, sonra
+  kaydedip kapatıyor.
+- Randevu kartındaki silme düğmesi yalnızca simgeydi; `Randevuyu sil` erişilebilirlik etiketi eklendi.
+- Profil sayfası UiAutomator kaydırma komutlarıyla hareket etmiyor; test `adb input swipe` kullanır.
+
 ## Bildirim gövdesi, randevu ertelemesi, silinen ilaç — 17 Eylül 2026 (v0.2.30)
 
 - `notification_actions.robot` yeni senaryolar: süreç öldürüldükten sonra bildirim gövdesine dokunma
