@@ -1,7 +1,7 @@
 {
-  "version": "0.2.28",
+  "version": "0.2.29",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v0.2.28: Hesabı bağlı telefonlarda uygulama kapalıyken bildirimden basılan \"İlaç İçildi\" kaydının açılıştaki hesap eşitlemesi sırasında kaybolması düzeltildi. Yayın APK'sı yalnızca 64 bit ARM telefonlar içindir (~40 MB).",
+  "releaseNotes": "v0.2.29: Hesabı bağlı telefonlarda uygulama kapalıyken bildirimden basılan \"İlaç İçildi\" artık kaybolmuyor. Doz saatine erken hatırlatma süresinden daha az kala eklenen ilaçlar, \"Henüz İçilmedi\" uyarısı yerine doz saatinde normal hatırlatmayla bildiriliyor. Yalnızca 64 bit ARM telefonlar (~40 MB).",
   "publishedAt": "2026-09-17T15:00:00Z"
 }
