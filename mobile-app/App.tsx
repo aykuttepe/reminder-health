@@ -335,6 +335,8 @@ function MainApp() {
   const [language, setLanguage] = useState<Language>('tr');
   const t = getTranslations(language);
   const [hydrated, setHydrated] = useState(false);
+  // Set once the launch session check has bound an account or failed; see the notification gate.
+  const [accountChecked, setAccountChecked] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [scheduleInfo, setScheduleInfo] = useState<string | null>(null);
   const [doses, setDoses] = useState<Dose[]>(() => initialDoses.map(d => normalizeDoseDay(d)));
@@ -1006,13 +1008,15 @@ function MainApp() {
     setSelectedHistoryDate(today);
   }, [today, hydrated]);
 
-  // Doses are loaded now: replay actions queued during launch, including the one that opened the app.
+  // Replay actions queued during launch, including the one that opened the app, only after doses are
+  // loaded and the launch account check settled: binding an account rewrites doses and drops records
+  // applied while it runs, which lost "İlaç İçildi" taps on phones signed in to sync.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !accountChecked) return;
     const launchResponse = takeLaunchNotificationResponse();
     if (launchResponse) notificationResponseGate.push(launchResponse);
     notificationResponseGate.open();
-  }, [hydrated]);
+  }, [hydrated, accountChecked]);
 
   // Save to Storage
   useEffect(() => {
@@ -1565,7 +1569,8 @@ function MainApp() {
   // Sync Action Handlers
 
   const accountSnapshot = (): Snapshot => ({
-    doses,
+    // Launch-time callers run from an older render; the ref keeps actions applied meanwhile.
+    doses: dosesRef.current,
     learnedMeds,
     settings: {
       userName,
@@ -1598,7 +1603,7 @@ function MainApp() {
     setToastText(null);
     setUndoAction(null);
     try {
-      const before = doses;
+      const before = dosesRef.current;
       const snapshot = await switchAccount(localStore, serverUrl, next.user, accountSnapshot());
       await finishSwitch(localStore, {doses:STORAGE_KEY_DOSES, learned:STORAGE_KEY_LEARNED_MEDS, settings:STORAGE_KEY_SETTINGS});
       const oldMap = await localStore.getItem('reminder_notification_map_v2');
@@ -1894,7 +1899,7 @@ function MainApp() {
           if (active) setActiveSyncCode(savedCode);
         } finally {setAuthBusy(false);}
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => { if (active) setAccountChecked(true); });
     return () => {active=false;};
   }, [serverUrl, hydrated]);
 
