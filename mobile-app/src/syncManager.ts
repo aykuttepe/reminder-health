@@ -346,10 +346,11 @@ export async function checkServerHealth(
   const start = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const targetUrl = `${cleanUrl}/health`;
   try {
     const headers: Record<string, string> = {Accept: 'application/json'};
     if (apiToken?.trim()) headers.Authorization = `Bearer ${apiToken.trim()}`;
-    const res = await fetch(`${cleanUrl}/health`, {
+    const res = await fetch(targetUrl, {
       method: 'GET', headers, signal: controller.signal,
     });
     if (!res.ok) {
@@ -361,9 +362,16 @@ export async function checkServerHealth(
     }
     return {ok: true, version: data.version || '1.0.0', latencyMs: Date.now() - start};
   } catch (err: any) {
-    return {ok: false, error: controller.signal.aborted || err?.name === 'AbortError'
-      ? 'Zaman aşımı (15 sn)'
-      : (err?.message || 'Bağlantı hatası')};
+    const elapsed = Date.now() - start;
+    const isTimeout = controller.signal.aborted || err?.name === 'AbortError';
+    const detail = err?.message || err?.name || String(err);
+    return {
+      ok: false,
+      latencyMs: elapsed,
+      error: isTimeout
+        ? `Zaman aşımı (${Math.round(elapsed / 1000)} sn) — ${targetUrl}`
+        : `${detail} — ${targetUrl} (${elapsed}ms)`,
+    };
   } finally {
     clearTimeout(timeoutId);
   }

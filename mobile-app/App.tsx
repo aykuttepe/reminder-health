@@ -2,7 +2,7 @@ import {Keyboard} from 'react-native';
 import {setNotificationIdMap} from './src/notifications';
 import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, type Session, type Snapshot} from './src/account';
 import {login, recover, registerAccount, updateUserEmail, getStoredSyncCode, getSession, logout, authRequest, localStore} from './src/authClient';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -146,6 +146,7 @@ const LEAD_TIME_OPTIONS = [
 ];
 
 const STOCK_THRESHOLD_OPTIONS = [3, 5, 7, 10];
+const SYNC_INTERVAL_OPTIONS = [1, 3, 5, 10, 15, 30];
 
 /**
  * Dual Clock Picker Component:
@@ -711,9 +712,14 @@ function MainApp() {
   const [authBusy, setAuthBusy] = useState(false);
   const switchingAccount = useRef(false);
   const [autoSync, setAutoSync] = useState(false);
+  const [syncIntervalMin, setSyncIntervalMin] = useState(5);
+  const [customIntervalText, setCustomIntervalText] = useState('5');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'testing' | 'syncing' | 'connected' | 'error'>('idle');
   const [syncStatusMsg, setSyncStatusMsg] = useState('');
+  const isSyncingRef = useRef(false);
+  const syncDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerDebouncedSyncRef = useRef<() => void>(() => {});
 
   const triggerHaptic = () => {
     if (hapticsEnabled) {
@@ -903,6 +909,10 @@ function MainApp() {
             const activeUrl = restoreServerUrl(parsed?.serverUrl);
             setServerUrl(activeUrl);
             if (parsed.autoSync !== undefined) setAutoSync(parsed.autoSync);
+            if (parsed.syncIntervalMin !== undefined && typeof parsed.syncIntervalMin === 'number' && parsed.syncIntervalMin > 0) {
+              setSyncIntervalMin(parsed.syncIntervalMin);
+              setCustomIntervalText(String(parsed.syncIntervalMin));
+            }
             if (parsed.lastSyncAt) setLastSyncAt(parsed.lastSyncAt);
             if (parsed?.serverUrl !== activeUrl) {
               AsyncStorage.setItem(
@@ -910,6 +920,7 @@ function MainApp() {
                 JSON.stringify({
                   serverUrl: activeUrl,
                   autoSync: parsed.autoSync,
+                  syncIntervalMin: parsed.syncIntervalMin,
                   lastSyncAt: parsed.lastSyncAt,
                 })
               ).catch(() => {});
@@ -1043,10 +1054,11 @@ function MainApp() {
       JSON.stringify({
         serverUrl,
         autoSync,
+        syncIntervalMin,
         lastSyncAt,
       })
     ).catch(() => {});
-  }, [hydrated, serverUrl, autoSync, lastSyncAt]);
+  }, [hydrated, serverUrl, autoSync, syncIntervalMin, lastSyncAt]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1355,6 +1367,7 @@ function MainApp() {
     triggerHaptic();
     dosesRef.current = result.doses;
     setDoses(result.doses);
+    triggerDebouncedSyncRef.current();
     if (status !== 'pending') cancelDoseRepeatNotifications(doseId, time, date).catch(err => {
       logger.warn('Notifications', 'Tekrar bildirimi iptal edilemedi', { error: String(err) });
     });
@@ -1369,6 +1382,7 @@ function MainApp() {
       }
       dosesRef.current = next;
       setDoses(next);
+      triggerDebouncedSyncRef.current();
       showToast(language === 'en' ? 'Record reverted; stock corrected.' : 'Kayıt geri alındı; stok düzeltildi.');
     } : undefined);
   };
@@ -1404,6 +1418,7 @@ function MainApp() {
       logger.breadcrumb(`Stok güncellendi: ${target.name} -> ${clean}`);
     }
     setDoses(ds => ds.map(d => d.id === id ? { ...d, stock: clean, updatedAt: Date.now() } : d));
+    triggerDebouncedSyncRef.current();
   };
 
   const openEditor = (dose?: Dose) => {
@@ -1543,10 +1558,12 @@ function MainApp() {
     if (editingId) {
       logger.breadcrumb(`İlaç güncellendi: ${name.trim()} (${amount.trim()})`);
       setDoses(ds => ds.map(d => d.id === editingId ? { ...d, ...patch, updatedAt: Date.now() } : d));
+      triggerDebouncedSyncRef.current();
       showToast(language === 'en' ? 'Medication updated' : 'İlaç güncellendi');
     } else {
       logger.breadcrumb(`Yeni ilaç eklendi: ${name.trim()} (${amount.trim()})`);
       setDoses(ds => [...ds, { id: newId(), ...patch, status: 'pending', statusDate: today, slotStatuses: {} }]);
+      triggerDebouncedSyncRef.current();
       showToast(language === 'en' ? 'New medication added' : 'Yeni ilaç eklendi');
     }
     setEditorOpen(false);
@@ -1566,6 +1583,7 @@ function MainApp() {
             const deletedAt = Date.now();
             const epoch = accountEpoch.current;
             setDoses(ds => ds.map(d => d.id === id ? { ...d, deletedAt, updatedAt: deletedAt } : d));
+            triggerDebouncedSyncRef.current();
             // Planning drops future reminders; already shown ones would otherwise stay in the shade.
             dismissDoseNotifications(id).catch(() => {});
             setEditorOpen(false);
@@ -1573,6 +1591,7 @@ function MainApp() {
               if (accountEpoch.current !== epoch || switchingAccount.current) return;
               setDoses(ds => ds.map(d => d.id === id && d.deletedAt === deletedAt
                 ? { ...d, deletedAt: undefined, updatedAt: Date.now() } : d));
+              triggerDebouncedSyncRef.current();
             });
           },
         },
@@ -1671,6 +1690,13 @@ function MainApp() {
       if (showToastNotification) throw new Error(language === 'en' ? 'Connect with your personal sync code first.' : 'Önce kişisel eşitleme kodunuzla bağlanın.');
       return;
     }
+    if (isSyncingRef.current) {
+      if (showToastNotification) {
+        showToast(language === 'en' ? 'Sync already in progress...' : 'Eşitleme zaten devam ediyor...');
+      }
+      return;
+    }
+    isSyncingRef.current = true;
     setSyncStatus('syncing');
     setSyncStatusMsg(language === 'en' ? 'Syncing...' : 'Eşitleniyor...');
     const targetUrl = restoreServerUrl(serverUrl);
@@ -1705,15 +1731,18 @@ function MainApp() {
       payloadSettings.doctorNotes = (doctorNotes || '').trim();
       payloadSettings.appointments = JSON.stringify(appointments || []);
 
+      const activeDoses = (dosesRef.current && dosesRef.current.length > 0 ? dosesRef.current : doses);
       const response = await authRequest(targetUrl, '/api/sync', {
-        doses: doses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
+        doses: activeDoses.map(d => ({ ...d, updatedAt: (d as any).updatedAt || Date.now() })),
         learnedMeds,
         settings: payloadSettings,
       }, currentSession);
 
       if (response.success) {
-        const merged = smartMergeDoses(doses as SyncDose[], response.doses);
-        setDoses(merged.map(d => normalizeDoseDay(d, today)));
+        const merged = smartMergeDoses(activeDoses as SyncDose[], response.doses);
+        const normalized = merged.map(d => normalizeDoseDay(d, today));
+        dosesRef.current = normalized;
+        setDoses(normalized);
         if (response.learnedMeds) {
           setLearnedMeds(prev => ({ ...prev, ...response.learnedMeds }));
         }
@@ -1805,8 +1834,49 @@ function MainApp() {
       setSyncStatusMsg(err.message || (language === 'en' ? 'Connection error' : 'Bağlantı hatası'));
       if (showToastNotification) showToast(t.toastSyncFailed);
       logger.error('Sync', 'Sunucu eşitleme hatası', err, { serverUrl });
+    } finally {
+      isSyncingRef.current = false;
     }
   };
+
+  const triggerDebouncedSync = useCallback(() => {
+    if (!session || !autoSync) return;
+    if (syncDebounceTimerRef.current) clearTimeout(syncDebounceTimerRef.current);
+    syncDebounceTimerRef.current = setTimeout(() => {
+      syncWithServer(session, false).catch(err => {
+        logger.warn('Sync', 'Otomatik senkronizasyon başarısız oldu', { error: String(err) });
+      });
+    }, 3000);
+  }, [session, autoSync, serverUrl]);
+
+  useEffect(() => {
+    triggerDebouncedSyncRef.current = triggerDebouncedSync;
+  }, [triggerDebouncedSync]);
+
+  // Auto-Sync: Periodic timer based on custom user interval
+  useEffect(() => {
+    if (!hydrated || !accountChecked || !session || !autoSync) return;
+    const intervalMs = Math.max(1, syncIntervalMin) * 60 * 1000;
+    const timer = setInterval(() => {
+      syncWithServer(session, false).catch(err => {
+        logger.warn('Sync', 'Periyodik senkronizasyon hatası', { error: String(err) });
+      });
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [hydrated, accountChecked, session, autoSync, syncIntervalMin, serverUrl]);
+
+  // Auto-Sync: Foreground AppState listener
+  useEffect(() => {
+    if (!hydrated || !accountChecked || !session || !autoSync) return;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        syncWithServer(session, false).catch(err => {
+          logger.warn('Sync', 'Ön plan senkronizasyonu hatası', { error: String(err) });
+        });
+      }
+    });
+    return () => subscription.remove();
+  }, [hydrated, accountChecked, session, autoSync, serverUrl]);
 
   const handleRegister = async () => {
     Keyboard.dismiss();
@@ -1923,7 +1993,9 @@ function MainApp() {
     setSyncStatusMsg(language === 'en' ? 'Connecting to server...' : 'Sunucuya bağlanılıyor...');
     const targetUrl = restoreServerUrl(serverUrl);
     if (targetUrl !== serverUrl) setServerUrl(targetUrl);
+    logger.breadcrumb(`Bağlantı testi: ${targetUrl} | fetch: ${globalThis.fetch?.name || 'anonymous'} | ${typeof globalThis.fetch}`);
     const result = await checkServerHealth(targetUrl);
+    logger.breadcrumb(`Bağlantı testi sonuç: ok=${result.ok} latency=${result.latencyMs}ms error=${result.error || 'none'}`);
     if (result.ok) {
       setSyncStatus('connected');
       setSyncStatusMsg(language === 'en' ? `Server Online (v${result.version} · ${result.latencyMs}ms)` : `Sunucu Çevrimiçi (v${result.version} · ${result.latencyMs}ms)`);
@@ -4473,22 +4545,185 @@ function MainApp() {
                           {language === 'en' ? 'Automatic Synchronization' : 'Otomatik Senkronizasyon'}
                         </Text>
                         <Text style={styles.settingSub}>
-                          {language === 'en' ? 'Use Sync Now button for now' : 'Şimdilik Şimdi Eşitle düğmesini kullanın'}
+                          {autoSync
+                            ? (language === 'en'
+                                ? 'Syncs automatically on dose changes, app open, and set intervals'
+                                : 'İlaç durumu değiştiğinde, uygulama açıldığında ve seçilen aralıklarla otomatik eşitlenir')
+                            : (language === 'en'
+                                ? 'Enable to keep your devices in sync automatically'
+                                : 'Cihazlarınızı otomatik olarak güncel tutmak için açın')}
                         </Text>
                       </View>
                       <Switch
-                        value={false}
-                        disabled
+                        value={autoSync}
                         onValueChange={val => {
                           triggerHaptic();
                           setAutoSync(val);
+                          if (!val && syncDebounceTimerRef.current) {
+                            clearTimeout(syncDebounceTimerRef.current);
+                          }
                           showToast(val
                             ? (language === 'en' ? 'Automatic sync enabled' : 'Otomatik eşitleme açıldı')
                             : (language === 'en' ? 'Automatic sync disabled' : 'Otomatik eşitleme kapatıldı'));
+                          if (val && session) {
+                            syncWithServer(session, false).catch(() => {});
+                          }
                         }}
                         trackColor={{ true: '#a9dfca', false: '#3a4655' }}
                       />
                     </View>
+
+                    {autoSync && (
+                      <>
+                        <View style={styles.settingDivider} />
+
+                        <View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={styles.settingTitle}>
+                              {language === 'en' ? 'Sync Interval' : 'Eşitleme Aralığı'}
+                            </Text>
+                            <View style={styles.selectedPillBadge}>
+                              <Text style={styles.selectedPillBadgeText}>
+                                {syncIntervalMin} {language === 'en' ? 'min' : 'dk'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.settingSub}>
+                            {language === 'en'
+                              ? 'How often to sync with server in the background'
+                              : 'Arka planda sunucu ile ne sıklıkla eşitlensin?'}
+                          </Text>
+
+                          {/* Quick Chips */}
+                          <View style={styles.chipSelector}>
+                            {SYNC_INTERVAL_OPTIONS.map(mins => (
+                              <TouchableOpacity
+                                key={mins}
+                                style={[styles.choiceChip, syncIntervalMin === mins && styles.choiceChipActive]}
+                                onPress={() => {
+                                  triggerHaptic();
+                                  setSyncIntervalMin(mins);
+                                  setCustomIntervalText(String(mins));
+                                  showToast(language === 'en' ? `Sync interval set to ${mins} minutes` : `Eşitleme aralığı ${mins} dakika yapıldı`);
+                                }}
+                              >
+                                <Text style={[styles.choiceChipText, syncIntervalMin === mins && styles.choiceChipTextActive]}>
+                                  {mins} {language === 'en' ? 'min' : 'dk'}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+
+                          {/* Custom Interval Stepper & Numeric Input */}
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginTop: 10,
+                            backgroundColor: '#101d29',
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: '#203244',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                          }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12.5, color: '#f5f3f0', fontWeight: '500' }}>
+                                {language === 'en' ? 'Custom Interval' : 'Özel Aralık'}
+                              </Text>
+                              <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
+                                {language === 'en' ? '1 - 1440 minutes' : '1 - 1440 dakika arası'}
+                              </Text>
+                            </View>
+
+                            <TouchableOpacity
+                              style={{
+                                width: 32,
+                                height: 32,
+                                backgroundColor: '#162838',
+                                borderRadius: 6,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderWidth: 1,
+                                borderColor: '#2c3e50',
+                              }}
+                              onPress={() => {
+                                triggerHaptic();
+                                const next = Math.max(1, syncIntervalMin - 1);
+                                setSyncIntervalMin(next);
+                                setCustomIntervalText(String(next));
+                              }}
+                              accessibilityLabel={language === 'en' ? 'Decrease interval' : 'Aralığı azalt'}
+                            >
+                              <Ionicons name="remove" size={16} color="#a9dfca" />
+                            </TouchableOpacity>
+
+                            <TextInput
+                              style={{
+                                width: 56,
+                                height: 32,
+                                backgroundColor: '#0d1822',
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: '#2c3e50',
+                                color: '#f5f3f0',
+                                textAlign: 'center',
+                                fontSize: 14,
+                                fontWeight: '700',
+                                marginHorizontal: 6,
+                              }}
+                              keyboardType="number-pad"
+                              value={customIntervalText}
+                              onChangeText={text => {
+                                const numeric = text.replace(/[^0-9]/g, '');
+                                setCustomIntervalText(numeric);
+                                const val = parseInt(numeric, 10);
+                                if (!isNaN(val) && val >= 1 && val <= 1440) {
+                                  setSyncIntervalMin(val);
+                                }
+                              }}
+                              onBlur={() => {
+                                const val = parseInt(customIntervalText, 10);
+                                if (isNaN(val) || val < 1) {
+                                  setCustomIntervalText(String(syncIntervalMin));
+                                } else {
+                                  const clamped = Math.min(1440, Math.max(1, val));
+                                  setSyncIntervalMin(clamped);
+                                  setCustomIntervalText(String(clamped));
+                                }
+                              }}
+                              selectTextOnFocus
+                            />
+
+                            <TouchableOpacity
+                              style={{
+                                width: 32,
+                                height: 32,
+                                backgroundColor: '#162838',
+                                borderRadius: 6,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderWidth: 1,
+                                borderColor: '#2c3e50',
+                              }}
+                              onPress={() => {
+                                triggerHaptic();
+                                const next = Math.min(1440, syncIntervalMin + 1);
+                                setSyncIntervalMin(next);
+                                setCustomIntervalText(String(next));
+                              }}
+                              accessibilityLabel={language === 'en' ? 'Increase interval' : 'Aralığı artır'}
+                            >
+                              <Ionicons name="add" size={16} color="#a9dfca" />
+                            </TouchableOpacity>
+
+                            <Text style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8, fontWeight: '600' }}>
+                              {language === 'en' ? 'min' : 'dk'}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+
                     {lastSyncAt && (
                       <View style={styles.settingDivider}>
                         <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 8 }}>

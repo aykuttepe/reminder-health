@@ -211,6 +211,15 @@ export interface Translations {
   syncCopy: string;
   syncCopied: string;
   syncNewCredentialsWarning: string;
+  syncIntervalLabel: string;
+  syncIntervalSub: string;
+  syncIntervalMinute: string;
+  syncCustomInterval: string;
+  syncCustomIntervalRange: string;
+  autoSyncTitle: string;
+  autoSyncDesc: string;
+  autoSyncEnabledToast: string;
+  autoSyncDisabledToast: string;
   settingsDiagnostics: string;
   settingsDiagnosticsDesc: string;
   settingsLanguage: string;
@@ -475,6 +484,15 @@ export const translations: Record<Language, Translations> = {
     syncCopy: 'Kopyala',
     syncCopied: 'Kopyalandı!',
     syncNewCredentialsWarning: 'Bu bilgileri güvenli bir yere kaydedin. Diğer cihazlardaki oturumlar güvenlik sebebiyle sonlandırıldı.',
+    syncIntervalLabel: 'Eşitleme Aralığı',
+    syncIntervalSub: 'Arka planda sunucu ile ne sıklıkla eşitlensin?',
+    syncIntervalMinute: 'dk',
+    syncCustomInterval: 'Özel Aralık',
+    syncCustomIntervalRange: '1 - 1440 dakika arası',
+    autoSyncTitle: 'Otomatik Senkronizasyon',
+    autoSyncDesc: 'İlaç durumu değiştiğinde, uygulama açıldığında ve seçilen aralıklarla otomatik eşitlenir',
+    autoSyncEnabledToast: 'Otomatik eşitleme açıldı',
+    autoSyncDisabledToast: 'Otomatik eşitleme kapatıldı',
     settingsDiagnostics: 'Hata & Tanılama Günlüğü',
     settingsDiagnosticsDesc: 'Sistem logları, yakalanan hatalar ve kaza raporları',
     settingsLanguage: 'Dil / Language',
@@ -738,6 +756,15 @@ export const translations: Record<Language, Translations> = {
     syncCopy: 'Copy',
     syncCopied: 'Copied!',
     syncNewCredentialsWarning: 'Save these credentials safely. Sessions on all other devices have been revoked for security.',
+    syncIntervalLabel: 'Sync Interval',
+    syncIntervalSub: 'How often to sync with server in the background',
+    syncIntervalMinute: 'min',
+    syncCustomInterval: 'Custom Interval',
+    syncCustomIntervalRange: 'Between 1 - 1440 minutes',
+    autoSyncTitle: 'Automatic Synchronization',
+    autoSyncDesc: 'Syncs automatically on dose changes, app open, and set intervals',
+    autoSyncEnabledToast: 'Automatic sync enabled',
+    autoSyncDisabledToast: 'Automatic sync disabled',
     settingsDiagnostics: 'Diagnostics & Error Log',
     settingsDiagnosticsDesc: 'System logs, captured errors, and crash reports',
     settingsLanguage: 'Language / Dil',
