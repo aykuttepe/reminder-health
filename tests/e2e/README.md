@@ -3,6 +3,29 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Samsung elle testleri — 17 Eylül 2026 (v0.2.28, v0.2.29)
+
+Samsung SM-A376B, Android 16, **hesap bağlı ve senkron açık**. Testleri kullanıcı elle yaptı; sistem
+kayıtları (`logcat` olay tamponu, `dumpsys alarm`, `dumpsys notification`) yalnızca okunarak izlendi,
+ekran görüntüsü veya UI dökümü alınmadı.
+
+- **v0.2.27'de başarısız:** Uygulama kapalıyken bildirimden "İlaç İçildi" ne dozu işaretledi ne stoğu düşürdü.
+  Neden: açılıştaki hesap kontrolü `bindAccount`'u eski render'dan çağırıyor, doz listesinin eski kopyasını
+  ağ isteğinden sonra geri yazıyor ve bağlama sürerken gelen işlemleri yok sayıyordu. Emulator'da hesap
+  olmadığı için otomatik soğuk açılış testleri geçiyordu.
+- **v0.2.28:** Bildirim kuyruğu hesap kontrolünü de bekliyor, hesap anlık görüntüsü `dosesRef`'ten okunuyor.
+  17:20'deki tekrar bildiriminde `notification_action_clicked` → uygulama `NotificationForwarderActivity`
+  ile açıldı → dozun kalan 9 tekrar alarmı iptal edildi; kullanıcı "Alınan Dozlar" ve stoğu doğruladı.
+  Emulator bildirim aksiyonları **3/3 passed** (hesapsız yol bozulmadı).
+- **Erken hatırlatma boşluğu:** Telefonda erken hatırlatma 5 dk. Doz saatine 5 dakikadan az kala eklenen
+  ilaçta ana bildirim kurulmuyor, ilk uyarı +3 dk "Henüz İçilmedi" tekrarı oluyordu (17:17 ve 17:23 dozları).
+  Bir testte bildirimin gövdesine dokunuldu (`notification_clicked`): bu yalnızca uygulamayı açar, dozu
+  işaretlemez.
+- **v0.2.29:** Erken hatırlatma anından sonra eklenen/düzenlenen doz, doz saatinde ana bildirim alıyor.
+  Yeni birim testi düzeltmeden önce başarısız, sonra geçti; mobil **39/39**. Telefonda 17:35 dozu için ilk
+  alarm 17:35'e kuruldu, `17:35-main` bildirimi geldi, düğmeye basıldı (`notification_action_clicked`),
+  17:38–18:05 tekrarları iptal oldu; kullanıcı sonucu doğruladı.
+
 ## Geçmiş uyum görünümü — 16 Eylül 2026 (v0.2.27)
 
 - Hafta şeridi noktaları gün uyumunu gösteriyor (tamamı / kısmen / kaçırıldı, bugün sürerken boş halka,

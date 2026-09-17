@@ -775,9 +775,15 @@ export function buildMedicationSchedule(
         // For future days (> 1), we schedule only the main dose reminder (repeatIndex === 0).
         // As time advances or when the app opens, the schedule automatically refreshes upcoming repeat nags.
         const maxRepeatForDay = offset <= 1 ? repeats : 0;
+        const earlyAt = due.getTime() - (options.leadTimeMinutes ?? 0) * 60000;
+        // A dose added or edited after its heads-up moment never got that heads-up; remind at the dose
+        // time instead of letting a "not taken yet" repeat be the first alert. Doses planned earlier
+        // already fired the heads-up, so they keep skipping it.
+        const mainAt = earlyAt <= now.getTime() && due > now && (dose.updatedAt ?? 0) >= earlyAt
+          ? due.getTime() : earlyAt;
         for (let repeatIndex = 0; repeatIndex <= maxRepeatForDay; repeatIndex++) {
           // Repeat reminders are measured from the dose time, not its early heads-up.
-          const fireAt = new Date(due.getTime() + (repeatIndex ? repeatIndex * 3 : -(options.leadTimeMinutes ?? 0)) * 60000);
+          const fireAt = new Date(repeatIndex ? due.getTime() + repeatIndex * 3 * 60000 : mainAt);
           if (fireAt <= now) continue;
           const isRepeat = repeatIndex > 0;
           const content = buildNotificationContent({ ...dose, amount: slotAmount }, { ...options, isRepeat, repeatIndex, timeStr: time });

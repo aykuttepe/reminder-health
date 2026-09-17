@@ -198,6 +198,29 @@ test('early reminders and repeat reminders cross midnight with the original dose
   assert.equal(new Date(repeat.content.data.fireAt).getMinutes(), 2);
 });
 
+test('a dose planned inside its early-reminder window is reminded at the dose time', () => {
+  // Real case: 5 min lead, medicine added at 17:21 for 17:23; the 17:18 heads-up had already passed.
+  const api = setup('2026-09-07T17:21:00');
+  const lead = { ...options, leadTimeMinutes: 5 };
+  const mainOf = requests => requests.find(r => r.identifier.endsWith('-2026-09-07-17:23-main'));
+  const added = dose({ time: '17:23', updatedAt: new Date('2026-09-07T17:20:30').getTime() });
+  const main = mainOf(api.buildMedicationSchedule([added], lead, api.now()));
+  assert.ok(main, 'the first alert must not be a "not taken yet" repeat');
+  assert.equal(main.content.data.fireAt, new Date('2026-09-07T17:23:00').getTime());
+  assert.equal(main.content.data.isRepeat, false);
+
+  // Planned before 17:18: the heads-up already fired, so no second main alert at 17:23.
+  const planned = dose({ time: '17:23', updatedAt: new Date('2026-09-07T17:00:00').getTime() });
+  assert.equal(mainOf(api.buildMedicationSchedule([planned], lead, api.now())), undefined);
+
+  // Outside the window nothing changes: early heads-up before it, nothing once the dose time passed.
+  api.setClock('2026-09-07T17:10:00');
+  assert.equal(mainOf(api.buildMedicationSchedule([added], lead, api.now())).content.data.fireAt,
+    new Date('2026-09-07T17:18:00').getTime());
+  api.setClock('2026-09-07T17:23:30');
+  assert.equal(mainOf(api.buildMedicationSchedule([added], lead, api.now())), undefined);
+});
+
 test('snooze survives resync and targets the selected second slot', async () => {
   const api = setup();
   const d = dose({ time: '09:00', times: ['09:00', '14:00'] });
