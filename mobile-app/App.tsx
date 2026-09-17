@@ -3469,7 +3469,7 @@ function MainApp() {
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>{language === 'en' ? 'Notifications' : 'Bildirimler'}</Text>
                         <Text style={styles.settingSub}>{language === 'en' ? 'System reminders at dose times' : 'Doz zamanında sistem hatırlatıcıları'}</Text>
                       </View>
@@ -3486,7 +3486,7 @@ function MainApp() {
                     <View style={styles.settingDivider} />
 
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>{language === 'en' ? 'Notification Sound' : 'Bildirim Sesi'}</Text>
                         <Text style={styles.settingSub}>{language === 'en' ? 'Play audible alert for dose reminders' : 'Doz hatırlatıcılarında sesli uyarı çal'}</Text>
                       </View>
@@ -3951,7 +3951,7 @@ function MainApp() {
                     <View style={styles.settingDivider} />
 
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>{language === 'en' ? 'Low Stock Notification' : 'Kritik Stok Bildirimi'}</Text>
                         <Text style={styles.settingSub}>{language === 'en' ? 'Show device notification when stock runs low' : 'İlaç azaldığında cihaz uyarısı göster'}</Text>
                       </View>
@@ -3978,7 +3978,7 @@ function MainApp() {
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>{language === 'en' ? 'Hide Medication Name' : 'İlaç Adını Gizle'}</Text>
                         <Text style={styles.settingSub}>{language === 'en' ? 'Hide medication name on lock screen notifications' : 'Kilit ekranında ilacın adını sakla'}</Text>
                       </View>
@@ -3995,7 +3995,7 @@ function MainApp() {
                     <View style={styles.settingDivider} />
 
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>{language === 'en' ? 'Hide Dose Amount' : 'Doz Miktarını Gizle'}</Text>
                         <Text style={styles.settingSub}>{language === 'en' ? 'Hide quantity/unit details on lock screen' : 'Kilit ekranında kaç tablet/damla olduğu bilgisini sakla'}</Text>
                       </View>
@@ -4111,7 +4111,7 @@ function MainApp() {
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>Alınan Dozları Otomatik Daralt</Text>
                         <Text style={styles.settingSub}>Bugün sekmesinde alınan ilaçlar katlanmış kalsın</Text>
                       </View>
@@ -4128,7 +4128,7 @@ function MainApp() {
                     <View style={styles.settingDivider} />
 
                     <View style={styles.settingRow}>
-                      <View>
+                      <View style={styles.settingRowText}>
                         <Text style={styles.settingTitle}>Dokunsal Titreşim (Haptics)</Text>
                         <Text style={styles.settingSub}>İşlem butonlarına dokunulduğunda hafif geri bildirim</Text>
                       </View>
@@ -5849,6 +5849,8 @@ const styles = StyleSheet.create({
   settingGroupTitle: { color: '#a9dfca', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
   settingCard: { backgroundColor: '#152332', borderRadius: 12, padding: 16, marginBottom: 12 },
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  // Long descriptions must wrap instead of sliding under the switch at the row's right edge.
+  settingRowText: { flex: 1, paddingRight: 12 },
   settingTitle: { color: '#f5f3f0', fontSize: 15, fontWeight: '600' },
   settingSub: { color: '#adb3bf', fontSize: 12, marginTop: 2 },
   settingDivider: { height: 1, backgroundColor: '#203244', marginVertical: 14 },

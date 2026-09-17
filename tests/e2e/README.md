@@ -3,6 +3,20 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Stok ekranı ve ayar satırları — 17 Eylül 2026 (v1.1.1)
+
+- `medication_stock.robot` (`npm --prefix tests/e2e run test:stock`): stoğu 3 olan ilaç "Kritik / Tükendi",
+  60 olan "Yeterli" sayılır; kritik filtresi yalnızca kritik ilacı listeler — **passed**. Stok alanı
+  formun altında kaldığı için parmak hareketiyle inilir.
+- **Bulunan hata:** `calculateStockProjection` duraklatılmış, süresi bitmiş ve henüz başlamamış ilaçları
+  da tüketiyormuş gibi sayıyordu; bu ilaçlar kritik stok uyarısı üretiyordu. Projeksiyon artık `isActive`
+  bilgisini döndürüyor ve etkin olmayan ilaçlar uyarı üretmiyor (yeni birim testi, düzeltmeden önce failed).
+- **Bulunan hata:** Ayar satırlarında açıklama yazısının genişlik sınırı yoktu; uzun açıklama sağdaki
+  anahtarın altına giriyordu (Gizlilik & Kilit Ekranı sayfasında görüldü). 7 satır ortak `settingRowText`
+  stiliyle düzeltildi.
+- **Not:** Uygulamada ilacı duraklatacak bir arayüz yok; `paused` alanı yalnızca veri modelinde ve
+  filtrelerde kullanılıyor.
+
 ## Randevu yaşam döngüsü — 17 Eylül 2026
 
 - `notification_appointments.robot` (`npm --prefix tests/e2e run test:appointments`): yarına randevu ekle →

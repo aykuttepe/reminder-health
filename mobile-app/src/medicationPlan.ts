@@ -431,6 +431,8 @@ export interface StockProjection {
   runOutDateFormatted: string;
   statusTier: 'critical' | 'low' | 'good';
   isOutOfStock: boolean;
+  /** False while the medicine is deleted, paused, finished or not started yet. */
+  isActive: boolean;
   boxSize: number;
   threshold: number;
   progressPercent: number;
@@ -496,8 +498,13 @@ export function calculateStockProjection(
   }
 
   // 4. Durum seviyesi (Triage) - Kullanıcı tercihi: kritik <= 7 gün, azalıyor <= 14 gün
+  // Paused, finished and not yet started medicines consume nothing, so they raise no alarm.
+  const duration = getDurationInfo(dose, today);
+  const isActive = !dose.deletedAt && !dose.paused && duration.hasStarted && !duration.isExpired;
   let statusTier: 'critical' | 'low' | 'good' = 'good';
-  if (isOutOfStock || daysRemaining <= 7 || stock <= threshold) {
+  if (!isActive) {
+    statusTier = 'good';
+  } else if (isOutOfStock || daysRemaining <= 7 || stock <= threshold) {
     statusTier = 'critical';
   } else if (daysRemaining <= 14 || stock <= threshold * 1.5) {
     statusTier = 'low';
@@ -517,6 +524,7 @@ export function calculateStockProjection(
     runOutDateFormatted,
     statusTier,
     isOutOfStock,
+    isActive,
     boxSize,
     threshold,
     progressPercent,
