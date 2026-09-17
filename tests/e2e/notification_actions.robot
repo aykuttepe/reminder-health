@@ -4,6 +4,7 @@ Documentation    Verifies Android notification action buttons against the first 
 ...              2. "Atla" records a skip without touching stock.
 ...              3. "3 Dk Ertele" delivers a snooze notification with action buttons.
 ...              4. "İlaç İçildi" still records the dose after the app process was killed.
+...              5. Tapping the notification body after a kill offers the dose in the in-app banner.
 ...              The settings test notification carries the first medication's id and time,
 ...              so its actions follow the same App.tsx handler as scheduled reminders.
 Library          AppiumLibrary    run_on_failure=No Operation
@@ -24,6 +25,8 @@ ${TAB_SETTINGS}  android=new UiSelector().descriptionContains(", Ayarlar").click
 ${ACTION_TAKEN}  android=new UiSelector().resourceId("android:id/action0").text("✅ İlaç İçildi")
 ${ACTION_SKIP}   android=new UiSelector().resourceId("android:id/action0").text("❌ Atla")
 ${ACTION_SNOOZE}    android=new UiSelector().resourceId("android:id/action0").text("⏱️ 3 Dk Ertele")
+# The title sits in the notification's content area; tapping it is a body tap, not an action.
+${NOTIFICATION_BODY}    android=new UiSelector().packageName("com.android.systemui").text("⏰ İlaç Vakti")
 
 *** Test Cases ***
 Taken Action Records Dose Reduces Stock And Can Be Undone
@@ -92,7 +95,30 @@ Taken Action After Process Kill Still Records Dose
     Stock Should Be    29
     History Should Show Today Record    Alındı
 
+Tapping Notification Body After Process Kill Offers Dose Actions
+    [Documentation]    Tapping the notification itself only opens the app. The dose must then be offered
+    ...                in the in-app banner instead of silently staying unmarked. Only the killed-process
+    ...                case is meaningful: with the app alive, the settings test notification opens the
+    ...                same banner from its own JS timer, so a warm variant would pass without the fix.
+    Add Medication And Verify Stock    ${MEDICATION}
+    Deliver Test Notification In Background
+    Press Keycode    4
+    Kill Reminder Process
+    Reminder Process Should Not Be Running
+    Open Shade Until Reminder Is Listed
+    Click Element    ${NOTIFICATION_BODY}
+    Reminder Should Reach Foreground
+    Take Dose From In-App Banner
+
 *** Keywords ***
+Take Dose From In-App Banner
+    Wait Until Page Contains Element    ${TAB_TODAY}    30s
+    # The launch account check can hold queued responses briefly; the banner follows once it settles.
+    Wait Until Page Contains Element    android=new UiSelector().text("RUTİN · BİLDİRİM")    20s
+    Click Element    android=new UiSelector().text("Al")
+    Stock Should Be    29
+    History Should Show Today Record    Alındı
+
 Add Medication And Verify Stock
     [Arguments]    ${name}
     Click Element    ${TAB_MEDS}

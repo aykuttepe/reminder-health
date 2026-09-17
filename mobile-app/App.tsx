@@ -820,6 +820,12 @@ function MainApp() {
       applyRecord(dose.id, time, doseDate, actionId === ACTION_TAKEN ? 'taken' : 'skipped');
     } else if (actionId === ACTION_SNOOZE) {
       void snoozeDose(dose, time, doseDate);
+    } else if (slotStatus(dose, time, doseDate) === 'pending') {
+      // Tapping the notification itself only opens the app, so offer the dose instead of leaving it
+      // silently unmarked while the user believes it was handled.
+      setTab('Bugün');
+      setActiveBannerNotification({ title: res.title ?? dose.name, body: res.body ?? '', doseId: dose.id,
+        time, date: doseDate, isRepeat: res.isRepeat });
     }
   };
 
