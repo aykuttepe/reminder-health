@@ -90,5 +90,6 @@ When any text-entry control loses focus, dismiss the simulated keyboard. If the 
 - Marking a past dose taken debits stock at the moment of marking, not on the dose's own date; there is no date-aware stock correction yet.
 - History week dots come from `summarizeDay`/`dayAdherence`: mint all taken, amber partly, red missed (skipped counts as not taken), hollow ring while today still has unmarked doses, dim when nothing was planned. "Son 7 Gün" uses `adherenceOverDays`, which leaves today's unmarked doses out of the due count. Days before a medicine was first tracked (earliest statusDate, dailyStatuses or doseRecords day) never produce unrecorded rows, so a back-dated start date cannot invent missed doses.
 - v0.2.26 was only installed over USB; v0.2.27 publishes it together with the History adherence work.
+- Android builds target `arm64-v8a` only (`mobile-app/android/gradle.properties`, owner decision on 2026-09-17). Four ABIs made CI native builds take ~9 minutes and the APK ~99 MB; arm64 alone is ~40 MB. 32-bit ARM and x86 devices cannot install the app. The test emulator AVD is arm64-v8a.
 
 - Native networking uses the React Native XMLHttpRequest-backed fetch installed in `mobile-app/src/networking.ts` after Expo initialization. Keep this bootstrap before App imports; do not rely solely on an environment flag for release builds.
