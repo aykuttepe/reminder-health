@@ -362,16 +362,9 @@ export async function checkServerHealth(
     }
     return {ok: true, version: data.version || '1.0.0', latencyMs: Date.now() - start};
   } catch (err: any) {
-    const elapsed = Date.now() - start;
-    const isTimeout = controller.signal.aborted || err?.name === 'AbortError';
-    const detail = err?.message || err?.name || String(err);
-    return {
-      ok: false,
-      latencyMs: elapsed,
-      error: isTimeout
-        ? `Zaman aşımı (${Math.round(elapsed / 1000)} sn) — ${targetUrl}`
-        : `${detail} — ${targetUrl} (${elapsed}ms)`,
-    };
+    return {ok: false, error: controller.signal.aborted || err?.name === 'AbortError'
+      ? 'Zaman aşımı (15 sn)'
+      : (err?.message || 'Bağlantı hatası')};
   } finally {
     clearTimeout(timeoutId);
   }
