@@ -1,7 +1,7 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.1.0: Randevu formunun üstündeki Kaydet ve kapat düğmeleri Android'de artık basılabiliyor. Randevu kartındaki silme düğmesi ekran okuyucularla kullanılabiliyor. Randevu ekleme, düzenleme, tamamlama ve silmede hatırlatmalar doğru güncelleniyor (uçtan uca test edildi).",
-  "publishedAt": "2026-09-17T17:30:00Z"
+  "releaseNotes": "v1.2.0: Otomatik senkronizasyon aktifleştirildi. İlaç onaylandığında, silindiğinde veya eklendiğinde 3 saniye debounce ile sunucuya otomatik eşitleme eklendi. Ayarlarda 1-1440 dk arası serbestçe özelleştirilebilir periyodik eşitleme aralığı ve ön plana dönüşte otomatik senkronizasyon desteği getirildi.",
+  "publishedAt": "2026-09-17T19:15:00Z"
 }
