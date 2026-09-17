@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
+  "version": "1.1.1",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.0: Otomatik senkronizasyon aktifleştirildi. İlaç onaylandığında, silindiğinde veya eklendiğinde 3 saniye debounce ile sunucuya otomatik eşitleme eklendi. Ayarlarda 1-1440 dk arası serbestçe özelleştirilebilir periyodik eşitleme aralığı ve ön plana dönüşte otomatik senkronizasyon desteği getirildi.",
-  "publishedAt": "2026-09-17T19:15:00Z"
+  "releaseNotes": "v1.1.1: Ayar sayfalarında uzun açıklama yazıları anahtarların altına giriyordu, düzeltildi (örneğin Gizlilik & Kilit Ekranı). Duraklatılmış, süresi bitmiş veya henüz başlamamış ilaçlar artık kritik stok uyarısı üretmiyor.",
+  "publishedAt": "2026-09-17T18:30:00Z"
 }

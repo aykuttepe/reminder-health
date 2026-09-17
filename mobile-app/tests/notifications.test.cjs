@@ -373,6 +373,23 @@ test('slotAmounts accurately deducts different amounts for morning and evening a
   assert.ok(eveningReq.content.title.includes('1 tablet'), 'Evening notification title should state 1 tablet');
 });
 
+test('paused, finished and not yet started medicines raise no stock alarm', () => {
+  const api = setup('2026-09-07T12:00:00');
+  const low = { stock: 3, amount: '1 tablet', stockThreshold: 5 };
+  assert.equal(api.calculateStockProjection(dose(low), '2026-09-07', 'tr').statusTier, 'critical');
+
+  for (const [label, patch] of [
+    ['paused', { paused: true }],
+    ['finished', { durationMode: 'days', startDate: '2026-09-01', durationDays: 2 }],
+    ['not started', { startDate: '2026-10-01' }],
+  ]) {
+    const projection = api.calculateStockProjection(dose({ ...low, ...patch }), '2026-09-07', 'tr');
+    assert.equal(projection.statusTier, 'good', `${label} medicine must not be counted as critical`);
+    assert.equal(projection.isActive, false, `${label} medicine must be reported as inactive`);
+  }
+  assert.equal(api.calculateStockProjection(dose(low), '2026-09-07', 'tr').isActive, true);
+});
+
 test('calculateStockProjection correctly estimates daily consumption, remaining days, and triage tiers', () => {
   const api = setup('2026-09-07T12:00:00');
 
