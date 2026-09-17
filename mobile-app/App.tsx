@@ -3255,6 +3255,8 @@ function MainApp() {
 
                               <TouchableOpacity
                                 style={{ padding: 5 }}
+                                accessibilityRole="button"
+                                accessibilityLabel={language === 'en' ? 'Delete appointment' : 'Randevuyu sil'}
                                 onPress={() => handleDeleteAppointment(appt.id)}
                               >
                                 <Ionicons name="trash-outline" size={15} color="#ff9696" />

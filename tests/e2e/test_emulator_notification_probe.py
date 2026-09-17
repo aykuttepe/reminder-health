@@ -31,6 +31,19 @@ class EmulatorNotificationEvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "format"):
                 parse("Permission denied")
 
+    def test_alarm_times_only_include_this_package(self):
+        dump = (
+            "Pending alarm batches: 2\n"
+            "  RTC_WAKEUP #1: Alarm{a1 type 0 origWhen 1 com.itmarti.reminder}\n"
+            "    tag=*walarm*:expo.modules.notifications.NOTIFICATION_EVENT\n"
+            "    origWhen=2026-09-18 05:00:00.000 window=0\n"
+            "  RTC_WAKEUP #2: Alarm{a2 type 0 origWhen 1 com.other.app}\n"
+            "    origWhen=2026-09-17 06:00:00.000 window=0\n"
+            "  RTC_WAKEUP #3: Alarm{a3 type 0 origWhen 1 com.itmarti.reminder}\n"
+            "    origWhen=2026-09-17 20:00:00.000 window=0\n"
+        )
+        self.assertEqual(EmulatorNotificationProbe._alarm_times(dump), ["2026-09-17 20:00", "2026-09-18 05:00"])
+
     def test_physical_device_serial_is_refused(self):
         probe = EmulatorNotificationProbe("R6GL5000NTV")
         with self.assertRaisesRegex(AssertionError, "emulator"):

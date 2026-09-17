@@ -20,6 +20,7 @@
     "test:notification-background": ".venv/bin/python -m robot --outputdir results/notification_background notification_background.robot",
     "test:undo": ".venv/bin/python -m robot --outputdir results/undo medication_undo.robot",
     "test:notification-actions": ".venv/bin/python -m robot --outputdir results/notification-actions notification_actions.robot",
+    "test:appointments": ".venv/bin/python -m robot --outputdir results/appointments notification_appointments.robot",
     "test:notification-schedule": ".venv/bin/python -m robot --outputdir results/notification-schedule notification_schedule.robot",
     "test:probe": ".venv/bin/python -m unittest -v test_notification_probe.py test_emulator_notification_probe.py",
     "test:all": "npm run check:server && npm run test:android && npm run test:medication && npm run test:undo && npm run test:persistence && npm run test:validation && npm run test:notification && npm run test:notification-background"

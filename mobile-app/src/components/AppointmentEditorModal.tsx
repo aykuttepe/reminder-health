@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -12,6 +11,9 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+// React Native's SafeAreaView is iOS-only; on edge-to-edge Android the header sat under the status bar
+// and its close / Kaydet buttons could not be tapped.
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppointmentItem } from '../medicationPlan';
 import { formatLocalizedDate, toDateKey } from './CalendarModal';
 import { useResponsive } from '../useResponsive';
