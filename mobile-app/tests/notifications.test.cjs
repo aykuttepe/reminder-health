@@ -148,6 +148,28 @@ test('deleted medicines stop scheduling and their pending reminders and snoozes 
   assert.deepEqual([...api.pending.keys()], [], 'a tombstoned medicine must not keep reminding');
 });
 
+test('a muted medicine schedules no reminders, drops its snoozes and leaves other medicines alone', async () => {
+  const api = setup();
+  const live = dose({ time: '14:30' });
+  const other = dose({ id: 2, name: 'İlaç B', time: '15:00' });
+  await api.syncMedicationNotifications([live, other], options);
+  await api.snoozeNotification({ ...live, statusDate: '2026-09-07' }, 3);
+  assert.ok([...api.pending.keys()].some(id => id.startsWith('dose-1-') && id.endsWith('-snooze')));
+
+  const muted = { ...live, muted: true, updatedAt: Date.now() };
+  assert.equal(api.buildMedicationSchedule([muted], options, api.now()).length, 0);
+  await api.syncMedicationNotifications([muted, other], options);
+  const keys = [...api.pending.keys()];
+  assert.ok(!keys.some(id => id.startsWith('dose-1-')), 'a muted medicine must not keep reminding');
+  assert.ok(keys.some(id => id.startsWith('dose-2-')), 'other medicines keep their reminders');
+
+  await api.snoozeNotification({ ...muted, statusDate: '2026-09-07' }, 3);
+  assert.ok(![...api.pending.keys()].some(id => id.startsWith('dose-1-')), 'snoozing a muted medicine schedules nothing');
+
+  const unmuted = { ...muted, muted: false };
+  assert.ok(api.buildMedicationSchedule([unmuted], options, api.now()).length > 0);
+});
+
 test('alternate/cycle plans skip off days and retain the next active day', () => {
   const api = setup();
   for (const frequencyType of ['alternate', 'cycle']) {

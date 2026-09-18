@@ -361,6 +361,7 @@ function MainApp() {
   const [expandedTaken, setExpandedTaken] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [muted, setMuted] = useState(false);
   const [heroCarouselIndex, setHeroCarouselIndex] = useState(0);
 
   // Diagnostics & Logger State
@@ -1452,6 +1453,7 @@ function MainApp() {
       setCurrentExpiryDate(dose.expiryDate ?? null);
       setCurrentBatchNo(null);
       setSlotAmounts(dose.slotAmounts ? { ...dose.slotAmounts } : {});
+      setMuted(dose.muted === true);
     } else {
       setEditingId(null);
       setName('');
@@ -1476,6 +1478,7 @@ function MainApp() {
       setCurrentGTIN(null);
       setCurrentExpiryDate(null);
       setCurrentBatchNo(null);
+      setMuted(false);
     }
     setEditorOpen(true);
   };
@@ -1539,6 +1542,7 @@ function MainApp() {
       endDate: durationMode === 'days' ? calculateEndDate(startDate, Number(durationDays) || 7) : undefined,
       gtin: currentGTIN || undefined,
       expiryDate: currentExpiryDate || undefined,
+      muted: muted || undefined,
       updatedAt: Date.now(),
       deletedAt: undefined,
     };
@@ -1564,6 +1568,8 @@ function MainApp() {
       logger.breadcrumb(`İlaç güncellendi: ${name.trim()} (${amount.trim()})`);
       setDoses(ds => ds.map(d => d.id === editingId ? { ...d, ...patch, updatedAt: Date.now() } : d));
       triggerDebouncedSyncRef.current();
+      // Planning drops future reminders; already shown ones would otherwise stay in the shade.
+      if (muted) dismissDoseNotifications(editingId).catch(() => {});
       showToast(language === 'en' ? 'Medication updated' : 'İlaç güncellendi');
     } else {
       logger.breadcrumb(`Yeni ilaç eklendi: ${name.trim()} (${amount.trim()})`);
@@ -5575,6 +5581,24 @@ function MainApp() {
                 </View>
               )}
 
+              {/* Per-medicine mute: no reminders at all for this medicine */}
+              <View style={[styles.settingRow, styles.muteRow]}>
+                <View style={styles.settingRowText}>
+                  <Text style={styles.settingTitle}>{language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}</Text>
+                  <Text style={styles.settingSub}>
+                    {language === 'en'
+                      ? 'No notifications for this medicine. It stays on Today; mark doses yourself.'
+                      : 'Bu ilaç için hiç bildirim gelmez. Bugün ekranında kalır, dozları kendin işaretlersin.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={muted}
+                  onValueChange={val => { triggerHaptic(); setMuted(val); }}
+                  trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                  accessibilityLabel={language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}
+                />
+              </View>
+
               {/* Stock & Box */}
               <Text style={styles.inputLabel}>{t.stockTracking}</Text>
               <View style={styles.twoColRow}>
@@ -5861,6 +5885,7 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   // Long descriptions must wrap instead of sliding under the switch at the row's right edge.
   settingRowText: { flex: 1, paddingRight: 12 },
+  muteRow: { marginTop: 16, backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
   settingTitle: { color: '#f5f3f0', fontSize: 15, fontWeight: '600' },
   settingSub: { color: '#adb3bf', fontSize: 12, marginTop: 2 },
   settingDivider: { height: 1, backgroundColor: '#203244', marginVertical: 14 },
