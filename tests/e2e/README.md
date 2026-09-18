@@ -3,6 +3,17 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## İlaç başına sessize alma — 18 Eylül 2026 (v1.2.5)
+
+- `medication_mute.robot` (`npm --prefix tests/e2e run test:mute`, uygulama verisini siler): yeni ilaç alarm
+  kurar; formda "Bildirimleri sessize al" açılınca listede "Sessiz" etiketi çıkar ve ilacın tüm alarmları
+  kalkar; kapatılınca alarmlar geri gelir — **passed**.
+- Sessize alınan ilaç için hiç bildirim kurulmaz, ertelemeleri iptal edilir, paneldeki bildirimleri kaldırılır;
+  ilaç Bugün ekranında kalır (`isDoseActive` değişmedi). Birim testi düzeltmeden önce failed, sonra passed;
+  mobil **45/45**.
+- `muted` alanı `rutin-api` ve yerel `server/` izin listelerine eklendi; eklenmeseydi sunucu alanı siler ve
+  ayar senkronizasyonda kaybolurdu.
+
 ## Özel eşitleme aralığı kutusu — 18 Eylül 2026 (v1.2.4)
 
 - Otomatik eşitleme açıkken "Özel Aralık" sayı kutusu 32 dp sabit yükseklikteydi ve Android'in varsayılan

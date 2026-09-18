@@ -12,6 +12,7 @@ export interface SyncDose {
   times?: string[];
   status: 'pending' | 'taken' | 'skipped';
   paused?: boolean;
+  muted?: boolean;
   snooze?: number;
   mealCondition?: 'tok' | 'ac' | 'yemekle' | 'farketmez';
   form?: 'tablet' | 'kapsul' | 'damla' | 'surup';

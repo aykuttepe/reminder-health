@@ -2,7 +2,7 @@ import { assertDoseRecords, mergeDoseRecords, materializeDoseRecords } from './d
 import { RutinDatabase } from './db.js';
 import { doseId, HttpError } from './identity.js';
 const settingKeys = new Set(['userName','notifications','soundEnabled','soundType','snoozeMinutes','leadTimeMinutes','privateMode','stockAlertsEnabled','defaultStockThreshold','hideDoseAmount','autoCollapseTaken','hapticsEnabled','language','doctorName','doctorSpecialty','doctorHospital','doctorPhone','doctorNextAppointment','doctorNotes','doctorAppointmentTime','doctorApptLeadOptions','doctorBloodTestDate','appointments']);
-const doseKeys = new Set(['id','name','amount','time','times','slotAmounts','status','paused','snooze','mealCondition','form','instructions','stock','stockThreshold','defaultStock','frequencyType','cyclePhase1Days','cyclePhase1Amount','cyclePhase2Days','cyclePhase2Amount','cycleStartDate','durationMode','durationDays','startDate','endDate','statusDate','slotStatuses','dailyStatuses','doseRecords','gtin','expiryDate','updatedAt','deletedAt']);
+const doseKeys = new Set(['id','name','amount','time','times','slotAmounts','status','paused','muted','snooze','mealCondition','form','instructions','stock','stockThreshold','defaultStock','frequencyType','cyclePhase1Days','cyclePhase1Amount','cyclePhase2Days','cyclePhase2Amount','cycleStartDate','durationMode','durationDays','startDate','endDate','statusDate','slotStatuses','dailyStatuses','doseRecords','gtin','expiryDate','updatedAt','deletedAt']);
 function record(value: any) { return !!value && typeof value === 'object' && !Array.isArray(value); }
 export class SyncService {
   constructor(private db: RutinDatabase) {}

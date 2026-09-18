@@ -790,7 +790,7 @@ export function buildMedicationSchedule(
     const date = localDateKey(day);
     for (const input of doses) {
       const dose: Dose = { ...input, status: input.status ?? 'pending' };
-      if (!isDoseActive(dose, date)) continue;
+      if (!isDoseActive(dose, date) || dose.muted) continue;
       for (const time of new Set(dose.times?.length ? dose.times : [dose.time])) {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) continue;
         if (slotStatus(dose, time, date) !== 'pending') continue;
@@ -852,7 +852,7 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
       const data = item.content.data;
       if (!options.enabled || !data?.isSnooze) return false;
       const input = doses.find(d => d.id === notificationId(data.doseId));
-      if (!input || typeof data.date !== 'string' || Number(data.fireAt) <= now.getTime()) return false;
+      if (!input || input.muted || typeof data.date !== 'string' || Number(data.fireAt) <= now.getTime()) return false;
       const dose: Dose = { ...input, status: input.status ?? 'pending' };
       return (dose.times?.length ? dose.times : [dose.time]).includes(String(data.time)) && isDoseActive(dose, data.date) && slotStatus(dose, String(data.time), data.date) === 'pending';
     });
@@ -947,6 +947,7 @@ export function snoozeNotification(
   soundOptions?: { soundEnabled?: boolean; soundType?: NotificationSoundType; privateMode?: boolean; hideDoseAmount?: boolean },
 ): Promise<void> {
   return serializeNotifications(async () => {
+    if (dose.muted) return;
     const fireAt = Date.now() + Math.max(10, minutes * 60) * 1000;
     await Notifications.scheduleNotificationAsync(buildSnoozeRequest(dose, fireAt, soundOptions));
   });

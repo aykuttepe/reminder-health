@@ -180,7 +180,19 @@ export const MedicationList: React.FC<MedicationListProps> = ({
                     </View>
                   </View>
                 </View>
-                <Text style={styles.medCardName}>{dose.name}</Text>
+                <View style={styles.medCardNameRow}>
+                  <Text style={styles.medCardName}>{dose.name}</Text>
+                  {dose.muted && (
+                    <View
+                      style={styles.mutedPill}
+                      accessible
+                      accessibilityLabel={language === 'en' ? 'Reminders muted' : 'Bildirimler sessizde'}
+                    >
+                      <Ionicons name="notifications-off-outline" size={12} color="#f0b484" />
+                      <Text style={styles.mutedPillText}>{language === 'en' ? 'Muted' : 'Sessiz'}</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.medCardSub}>
                   {dose.amount} · {getMealLabel(dose.mealCondition)} · {regimenText}
                   {dose.instructions ? ` · ${dose.instructions}` : ''}
@@ -326,6 +338,28 @@ const styles = StyleSheet.create({
   },
   stockPillLowText: {
     color: '#f0b484',
+    fontWeight: '700',
+  },
+  medCardNameRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mutedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#2d2516',
+    borderWidth: 1,
+    borderColor: '#59441f',
+  },
+  mutedPillText: {
+    color: '#f0b484',
+    fontSize: 11,
     fontWeight: '700',
   },
   medCardName: {

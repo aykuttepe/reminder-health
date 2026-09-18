@@ -1,7 +1,7 @@
 {
-  "version": "1.2.4",
+  "version": "1.2.5",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.4: Otomatik eşitlemedeki \"Özel Aralık\" kutusunda sayı kesiliyordu, artık tam görünüyor. Senkronizasyon sayfasındaki e-posta kutuları büyük yazı boyutunda kesilmiyor.",
-  "publishedAt": "2026-09-18T19:15:00Z"
+  "releaseNotes": "v1.2.5: İlaç başına bildirimleri sessize alma. İlaç formundaki \"Bildirimleri sessize al\" açıldığında o ilaç için hiç bildirim gelmez; ilaç Bugün ekranında kalır ve listede \"Sessiz\" etiketiyle görünür. Ayar bulut senkronizasyonuyla diğer cihazlara taşınır.",
+  "publishedAt": "2026-09-18T20:40:00Z"
 }

@@ -22,6 +22,8 @@ export type Dose = {
   slotAmounts?: Record<string, string>;
   status: 'pending' | 'taken' | 'skipped';
   paused?: boolean;
+  /** Muted by the user: the medicine stays on the plan but gets no reminders at all. */
+  muted?: boolean;
   snooze?: number;
   mealCondition?: MealCondition;
   form?: MedicineForm;
