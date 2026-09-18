@@ -6,6 +6,8 @@ export interface ResponsiveInfo {
   isTablet: boolean;
   isLandscape: boolean;
   isSmallScreen: boolean;
+  /** Large system font or narrow screen: side-by-side label + button rows should stack. */
+  isCompactText: boolean;
   contentMaxWidth: number | undefined;
   tabBarMaxWidth: number | undefined;
   modalMaxWidth: number | undefined;
@@ -14,12 +16,13 @@ export interface ResponsiveInfo {
 }
 
 export function useResponsive(): ResponsiveInfo {
-  const { width, height } = useWindowDimensions();
+  const { width, height, fontScale } = useWindowDimensions();
 
   // Tablet definition: physical smallest width >= 600 or current width >= 768
   const isTablet = Math.min(width, height) >= 600 || width >= 768;
   const isLandscape = width > height;
   const isSmallScreen = width < 380;
+  const isCompactText = isSmallScreen || fontScale >= 1.15;
 
   // On tablets, constrain the content well to prevent awkward stretching
   const contentMaxWidth = isTablet ? Math.min(Math.round(width - 48), 840) : undefined;
@@ -41,6 +44,7 @@ export function useResponsive(): ResponsiveInfo {
     isTablet,
     isLandscape,
     isSmallScreen,
+    isCompactText,
     contentMaxWidth,
     tabBarMaxWidth,
     modalMaxWidth,

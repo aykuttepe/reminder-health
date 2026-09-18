@@ -330,7 +330,7 @@ function TimeSlotPicker({
 }
 
 function MainApp() {
-  const { isTablet, contentMaxWidth, tabBarMaxWidth, modalMaxWidth, carouselCardWidth } = useResponsive();
+  const { isTablet, isCompactText, contentMaxWidth, tabBarMaxWidth, modalMaxWidth, carouselCardWidth } = useResponsive();
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [today, setToday] = useState(localDateKey);
@@ -754,6 +754,11 @@ function MainApp() {
       mainScrollViewRef.current?.scrollTo({ y: 0, animated: tab === targetTab });
     }, 10);
   };
+
+  // Alt sayfa, ana menünün kaydırma konumunda değil en üstte açılsın
+  useEffect(() => {
+    mainScrollViewRef.current?.scrollTo({ y: 0, animated: false });
+  }, [settingsSubPage]);
 
   const dosesRef = useRef(doses);
   dosesRef.current = doses;
@@ -2871,14 +2876,14 @@ function MainApp() {
                       <View style={styles.updateIconBox}>
                         <Ionicons name="git-branch-outline" size={20} color="#a9dfca" />
                       </View>
-                      <View style={{ flex: 1, marginLeft: 12 }}>
+                      <View style={styles.updateTextBox}>
                         <Text style={styles.updateTitle}>Rutin v{CURRENT_APP_VERSION}</Text>
                         <Text style={styles.updateSub}>
                           {language === 'en' ? 'GitHub Releases & Local Server' : 'GitHub Releases & Yerel Sunucu'}
                         </Text>
                       </View>
                       <TouchableOpacity
-                        style={[styles.checkUpdateBtn, checkingUpdate && { opacity: 0.6 }]}
+                        style={[styles.checkUpdateBtn, isCompactText && styles.checkUpdateBtnStacked, checkingUpdate && { opacity: 0.6 }]}
                         onPress={() => handleCheckUpdate(true)}
                         disabled={checkingUpdate}
                         activeOpacity={0.7}
@@ -5873,9 +5878,9 @@ const styles = StyleSheet.create({
   selectedPillBadge: { backgroundColor: '#143532', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#215c52' },
   selectedPillBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '700' },
   chipSelector: { flexDirection: 'row', gap: 6, marginTop: 10 },
-  choiceChip: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: '#101d29', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#203244' },
+  choiceChip: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, backgroundColor: '#101d29', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#203244' },
   choiceChipActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
-  choiceChipText: { color: '#adb3bf', fontSize: 11, fontWeight: '600' },
+  choiceChipText: { color: '#adb3bf', fontSize: 11, fontWeight: '600', textAlign: 'center' },
   choiceChipTextActive: { color: '#a9dfca', fontWeight: '700' },
   resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 48, borderRadius: 10, borderWidth: 1, borderColor: '#5c2d33', marginTop: 8, marginBottom: 20 },
   resetBtnText: { color: '#ff9696', fontSize: 14, fontWeight: '600' },
@@ -5886,8 +5891,8 @@ const styles = StyleSheet.create({
   testNotificationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#a9dfca', height: 46, borderRadius: 10, marginTop: 14 },
   testNotificationBtnText: { color: '#081624', fontSize: 14, fontWeight: '700' },
   notifPreviewCard: { backgroundColor: '#101d29', borderRadius: 10, padding: 14, marginTop: 14, borderWidth: 1, borderColor: '#203244' },
-  notifPreviewHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  notifPreviewTag: { color: '#a9dfca', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  notifPreviewHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 },
+  notifPreviewTag: { flexShrink: 1, color: '#a9dfca', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
   previewSoundBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#182836', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#23384c' },
   previewSoundBadgeText: { color: '#a9dfca', fontSize: 10, fontWeight: '600' },
   notifPreviewContent: { flexDirection: 'row', alignItems: 'center' },
@@ -6227,8 +6232,10 @@ const styles = StyleSheet.create({
   },
   reliabilityHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     marginBottom: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
@@ -6259,6 +6266,7 @@ const styles = StyleSheet.create({
   reliabilityVersionText: {
     color: '#64748b',
     fontSize: 11,
+    flexShrink: 1,
   },
   reliabilityItem: {
     flexDirection: 'row',
@@ -6310,7 +6318,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#a9dfca',
-    height: 46,
+    minHeight: 46,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 10,
     marginTop: 14,
   },
@@ -6318,6 +6328,8 @@ const styles = StyleSheet.create({
     color: '#081624',
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   scanBarcodeBtn: {
     flexDirection: 'row',
@@ -6758,8 +6770,14 @@ const styles = StyleSheet.create({
   },
   updateHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    rowGap: 12,
+  },
+  updateTextBox: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
   },
   updateIconBox: {
     width: 36,
@@ -6787,6 +6805,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
+  },
+  checkUpdateBtnStacked: {
+    width: '100%',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
   checkUpdateBtnText: {
     color: '#081624',

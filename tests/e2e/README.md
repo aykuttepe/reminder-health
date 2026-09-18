@@ -3,6 +3,22 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Ayar alt sayfaları ve büyük yazı — 18 Eylül 2026 (v1.2.2)
+
+- `settings_layout.robot` (`npm --prefix tests/e2e run test:settings-layout`): Ayarlar ana menüsünü ve
+  11 alt sayfayı açar, her kaydırma konumunun ekran görüntüsünü alır; veri ve ayar değiştirmez. Sonuçlar
+  gözle incelenir. Büyük yazı için koşudan önce `adb shell settings put system font_scale 1.3`, sonra `1.0`.
+- Varsayılan yazıda 12/12 passed ve belirgin bozulma yok. **1,3× yazıda bulunan hatalar:** sürüm kartında
+  başlık dar sütuna sıkışıyordu; Cihaz Güvenilirliği başlığındaki "Android 14+ / iOS Uyumlu" kartın dışına
+  taşıyordu; canlı alarm test düğmesinin simgesi düğmenin dışına itiliyordu; kilit ekranı önizlemesindeki
+  ses rozeti kartın dışına taşıyordu; tekrar sayısı çiplerinde yazı kenara yapışıyordu.
+- **Bulunan hata:** Ana menü kaydırılmışken açılan alt sayfa en üstten değil, menünün kaydırma konumundan
+  açılıyordu (Senkronizasyon, Tanılama). Alt sayfa değişince kaydırma sıfırlanıyor.
+- Düzeltmeden sonra 1,3× ve 1,0× yazıda 12/12 passed, görüntüler gözle doğrulandı. Sürüm kartı büyük yazıda
+  (`useResponsive().isCompactText`) düğmeyi alt satıra alır.
+- Sıfırlama satırı alt sekme çubuğunun arkasındayken UiAutomator onu görünür sayıyor; test satırı çubuğun
+  üstüne kaydırmadan dokunmuyor.
+
 ## Stok ekranı ve ayar satırları — 17 Eylül 2026 (v1.1.1)
 
 - `medication_stock.robot` (`npm --prefix tests/e2e run test:stock`): stoğu 3 olan ilaç "Kritik / Tükendi",

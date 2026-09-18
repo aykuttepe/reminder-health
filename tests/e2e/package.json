@@ -21,6 +21,7 @@
     "test:undo": ".venv/bin/python -m robot --outputdir results/undo medication_undo.robot",
     "test:notification-actions": ".venv/bin/python -m robot --outputdir results/notification-actions notification_actions.robot",
     "test:stock": ".venv/bin/python -m robot --outputdir results/stock medication_stock.robot",
+    "test:settings-layout": ".venv/bin/python -m robot --outputdir results/settings-layout settings_layout.robot",
     "test:appointments": ".venv/bin/python -m robot --outputdir results/appointments notification_appointments.robot",
     "test:notification-schedule": ".venv/bin/python -m robot --outputdir results/notification-schedule notification_schedule.robot",
     "test:probe": ".venv/bin/python -m unittest -v test_notification_probe.py test_emulator_notification_probe.py",
