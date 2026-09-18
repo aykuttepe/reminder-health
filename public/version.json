@@ -1,7 +1,7 @@
 {
-  "version": "1.2.2",
+  "version": "1.2.3",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.2: Telefonun yazı boyutu büyütüldüğünde Ayarlar sayfalarında taşan ve sıkışan öğeler düzeltildi (sürüm kartı, Cihaz Güvenilirliği başlığı ve test düğmesi, kilit ekranı önizlemesi, tekrar seçenekleri). Ana menü kaydırılmışken açılan alt sayfalar artık en üstten açılıyor.",
-  "publishedAt": "2026-09-18T18:15:00Z"
+  "releaseNotes": "v1.2.3: Kullanıcı Profili ve Senkronizasyon sayfalarında taşan öğeler düzeltildi: \"Yeni Randevu Ekle\" düğmesi, randevu kartındaki tahlil tarihi, e-posta satırındaki \"Değiştir\" ve kesilen sayfa başlığı. Senkronizasyon düğmelerindeki yazılar kenara yapışmıyor.",
+  "publishedAt": "2026-09-18T18:45:00Z"
 }
