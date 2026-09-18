@@ -4241,7 +4241,7 @@ function MainApp() {
                           {editingEmail && (
                             <View style={{ marginTop: 8, gap: 6 }}>
                               <TextInput
-                                style={[styles.textInput, { height: 38, fontSize: 12 }]}
+                                style={[styles.textInput, { minHeight: 38, paddingVertical: 8, fontSize: 12 }]}
                                 value={authEmail}
                                 onChangeText={setAuthEmail}
                                 placeholder={t.syncEmailPlaceholder}
@@ -4339,7 +4339,7 @@ function MainApp() {
                           <View style={{ marginBottom: 10 }}>
                             <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 4 }]}>{t.syncEmailLabel}</Text>
                             <TextInput
-                              style={[styles.textInput, { height: 40, fontSize: 12 }]}
+                              style={[styles.textInput, { minHeight: 40, paddingVertical: 8, fontSize: 12 }]}
                               value={authEmail}
                               onChangeText={setAuthEmail}
                               placeholder={t.syncEmailPlaceholder}
@@ -4631,7 +4631,7 @@ function MainApp() {
                             paddingHorizontal: 12,
                             paddingVertical: 8,
                           }}>
-                            <View style={{ flex: 1 }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
                               <Text style={{ fontSize: 12.5, color: '#f5f3f0', fontWeight: '500' }}>
                                 {language === 'en' ? 'Custom Interval' : 'Özel Aralık'}
                               </Text>
@@ -4642,8 +4642,8 @@ function MainApp() {
 
                             <TouchableOpacity
                               style={{
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 backgroundColor: '#162838',
                                 borderRadius: 6,
                                 alignItems: 'center',
@@ -4664,8 +4664,13 @@ function MainApp() {
 
                             <TextInput
                               style={{
-                                width: 56,
-                                height: 32,
+                                // Android adds default vertical padding that clipped the number in a 32dp box
+                                minWidth: 60,
+                                minHeight: 36,
+                                paddingVertical: 0,
+                                paddingHorizontal: 6,
+                                includeFontPadding: false,
+                                textAlignVertical: 'center',
                                 backgroundColor: '#0d1822',
                                 borderRadius: 6,
                                 borderWidth: 1,
@@ -4701,8 +4706,8 @@ function MainApp() {
 
                             <TouchableOpacity
                               style={{
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                                 backgroundColor: '#162838',
                                 borderRadius: 6,
                                 alignItems: 'center',

@@ -1,7 +1,7 @@
 {
-  "version": "1.2.3",
+  "version": "1.2.4",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.3: Kullanıcı Profili ve Senkronizasyon sayfalarında taşan öğeler düzeltildi: \"Yeni Randevu Ekle\" düğmesi, randevu kartındaki tahlil tarihi, e-posta satırındaki \"Değiştir\" ve kesilen sayfa başlığı. Senkronizasyon düğmelerindeki yazılar kenara yapışmıyor.",
-  "publishedAt": "2026-09-18T18:45:00Z"
+  "releaseNotes": "v1.2.4: Otomatik eşitlemedeki \"Özel Aralık\" kutusunda sayı kesiliyordu, artık tam görünüyor. Senkronizasyon sayfasındaki e-posta kutuları büyük yazı boyutunda kesilmiyor.",
+  "publishedAt": "2026-09-18T19:15:00Z"
 }

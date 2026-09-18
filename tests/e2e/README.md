@@ -3,6 +3,14 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Özel eşitleme aralığı kutusu — 18 Eylül 2026 (v1.2.4)
+
+- Otomatik eşitleme açıkken "Özel Aralık" sayı kutusu 32 dp sabit yükseklikteydi ve Android'in varsayılan
+  dikey iç boşluğu sıfırlanmamıştı; emulator'da 1,0× yazıda bile "5" rakamının yalnızca alt ucu görünüyordu.
+  Kutu artık `minHeight` 36 ve `paddingVertical: 0` kullanıyor; 1,3× ve 1,0× yazıda rakam tam görünüyor.
+- Aynı kalıptaki Senkronizasyon e-posta kutuları (38–40 dp sabit yükseklik + 12 dp iç boşluk) `minHeight`
+  ile düzeltildi. Emulator'da otomatik eşitleme bu kontrol için açıldı (hesap yok, yalnızca yerel ayar).
+
 ## Profil ve Senkronizasyon taşmaları — 18 Eylül 2026 (v1.2.3)
 
 - Kullanıcının telefon ekran görüntülerinde (1.2.2, hesap bağlı, profil dolu): "Yeni Randevu Ekle" ekranın
