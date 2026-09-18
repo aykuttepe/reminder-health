@@ -59,7 +59,7 @@ Open Settings Main
     Wait Until Page Contains Element    android=new UiSelector().text("AYAR KATEGORİLERİ")    15s
 
 Swipe Up
-    Run Process    ${ADB}    -s    emulator-5554    shell    input    swipe    540    1700    540    700    1000
+    Run Process    ${ADB}    -s    emulator-5554    shell    input    swipe    25    1700    25    700    1000
     Sleep    0.8s
 
 Open Menu Item

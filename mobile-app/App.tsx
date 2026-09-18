@@ -2610,7 +2610,7 @@ function MainApp() {
                     <Ionicons name="chevron-back" size={18} color="#a9dfca" />
                     <Text style={styles.settingsBackBtnText}>{t.tabSettings}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.settingsSubHeaderTitle} numberOfLines={1}>
+                  <Text style={styles.settingsSubHeaderTitle} numberOfLines={2}>
                     {settingsSubPage === 'profile' && t.settingsProfile}
                     {settingsSubPage === 'language' && t.settingsLanguage}
                     {settingsSubPage === 'notifications' && t.settingsNotifications}
@@ -3102,10 +3102,10 @@ function MainApp() {
                     </View>
 
                     {/* RANDEVULAR VE DOKTOR TAKİBİ */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8, paddingHorizontal: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 16, marginBottom: 8, paddingHorizontal: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
                         <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
-                        <Text style={styles.settingGroupTitle}>
+                        <Text style={[styles.settingGroupTitle, { flexShrink: 1 }]}>
                           {language === 'en' ? 'APPOINTMENTS & LAB TESTS' : 'RANDEVULAR VE TAHLİLLER'}
                         </Text>
                         {appointments.length > 0 && (
@@ -3248,10 +3248,10 @@ function MainApp() {
                             </View>
 
                             {/* Tarih ve Saat */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
                                 <Ionicons name="calendar-outline" size={14} color="#a9dfca" />
-                                <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '600' }}>
+                                <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '600', flexShrink: 1 }}>
                                   {formatLocalizedDate(appt.date, language)}
                                 </Text>
                               </View>
@@ -3272,7 +3272,7 @@ function MainApp() {
                                 padding: 10,
                                 marginTop: 10,
                               }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2 }}>
                                   <Ionicons name="flask" size={15} color="#c4b5fd" />
                                   <Text style={{ color: '#c4b5fd', fontSize: 12, fontWeight: '700' }}>
                                     {language === 'en' ? 'Fasting Lab Test' : 'Aç Karnına Kan Verme'}
@@ -3297,7 +3297,7 @@ function MainApp() {
                             ) : null}
 
                             {/* Kart Aksiyonları: Arama, Düzenle, Tamamla, Sil */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1a2736' }}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1a2736' }}>
                               {appt.phone ? (
                                 <TouchableOpacity
                                   style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(52, 211, 153, 0.15)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
@@ -4222,8 +4222,8 @@ function MainApp() {
                         <Text style={styles.syncCardDesc}>{t.syncConnectedAccount}: <Text style={{ color: '#34d399', fontWeight: '700' }}>{session.user.name}</Text></Text>
                         
                         <View style={{ backgroundColor: '#071626', padding: 10, borderRadius: 8, marginVertical: 6, borderWidth: 1, borderColor: '#1e293b' }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Text style={{ color: '#94a3b8', fontSize: 12 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <Text style={{ color: '#94a3b8', fontSize: 12, flexShrink: 1 }}>
                               ✉️ {t.syncEmailLabel}: <Text style={{ color: session.user.email ? '#38bdf8' : '#64748b', fontWeight: '600' }}>{session.user.email || (language === 'en' ? 'Not set' : 'Belirtilmedi')}</Text>
                             </Text>
                             <TouchableOpacity
@@ -4251,7 +4251,7 @@ function MainApp() {
                                 autoCorrect={false}
                               />
                               <TouchableOpacity
-                                style={[styles.syncPrimaryBtn, { height: 36, marginTop: 4 }]}
+                                style={[styles.syncPrimaryBtn, { minHeight: 36, marginTop: 4 }]}
                                 onPress={handleUpdateEmail}
                                 disabled={authBusy || !authEmail.trim()}
                               >
@@ -6438,13 +6438,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#a9dfca',
-    height: 44,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
   },
   syncPrimaryBtnText: {
     color: '#081624',
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   syncSecondaryBtn: {
     flex: 1,
@@ -6455,13 +6459,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#172c3d',
     borderWidth: 1,
     borderColor: '#244763',
-    height: 44,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
   },
   syncSecondaryBtnText: {
     color: '#a9dfca',
     fontSize: 13,
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   backupExportBtn: {
     flexDirection: 'row',

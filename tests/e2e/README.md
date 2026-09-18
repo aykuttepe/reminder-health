@@ -3,6 +3,17 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Profil ve Senkronizasyon taşmaları — 18 Eylül 2026 (v1.2.3)
+
+- Kullanıcının telefon ekran görüntülerinde (1.2.2, hesap bağlı, profil dolu): "Yeni Randevu Ekle" ekranın
+  sağından, tahlil satırındaki tarih randevu kartından, e-posta satırındaki "Değiştir" karttan taşıyordu;
+  alt sayfa başlığı "Senkronizasyon & Yedekle…" diye kesiliyordu. Boş profil ve hesapsız emulator'da bu
+  durumlar görünmediği için 1.2.2 testi yakalamadı.
+- Emulator'da tahlilli randevu eklenerek 1,3× ve 1,0× yazıda doğrulandı. Hesaplı Senkronizasyon görünümü
+  emulator'da yok; e-posta satırı yalnızca kodla düzeltildi, telefonda doğrulanmalı.
+- `settings_layout.robot` artık ekranın sol kenarından kaydırır: ortadan başlayan kaydırma büyük yazıda
+  Profil sayfasını hareket ettirmiyordu.
+
 ## Ayar alt sayfaları ve büyük yazı — 18 Eylül 2026 (v1.2.2)
 
 - `settings_layout.robot` (`npm --prefix tests/e2e run test:settings-layout`): Ayarlar ana menüsünü ve
