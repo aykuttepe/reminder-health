@@ -39,15 +39,6 @@ export interface SyncDose {
   deletedAt?: number; // Epoch ms timestamp if soft-deleted
 }
 
-export interface BackupPayload {
-  version: 1 | 2;
-  ownerId?: string;
-  exportedAt: string;
-  doses: SyncDose[];
-  settings?: Record<string, any>;
-  learnedMeds?: Record<string, any>;
-}
-
 export interface SyncRequestPayload {
   clientVersion?: string;
   since?: number;
@@ -179,50 +170,6 @@ export function smartMergeLearnedMeds(
     }
   }
   return merged;
-}
-
-/**
- * Tam yedekleme JSON objesi üretir.
- */
-export function createBackupPayload(params: {
-  ownerId?: string;
-  doses: any[];
-  settings?: Record<string, any>;
-  learnedMeds?: Record<string, any>;
-}): BackupPayload {
-  return {
-    version: params.ownerId ? 2 : 1,
-    ...(params.ownerId ? {ownerId: params.ownerId} : {}),
-    exportedAt: new Date().toISOString(),
-    doses: params.doses || [],
-    settings: params.settings || {},
-    learnedMeds: params.learnedMeds || {},
-  };
-}
-
-/**
- * Yüklenen JSON dosyasını doğrular ve ayrıştırır.
- */
-export function validateBackupJSON(jsonStr: string): {
-  valid: boolean;
-  data?: BackupPayload;
-  error?: string;
-} {
-  try {
-    const parsed = JSON.parse(jsonStr);
-    if (!parsed || typeof parsed !== 'object') {
-      return { valid: false, error: 'Dosya geçerli bir JSON objesi değil.' };
-    }
-    if (![1, 2].includes(parsed.version)) {
-      return { valid: false, error: `Desteklenmeyen yedek sürümü: ${parsed.version}. Sürüm 1 ve 2 desteklenir.` };
-    }
-    if (!Array.isArray(parsed.doses)) {
-      return { valid: false, error: 'Yedek dosyasında ilaç listesi ("doses") bulunamadı.' };
-    }
-    return { valid: true, data: parsed as BackupPayload };
-  } catch (err: any) {
-    return { valid: false, error: `JSON çözme hatası: ${err.message}` };
-  }
 }
 
 export const DEFAULT_SYNC_SERVER_URL = 'https://api.mytepeapi.com.tr';
