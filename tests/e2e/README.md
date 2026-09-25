@@ -11,6 +11,9 @@ Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değişti
   hesap arayüzü geri geldi.
 - Hesaplı yollar (yerel moddayken yoldaki eşitleme yanıtının atılması, yeniden açınca aynı hesapla birleştirme)
   emulator'da hesap olmadığı için yalnızca telefonda elle doğrulanabilir.
+- Sahibin kararıyla sunucu eşitlemesi ve tanılama ekranı bu sürümde kapalı (`CLOUD_SYNC_AVAILABLE`,
+  `DIAGNOSTICS_AVAILABLE`): emulator'da Senkronizasyon sayfası yalnızca yerel mod uyarısı ve yedeklemeyi,
+  Ayarlar menüsü "Hata & Tanılama Günlüğü" olmadan listeyi gösterdi.
 
 ## Yedekten geri yükleme — 26 Eylül 2026 (v1.2.6)
 

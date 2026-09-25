@@ -149,6 +149,12 @@ const STORAGE_KEY_LEARNED_MEDS = 'rutin_native_learned_meds';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_native_sync_config';
 const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
 const BACKUP_CACHE_DIR = 'backup-export';
+// Server sync (account, cloud switch, manual/auto sync) is parked until a later update: the app runs
+// in local mode and its sync UI is hidden. The user's stored cloud choice and account link are kept,
+// so flipping this back to true restores the previous behavior without a migration.
+const CLOUD_SYNC_AVAILABLE = false;
+// The diagnostics log screen is hidden from the settings menu for now; the logger keeps recording.
+const DIAGNOSTICS_AVAILABLE = false;
 
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 
@@ -731,6 +737,7 @@ function MainApp() {
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
   const cloudEpochRef = useRef(0);
   const resumeCloudSyncRef = useRef(false);
+  const cloudActive = CLOUD_SYNC_AVAILABLE && cloudSyncEnabled;
   const [autoSync, setAutoSync] = useState(false);
   const [syncIntervalMin, setSyncIntervalMin] = useState(5);
   const [customIntervalText, setCustomIntervalText] = useState('5');
@@ -1719,7 +1726,7 @@ function MainApp() {
   };
 
   const syncWithServer = async (activeSession?: Session | null, showToastNotification = true) => {
-    if (!cloudSyncEnabled) return;
+    if (!cloudActive) return;
     const s = activeSession || session;
     if (!s) {
       if (showToastNotification) throw new Error(language === 'en' ? 'Connect with your personal sync code first.' : 'Önce kişisel eşitleme kodunuzla bağlanın.');
@@ -2019,7 +2026,7 @@ function MainApp() {
     let active = true;
     setSession(null);
     // Local mode never waits on the network: notification actions must not depend on a server reply.
-    if (!cloudSyncEnabled) {
+    if (!cloudActive) {
       setAccountChecked(true);
       return;
     }
@@ -2037,7 +2044,7 @@ function MainApp() {
       }
     }).catch(() => {}).finally(() => { if (active) setAccountChecked(true); });
     return () => {active=false;};
-  }, [serverUrl, hydrated, cloudSyncEnabled]);
+  }, [serverUrl, hydrated, cloudActive]);
 
   // Switching the cloud back on merges once the account is verified again.
   useEffect(() => {
@@ -2102,7 +2109,7 @@ function MainApp() {
     doctorNotes: string;
     appointments: AppointmentItem[];
   }>) => {
-    if (session && cloudSyncEnabled) {
+    if (session && cloudActive) {
       const activeUserName = (overrides?.userName !== undefined ? overrides.userName : userName).trim();
       const activeDocName = (overrides?.doctorName !== undefined ? overrides.doctorName : doctorName).trim();
       const activeDocSpecialty = (overrides?.doctorSpecialty !== undefined ? overrides.doctorSpecialty : doctorSpecialty).trim();
@@ -2449,7 +2456,7 @@ function MainApp() {
         .replace('{appts}', summary.appointments === null ? '—' : String(summary.appointments)),
     ];
     if (summary.appointments === null) lines.push(t.restoreConfirmNoAppointments);
-    if (session && cloudSyncEnabled) lines.push(t.restoreConfirmSyncNote);
+    if (session && cloudActive) lines.push(t.restoreConfirmSyncNote);
     Alert.alert(t.restoreConfirmTitle, lines.join('\n\n'), [
       { text: t.cancel, style: 'cancel' },
       { text: t.restoreAction, style: 'destructive', onPress: () => applyRestoredBackup(backup) },
@@ -2968,38 +2975,42 @@ function MainApp() {
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsSync}</Text>
                         <Text style={styles.menuItemSub}>
-                          {!cloudSyncEnabled ? t.settingsSyncLocalDesc : lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
+                          {!cloudActive ? t.settingsSyncLocalDesc : lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
 
-                    {/* 9. Hata & Tanılama Günlüğü */}
-                    <TouchableOpacity
-                      style={styles.menuListItem}
-                      onPress={() => { triggerHaptic(); setSettingsSubPage('diagnostics'); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#281a17' }]}>
-                        <Ionicons name="bug-outline" size={22} color="#f0b484" />
-                      </View>
-                      <View style={styles.menuTextContainer}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.menuItemTitle}>{t.settingsDiagnostics}</Text>
-                          {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
-                            <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                              <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
-                                {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} {language === 'en' ? 'Errors' : 'Hata'}
-                              </Text>
-                            </View>
-                          )}
+                    {DIAGNOSTICS_AVAILABLE && (
+                      <>
+                      {/* 9. Hata & Tanılama Günlüğü */}
+                      <TouchableOpacity
+                        style={styles.menuListItem}
+                        onPress={() => { triggerHaptic(); setSettingsSubPage('diagnostics'); }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.menuIconBox, { backgroundColor: '#281a17' }]}>
+                          <Ionicons name="bug-outline" size={22} color="#f0b484" />
                         </View>
-                        <Text style={styles.menuItemSub}>{t.settingsDiagnosticsDesc}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
-                    </TouchableOpacity>
+                        <View style={styles.menuTextContainer}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.menuItemTitle}>{t.settingsDiagnostics}</Text>
+                            {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
+                              <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
+                                  {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} {language === 'en' ? 'Errors' : 'Hata'}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.menuItemSub}>{t.settingsDiagnosticsDesc}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      </TouchableOpacity>
 
-                    <View style={styles.menuListDivider} />
+                      <View style={styles.menuListDivider} />
+                      </>
+                    )}
 
                     {/* 10. Veri & Sıfırlama */}
                     <TouchableOpacity
@@ -4332,29 +4343,33 @@ function MainApp() {
               {/* SUB PAGE 8: SENKRONİZASYON & YEDEKLEME */}
               {settingsSubPage === 'sync' && (
                 <>
-                  <View style={styles.settingGroupHeader}>
-                    <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
-                    <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
-                      {language === 'en' ? 'CLOUD SYNCHRONIZATION' : 'BULUT EŞİTLEME (SENKRONİZASYON)'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.settingCard}>
-                    <View style={styles.settingRow}>
-                      <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.settingTitle}>{t.cloudSyncTitle}</Text>
-                        <Text style={styles.settingSub}>{cloudSyncEnabled ? t.cloudSyncOnDesc : t.cloudSyncOffDesc}</Text>
-                      </View>
-                      <Switch
-                        value={cloudSyncEnabled}
-                        onValueChange={handleCloudSyncToggle}
-                        accessibilityLabel={t.cloudSyncTitle}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
+                  {CLOUD_SYNC_AVAILABLE && (
+                    <>
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
+                      <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
+                        {language === 'en' ? 'CLOUD SYNCHRONIZATION' : 'BULUT EŞİTLEME (SENKRONİZASYON)'}
+                      </Text>
                     </View>
-                  </View>
 
-                  {cloudSyncEnabled ? (
+                    <View style={styles.settingCard}>
+                      <View style={styles.settingRow}>
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text style={styles.settingTitle}>{t.cloudSyncTitle}</Text>
+                          <Text style={styles.settingSub}>{cloudSyncEnabled ? t.cloudSyncOnDesc : t.cloudSyncOffDesc}</Text>
+                        </View>
+                        <Switch
+                          value={cloudSyncEnabled}
+                          onValueChange={handleCloudSyncToggle}
+                          accessibilityLabel={t.cloudSyncTitle}
+                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        />
+                      </View>
+                    </View>
+                    </>
+                  )}
+
+                  {cloudActive ? (
                     <>
 
                     <View style={styles.syncCard}>
