@@ -55,11 +55,6 @@ export interface TodayViewProps {
   CAROUSEL_SPACING: number;
   appointments?: AppointmentItem[];
   onOpenAppointmentEditor?: (appt?: AppointmentItem) => void;
-  doctorNextAppointment?: string;
-  doctorAppointmentTime?: string;
-  doctorName?: string;
-  doctorHospital?: string;
-  doctorSpecialty?: string;
   onNavigateDoctorProfile?: () => void;
   showAppointmentCard?: boolean;
 }
@@ -83,11 +78,6 @@ export const TodayView: React.FC<TodayViewProps> = ({
   onNavigateSettings,
   appointments,
   onOpenAppointmentEditor,
-  doctorNextAppointment,
-  doctorAppointmentTime,
-  doctorName,
-  doctorHospital,
-  doctorSpecialty,
   onNavigateDoctorProfile,
   showAppointmentCard = true,
   today,
@@ -112,22 +102,9 @@ export const TodayView: React.FC<TodayViewProps> = ({
       {/* Yaklaşan Doktor Randevusu Kartı ve Yönetimi */}
       {(() => {
         if (!showAppointmentCard) return null;
-        const activeAppts: AppointmentItem[] = appointments !== undefined
-          ? appointments
-              .filter(a => !a.completed && a.date)
-              .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')))
-          : (doctorNextAppointment ? [{
-              id: 'default',
-              doctorName: doctorName || '',
-              specialty: doctorSpecialty || '',
-              hospital: doctorHospital || '',
-              date: doctorNextAppointment,
-              time: doctorAppointmentTime || '13:00',
-              leadOptions: ['1d', '0d'],
-              hasBloodTest: false,
-              createdAt: 0,
-              updatedAt: 0,
-            } as AppointmentItem] : []);
+        const activeAppts: AppointmentItem[] = (appointments ?? [])
+          .filter(a => !a.completed && a.date)
+          .sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')));
 
         const isEn = language === 'en';
 

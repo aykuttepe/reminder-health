@@ -1021,12 +1021,6 @@ export async function scheduleTestNotification(
 
 export interface DoctorAppointmentScheduleParams {
   appointments?: AppointmentItem[];
-  appointmentDate?: string;
-  appointmentTime?: string;
-  leadOptions?: string[];
-  bloodTestDate?: string;
-  doctorName?: string;
-  hospital?: string;
   lang?: 'tr' | 'en';
 }
 
@@ -1087,29 +1081,9 @@ export function syncDoctorAppointmentNotifications(
       const isEn = lang === 'en';
 
       // 2. Build list of active appointments to schedule
-      let itemsToSchedule: AppointmentItem[] = [];
-      if (params.appointments && params.appointments.length > 0) {
-        itemsToSchedule = params.appointments.filter(
-          a => !a.completed && a.date && /^\d{4}-\d{2}-\d{2}$/.test(a.date)
-        );
-      } else if (params.appointmentDate && /^\d{4}-\d{2}-\d{2}$/.test(params.appointmentDate)) {
-        itemsToSchedule = [
-          {
-            id: 'default',
-            doctorName: params.doctorName || '',
-            specialty: '',
-            hospital: params.hospital || '',
-            date: params.appointmentDate,
-            time: params.appointmentTime || '13:00',
-            leadOptions: params.leadOptions || ['1d', '0d'],
-            hasBloodTest: !!params.bloodTestDate,
-            bloodTestDate: params.bloodTestDate,
-            bloodTestFasting: true,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-        ];
-      }
+      const itemsToSchedule: AppointmentItem[] = (params.appointments ?? []).filter(
+        a => !a.completed && a.date && /^\d{4}-\d{2}-\d{2}$/.test(a.date)
+      );
 
       // Rebuild lead and lab reminders from scratch; a snooze the user chose stays while its appointment is active.
       const activeIds = new Set(itemsToSchedule.map(item => String(item.id)));
