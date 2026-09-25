@@ -46,7 +46,7 @@ Open Notification Test Settings
     ${privacy}=    Run Keyword And Return Status    Page Should Contain Text    İlaç Adını Gizle
     IF    not ${privacy}
         Wait Until Page Contains    Kullanıcı Profili    15s
-        Click Element    android=new UiSelector().text("Gizlilik & Kilit Ekranı")
+        Click Element    android=new UiSelector().text("Görünüm")
         Wait Until Page Contains    İlaç Adını Gizle    15s
     END
     Scroll Down    android=new UiSelector().text("3 Sn Sonra Test Bildirimi Gönder")    20s    1s

@@ -3,6 +3,16 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Sadeleştirme ve uygulama içi şeridin kaldırılması — 26 Eylül 2026 (v1.2.7)
+
+- Uygulama açıkken üstte sabit kalan bildirim şeridi kaldırıldı; Android'in kendi bildirimi gösteriliyor.
+  Bildirim gövdesine dokunmak Bugün'e geçer ve doz kartındaki "Al" ile kaydedilir.
+- Ayarlar menüsü: Hatırlatmalar (bildirim + erteleme), Alarm Güvenilirliği (yalnızca "Ayarları Aç" düğmeleri
+  ve deneme alarmı), Görünüm (gizlilik + deneyim), Yedekleme. Menü tıklamaları "Görünüm" ile güncellendi;
+  `notification_test.robot` artık Android bildirim panelinde "⏰ İlaç Vakti"yi ve şeridin olmadığını doğrular.
+- Emulator sonuçları: settings-layout 9/9, notification-actions 6/6, notification, notification-background,
+  medication, persistence ve undo 1/1 — **passed**.
+
 ## Bulut eşitleme anahtarı — 26 Eylül 2026 (v1.2.7)
 
 - Emulator'da elle doğrulandı (release APK, hesap yok): anahtar varsayılan açık; kapatınca hesap/eşitleme

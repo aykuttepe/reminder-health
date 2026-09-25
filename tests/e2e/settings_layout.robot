@@ -16,14 +16,11 @@ ${MAX_PAGES}     8
 Settings Main                       ${EMPTY}                         main
 Profile                             Kullanıcı Profili                profile
 Language                            Dil / Language                   language
-Notifications                       Bildirim ve Ses Ayarları         notifications
-Reminders                           Hatırlatıcı & Erteleme           reminders
-Reliability                         Cihaz Güvenilirliği & Alarm      reliability
+Reminders                           Hatırlatmalar                    notifications
+Reliability                         Alarm Güvenilirliği              reliability
 Stock                               Stok ve Envanter                 stock
-Privacy                             Gizlilik & Kilit Ekranı          privacy
-Experience                          Uygulama Deneyimi                experience
-Sync                                Senkronizasyon & Yedekleme       sync
-Diagnostics                         Hata & Tanılama Günlüğü          diagnostics
+Display                             Görünüm                          experience
+Backup                              Yedekleme                        sync
 Reset                               Veri & Sıfırlama                 reset
 
 *** Keywords ***

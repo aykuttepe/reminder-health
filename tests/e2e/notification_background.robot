@@ -13,7 +13,7 @@ Test Notification Reaches Android Notification Shade In Background
     Clear Existing Android Notifications
     Click Element    android=new UiSelector().descriptionContains(", Ayarlar").clickable(true)
     Wait Until Page Contains    Kullanıcı Profili    15s
-    Click Element    android=new UiSelector().text("Gizlilik & Kilit Ekranı")
+    Click Element    android=new UiSelector().text("Görünüm")
     Wait Until Page Contains    İlaç Adını Gizle    15s
     ${test_notification}=    Set Variable    android=new UiSelector().text("3 Sn Sonra Test Bildirimi Gönder")
     Scroll Down    ${test_notification}    20s    1s

@@ -108,10 +108,8 @@ export type SettingsSubPage =
   | 'profile'
   | 'language'
   | 'notifications'
-  | 'reminders'
   | 'reliability'
   | 'stock'
-  | 'privacy'
   | 'experience'
   | 'sync'
   | 'reset'
@@ -712,10 +710,6 @@ function MainApp() {
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [repeatNagEnabled, setRepeatNagEnabled] = useState(true);
   const [repeatNagCount, setRepeatNagCount] = useState(5);
-  const [batteryExemptionEnabled, setBatteryExemptionEnabled] = useState(true);
-  const [exactAlarmEnabled, setExactAlarmEnabled] = useState(true);
-  const [autoRescheduleOnBoot, setAutoRescheduleOnBoot] = useState(true);
-  const [wakeScreenOnAlarm, setWakeScreenOnAlarm] = useState(true);
 
   // Sync & Backup States
   const [serverUrl, setServerUrl] = useState(DEFAULT_SYNC_SERVER_URL);
@@ -964,10 +958,6 @@ function MainApp() {
     if (parsed.hapticsEnabled !== undefined) setHapticsEnabled(parsed.hapticsEnabled);
     if (parsed.repeatNagEnabled !== undefined) setRepeatNagEnabled(parsed.repeatNagEnabled);
     if (parsed.repeatNagCount !== undefined) setRepeatNagCount(parsed.repeatNagCount);
-    if (parsed.batteryExemptionEnabled !== undefined) setBatteryExemptionEnabled(parsed.batteryExemptionEnabled);
-    if (parsed.exactAlarmEnabled !== undefined) setExactAlarmEnabled(parsed.exactAlarmEnabled);
-    if (parsed.autoRescheduleOnBoot !== undefined) setAutoRescheduleOnBoot(parsed.autoRescheduleOnBoot);
-    if (parsed.wakeScreenOnAlarm !== undefined) setWakeScreenOnAlarm(parsed.wakeScreenOnAlarm);
   };
 
   // Hydrate before writing defaults or rebuilding the device notification queue.
@@ -1112,10 +1102,6 @@ function MainApp() {
     hapticsEnabled,
     repeatNagEnabled,
     repeatNagCount,
-    batteryExemptionEnabled,
-    exactAlarmEnabled,
-    autoRescheduleOnBoot,
-    wakeScreenOnAlarm,
   }), [
     appointments,
     privateMode,
@@ -1142,10 +1128,6 @@ function MainApp() {
     hapticsEnabled,
     repeatNagEnabled,
     repeatNagCount,
-    batteryExemptionEnabled,
-    exactAlarmEnabled,
-    autoRescheduleOnBoot,
-    wakeScreenOnAlarm,
   ]);
 
   useEffect(() => {
@@ -2420,10 +2402,7 @@ function MainApp() {
   const applyRestoredBackup = (backup: RestorableBackup) => {
     setDoses(prepareRestoredDoses(backup.doses).map(dose => normalizeDoseDay(dose as Dose)));
     setLearnedMeds(backup.learnedMeds as Record<string, Partial<CatalogMedicine>>);
-    applyStoredSettings(settingsForRestore(backup, {
-      appointments: storedSettings.appointments,
-      deviceBound: { batteryExemptionEnabled, exactAlarmEnabled },
-    }));
+    applyStoredSettings(settingsForRestore(backup, storedSettings.appointments));
     if (backup.language && backup.language !== language) void updateLanguage(backup.language);
     triggerDebouncedSyncRef.current();
     logger.info('Backup', 'Yedek geri yüklendi', { version: backup.version, medicines: backup.doses.length });
@@ -2670,12 +2649,10 @@ function MainApp() {
                     {settingsSubPage === 'profile' && t.settingsProfile}
                     {settingsSubPage === 'language' && t.settingsLanguage}
                     {settingsSubPage === 'notifications' && t.settingsNotifications}
-                    {settingsSubPage === 'reminders' && t.settingsReminders}
                     {settingsSubPage === 'reliability' && t.settingsReliability}
                     {settingsSubPage === 'stock' && t.settingsStock}
-                    {settingsSubPage === 'privacy' && t.settingsPrivacy}
                     {settingsSubPage === 'experience' && t.settingsExperience}
-                    {settingsSubPage === 'sync' && t.settingsSync}
+                    {settingsSubPage === 'sync' && (CLOUD_SYNC_AVAILABLE ? t.settingsSync : t.settingsBackup)}
                     {settingsSubPage === 'reset' && t.settingsReset}
                     {settingsSubPage === 'diagnostics' && t.settingsDiagnostics}
                   </Text>
@@ -2766,27 +2743,11 @@ function MainApp() {
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsNotifications}</Text>
                         <Text style={styles.menuItemSub}>
-                          {notifications ? (soundEnabled ? (language === 'en' ? 'Sound notifications on' : 'Sesli bildirimler açık') : (language === 'en' ? 'Silent notifications' : 'Sessiz bildirim')) : (language === 'en' ? 'Notifications off' : 'Bildirimler kapalı')}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuListDivider} />
-
-                    {/* 3. Hatırlatıcı & Erteleme */}
-                    <TouchableOpacity
-                      style={styles.menuListItem}
-                      onPress={() => { triggerHaptic(); setSettingsSubPage('reminders'); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#262f3a' }]}>
-                        <Ionicons name="time-outline" size={22} color="#a9dfca" />
-                      </View>
-                      <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>{t.settingsReminders}</Text>
-                        <Text style={styles.menuItemSub}>
-                          {language === 'en' ? `${snoozeMinutes} min snooze · ${repeatNagEnabled ? `${repeatNagCount} repeats` : 'No repeats'}` : `${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
+                          {!notifications
+                            ? (language === 'en' ? 'Notifications off' : 'Bildirimler kapalı')
+                            : language === 'en'
+                              ? `${soundEnabled ? 'Sound on' : 'Silent'} · ${snoozeMinutes} min snooze · ${repeatNagEnabled ? `${repeatNagCount} repeats` : 'No repeats'}`
+                              : `${soundEnabled ? 'Sesli' : 'Sessiz'} · ${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
@@ -2830,24 +2791,6 @@ function MainApp() {
 
                     <View style={styles.menuListDivider} />
 
-                    {/* 6. Gizlilik ve Kilit Ekranı */}
-                    <TouchableOpacity
-                      style={styles.menuListItem}
-                      onPress={() => { triggerHaptic(); setSettingsSubPage('privacy'); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#1d2c38' }]}>
-                        <Ionicons name="lock-closed-outline" size={22} color="#7dd3fc" />
-                      </View>
-                      <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>{t.settingsPrivacy}</Text>
-                        <Text style={styles.menuItemSub}>{privateMode ? (language === 'en' ? 'Privacy mode on (Med hidden)' : 'Gizlilik modu aktif (İlaç gizli)') : (language === 'en' ? 'Detailed notifications' : 'Detaylı bildirimler')}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuListDivider} />
-
                     {/* 7. Uygulama Deneyimi */}
                     <TouchableOpacity
                       style={styles.menuListItem}
@@ -2859,7 +2802,11 @@ function MainApp() {
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsExperience}</Text>
-                        <Text style={styles.menuItemSub}>{t.settingsExperienceDesc}</Text>
+                        <Text style={styles.menuItemSub}>
+                          {privateMode
+                            ? (language === 'en' ? 'Medicine names hidden in notifications' : 'Bildirimlerde ilaç adı gizli')
+                            : t.settingsExperienceDesc}
+                        </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -2874,7 +2821,7 @@ function MainApp() {
                         <Ionicons name="cloud-upload-outline" size={22} color="#38bdf8" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>{t.settingsSync}</Text>
+                        <Text style={styles.menuItemTitle}>{CLOUD_SYNC_AVAILABLE ? t.settingsSync : t.settingsBackup}</Text>
                         <Text style={styles.menuItemSub}>
                           {!cloudActive ? t.settingsSyncLocalDesc : lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
                         </Text>
@@ -2934,13 +2881,11 @@ function MainApp() {
                   <View style={styles.updateCard}>
                     <View style={styles.updateHeaderRow}>
                       <View style={styles.updateIconBox}>
-                        <Ionicons name="git-branch-outline" size={20} color="#a9dfca" />
+                        <Ionicons name="information-circle-outline" size={20} color="#a9dfca" />
                       </View>
                       <View style={styles.updateTextBox}>
                         <Text style={styles.updateTitle}>Rutin v{CURRENT_APP_VERSION}</Text>
-                        <Text style={styles.updateSub}>
-                          {language === 'en' ? 'GitHub Releases & Local Server' : 'GitHub Releases & Yerel Sunucu'}
-                        </Text>
+                        <Text style={styles.updateSub}>{language === 'en' ? 'App version' : 'Uygulama sürümü'}</Text>
                       </View>
                       <TouchableOpacity
                         style={[styles.checkUpdateBtn, isCompactText && styles.checkUpdateBtnStacked, checkingUpdate && { opacity: 0.6 }]}
@@ -3671,7 +3616,7 @@ function MainApp() {
               )}
 
               {/* SUB PAGE 3: HATIRLATICI & ERTELEME */}
-              {settingsSubPage === 'reminders' && (
+              {settingsSubPage === 'notifications' && (
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="time-outline" size={16} color="#a9dfca" />
@@ -3799,163 +3744,46 @@ function MainApp() {
                     <Text style={styles.settingGroupTitle}>{t.settingsReliability.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
-                    <View style={styles.reliabilityHeaderRow}>
-                      <View style={batteryExemptionEnabled && exactAlarmEnabled ? styles.reliabilityBadgeActive : [styles.reliabilityBadgeActive, { backgroundColor: '#2d2516', borderColor: '#59441f' }]}>
-                        <View style={[styles.reliabilityBadgeDot, (!batteryExemptionEnabled || !exactAlarmEnabled) && { backgroundColor: '#f0b484' }]} />
-                        <Text style={[styles.reliabilityBadgeActiveText, (!batteryExemptionEnabled || !exactAlarmEnabled) && { color: '#f0b484' }]}>
-                          {language === 'en'
-                            ? (batteryExemptionEnabled && exactAlarmEnabled ? 'Full Background Protection' : 'Partial Protection')
-                            : (batteryExemptionEnabled && exactAlarmEnabled ? 'Arka Plan Koruması Tam' : 'Kısmi Koruma')}
-                        </Text>
-                      </View>
-                      <Text style={styles.reliabilityVersionText}>{language === 'en' ? 'Android 14+ / iOS Compatible' : 'Android 14+ / iOS Uyumlu'}</Text>
-                    </View>
-
-                    {/* 1. Pil Optimizasyonu Muafiyeti (Doze Mode) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="battery-charging" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Battery Optimization Exemption' : 'Pil Optimizasyonu Muafiyeti'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'Prevents alarms from being delayed or missed when phone is in deep sleep (Doze)'
-                            : 'Telefon Doze (derin uyku) modundayken alarmların gecikmesini veya atlanmasını engeller'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={batteryExemptionEnabled}
-                        onValueChange={async (val) => {
-                          triggerHaptic();
-                          setBatteryExemptionEnabled(val);
-                          if (val) {
-                            const ok = await openBatteryOptimizationSettings();
-                            if (ok) showToast(language === 'en' ? '⚡ Battery settings opened. Select "No restrictions".' : '⚡ Pil ayarları açıldı. "Kısıtlama Yok" seçiniz.');
-                          } else {
-                            showToast(language === 'en' ? 'Battery exemption disabled (Standard mode)' : 'Pil muafiyeti kapatıldı (Standart mod)');
-                          }
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 2. Exact Alarm (Hassas Zamanlama) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="alarm" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Exact Alarm Permission' : 'Hassas Alarm İzni (Exact Alarm)'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'System permission for timers to fire precisely on the second with high priority'
-                            : 'İlaç zamanlayıcılarının saniyesi saniyesine ve yüksek öncelikli çalması için sistem alarm izni'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={exactAlarmEnabled}
-                        onValueChange={async (val) => {
-                          triggerHaptic();
-                          setExactAlarmEnabled(val);
-                          if (val) {
-                            const ok = await openExactAlarmSettings();
-                            if (ok) showToast(language === 'en' ? '⏰ Alarm permissions opened.' : '⏰ Alarm izinleri açıldı.');
-                          } else {
-                            showToast(language === 'en' ? 'Exact alarm disabled' : 'Hassas alarm kapatıldı');
-                          }
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 3. Yeniden Başlatma Koruması (Boot) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="sync-circle" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Auto Reschedule on Reboot (Boot)' : 'Yeniden Başlatma Koruması (Boot)'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'When the phone restarts, all active daily medication alarms are automatically restored'
-                            : 'Telefon kapatılıp açıldığında aktif tüm günlük ilaç alarmları işletim sistemince otomatik baştan kurulur'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={autoRescheduleOnBoot}
-                        onValueChange={(val) => {
-                          triggerHaptic();
-                          setAutoRescheduleOnBoot(val);
-                          showToast(val ? (language === 'en' ? '🔄 Reboot protection active' : '🔄 Yeniden başlatma koruması devrede') : (language === 'en' ? 'Reboot protection disabled' : 'Yeniden başlatma koruması kapatıldı'));
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 4. Ekran Kapalıyken Uyandırma (Wake Screen) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="phone-portrait-outline" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Wake Screen on Alarm' : 'Ekran Kapalıyken Uyandır'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'If phone is locked at alarm time, lights up screen and displays full-screen alert'
-                            : 'Alarm saatinde telefon kilitliyse ekranı aydınlatıp tam ekran ilaç uyarısını gösterir'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={wakeScreenOnAlarm}
-                        onValueChange={(val) => {
-                          triggerHaptic();
-                          setWakeScreenOnAlarm(val);
-                          showToast(val ? (language === 'en' ? '💡 Screen wake active' : '💡 Ekran uyandırma aktif') : (language === 'en' ? 'Screen wake disabled' : 'Ekran uyandırma kapatıldı'));
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 5. Üretici Özel Koruması */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="hardware-chip-outline" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Manufacturer Background Settings' : 'Üretici Arka Plan Ayarları'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'On Xiaomi (MIUI/HyperOS), Samsung (OneUI), or Huawei devices, grant "Auto-start" and unrestricted background'
-                            : 'Xiaomi (MIUI/HyperOS), Samsung (OneUI) veya Huawei cihazlarda "Otomatik Başlatma" ve kısıtlamasız arka plan izni verin'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.reliabilityActionBtn}
-                        onPress={async () => {
-                          triggerHaptic();
-                          const ok = await openChannelNotificationSettings();
-                          if (ok) showToast(language === 'en' ? '⚙️ Device and notification permissions opened.' : '⚙️ Cihaz ve bildirim izinleri açıldı.');
-                        }}
-                      >
-                        <Text style={styles.reliabilityActionBtnText}>{language === 'en' ? 'Open Settings' : 'İzinleri Aç'}</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* 6. Canlı Alarm & Titreşim Testi */}
+                    {/* The app cannot read these permissions, so it only opens the right screen instead of
+                        showing switches that would pretend to know their state. */}
+                    {Platform.OS === 'android' && (
+                      <>
+                        <Text style={[styles.settingSub, { marginBottom: 12 }]}>{t.reliabilityIntro}</Text>
+                        {[
+                          { icon: 'battery-charging' as const, title: t.reliabilityBatteryTitle, desc: t.reliabilityBatteryDesc, open: openBatteryOptimizationSettings },
+                          { icon: 'alarm' as const, title: t.reliabilityExactTitle, desc: t.reliabilityExactDesc, open: openExactAlarmSettings },
+                          { icon: 'hardware-chip-outline' as const, title: t.reliabilityVendorTitle, desc: t.reliabilityVendorDesc, open: () => openChannelNotificationSettings() },
+                        ].map((item, index) => (
+                          <React.Fragment key={item.title}>
+                            {index > 0 && <View style={styles.settingDivider} />}
+                            <View style={styles.reliabilityItem}>
+                              <View style={styles.reliabilityItemIconWrap}>
+                                <Ionicons name={item.icon} size={18} color="#a9dfca" />
+                              </View>
+                              <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
+                                <Text style={styles.settingTitle}>{item.title}</Text>
+                                <Text style={styles.settingSub}>{item.desc}</Text>
+                              </View>
+                              <TouchableOpacity
+                                style={styles.reliabilityActionBtn}
+                                accessibilityLabel={`${item.title}: ${t.reliabilityOpenSettings}`}
+                                onPress={async () => {
+                                  triggerHaptic();
+                                  if (await item.open()) showToast(t.reliabilityOpened);
+                                }}
+                              >
+                                <Text style={styles.reliabilityActionBtnText}>{t.reliabilityOpenSettings}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </React.Fragment>
+                        ))}
+                      </>
+                    )}
                     <TouchableOpacity
                       style={styles.reliabilityTestBtn}
                       onPress={() => {
                         triggerHaptic();
-                        showToast(language === 'en' ? '⏱️ Test alarm will sound in 5 seconds! You can lock your phone to test.' : '⏱️ 5 saniye sonra test alarmı çalacak! Telefonu kilitleyip deneyebilirsiniz.');
+                        showToast(t.reliabilityTestToast);
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
@@ -3964,7 +3792,7 @@ function MainApp() {
                       }}
                     >
                       <Ionicons name="flash" size={18} color="#081624" />
-                      <Text style={styles.reliabilityTestBtnText}>{language === 'en' ? 'Test Live Alarm in 5s (Lock Screen)' : '5 Sn Sonra Canlı Alarmı Test Et (Kilit Ekranı)'}</Text>
+                      <Text style={styles.reliabilityTestBtnText}>{t.reliabilityTestButton}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -4029,7 +3857,7 @@ function MainApp() {
               )}
 
               {/* SUB PAGE 6: GİZLİLİK VE KİLİT EKRANI */}
-              {settingsSubPage === 'privacy' && (
+              {settingsSubPage === 'experience' && (
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="shield-checkmark-outline" size={16} color="#a9dfca" />
@@ -4185,8 +4013,8 @@ function MainApp() {
 
                     <View style={styles.settingRow}>
                       <View style={styles.settingRowText}>
-                        <Text style={styles.settingTitle}>Dokunsal Titreşim (Haptics)</Text>
-                        <Text style={styles.settingSub}>İşlem butonlarına dokunulduğunda hafif geri bildirim</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Vibrate on Tap' : 'Dokununca Titreşim'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'A light vibration when you press buttons' : 'Düğmelere basınca hafif titreşim'}</Text>
                       </View>
                       <Switch
                         value={hapticsEnabled}
@@ -6307,44 +6135,6 @@ const styles = StyleSheet.create({
     color: '#a9dfca',
     fontSize: 11,
     fontWeight: '700',
-  },
-  reliabilityHeaderRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1d2f42',
-  },
-  reliabilityBadgeActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#12332e',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#246156',
-  },
-  reliabilityBadgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34d399',
-  },
-  reliabilityBadgeActiveText: {
-    color: '#34d399',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  reliabilityVersionText: {
-    color: '#64748b',
-    fontSize: 11,
-    flexShrink: 1,
   },
   reliabilityItem: {
     flexDirection: 'row',
