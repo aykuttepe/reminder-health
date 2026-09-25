@@ -2,7 +2,7 @@ import {Keyboard} from 'react-native';
 import {setNotificationIdMap} from './src/notifications';
 import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, type Session, type Snapshot} from './src/account';
 import {login, recover, registerAccount, updateUserEmail, getStoredSyncCode, getSession, logout, authRequest, localStore} from './src/authClient';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -79,11 +79,24 @@ import {
   checkServerHealth,
   syncWithServer,
   smartMergeDoses,
-  createBackupPayload,
-  validateBackupJSON,
   type SyncDose,
 } from './src/syncManager';
 import { logger, type LogEntry, type LogLevel } from './src/logger';
+import {
+  BACKUP_MIME_TYPE,
+  MAX_BACKUP_CHARS,
+  buildBackupFile,
+  backupFileName,
+  isBackupForeignToAccount,
+  parseBackup,
+  prepareRestoredDoses,
+  settingsForRestore,
+  summarizeBackup,
+  type ParseBackupResult,
+  type RestorableBackup,
+} from './src/backup';
+import { Directory, File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 LogBox.ignoreLogs([
@@ -135,6 +148,7 @@ const STORAGE_KEY_SETTINGS = 'rutin_native_settings';
 const STORAGE_KEY_LEARNED_MEDS = 'rutin_native_learned_meds';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_native_sync_config';
 const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
+const BACKUP_CACHE_DIR = 'backup-export';
 
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 
@@ -879,6 +893,83 @@ function MainApp() {
     };
   }, []);
 
+  // Shared by launch hydration and backup restore so both read settings the same way.
+  const applyStoredSettings = (parsed: Record<string, any>) => {
+    if (parsed.privateMode !== undefined) setPrivateMode(parsed.privateMode);
+    if (parsed.notifications !== undefined) setNotifications(parsed.notifications);
+    if (parsed.soundEnabled !== undefined) setSoundEnabled(parsed.soundEnabled);
+    if (parsed.soundType !== undefined) setSoundType(parsed.soundType);
+    if (parsed.userName !== undefined) setUserName(parsed.userName);
+    if (parsed.doctorName !== undefined) setDoctorName(parsed.doctorName);
+    if (parsed.doctorSpecialty !== undefined) setDoctorSpecialty(parsed.doctorSpecialty);
+    if (parsed.doctorHospital !== undefined) setDoctorHospital(parsed.doctorHospital);
+    if (parsed.doctorPhone !== undefined) setDoctorPhone(parsed.doctorPhone);
+    if (parsed.doctorNextAppointment !== undefined) setDoctorNextAppointment(parsed.doctorNextAppointment);
+    if (parsed.doctorAppointmentTime !== undefined) {
+      setDoctorAppointmentTime(parsed.doctorAppointmentTime === '09:00' ? '13:00' : parsed.doctorAppointmentTime);
+    }
+    if (parsed.doctorApptLeadOptions !== undefined && Array.isArray(parsed.doctorApptLeadOptions)) setDoctorApptLeadOptions(parsed.doctorApptLeadOptions);
+    if (parsed.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(parsed.doctorBloodTestDate);
+    if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
+
+    let initialAppointments: AppointmentItem[] = [];
+    const hasStoredAppointments = parsed.appointments !== undefined;
+    if (hasStoredAppointments) {
+      try {
+        const apptsParsed = typeof parsed.appointments === 'string' ? JSON.parse(parsed.appointments) : parsed.appointments;
+        if (Array.isArray(apptsParsed)) {
+          initialAppointments = apptsParsed;
+        }
+      } catch {}
+    }
+    if (!hasStoredAppointments && parsed.doctorNextAppointment) {
+      // Seamlessly migrate legacy single-appointment user
+      initialAppointments = [{
+        id: 'appt-legacy-1',
+        doctorName: parsed.doctorName || '',
+        specialty: parsed.doctorSpecialty || 'Göz',
+        hospital: parsed.doctorHospital || '',
+        phone: parsed.doctorPhone || '',
+        date: parsed.doctorNextAppointment,
+        time: parsed.doctorAppointmentTime === '09:00' ? '13:00' : (parsed.doctorAppointmentTime || '13:00'),
+        leadOptions: parsed.doctorApptLeadOptions || ['1d', '0d'],
+        hasBloodTest: !!parsed.doctorBloodTestDate,
+        bloodTestDate: parsed.doctorBloodTestDate || '',
+        bloodTestFasting: true,
+        bloodTestTime: '08:30',
+        bloodTestNotes: parsed.doctorNotes || '',
+        notes: parsed.doctorNotes || '',
+        completed: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }];
+    }
+    setAppointments(initialAppointments);
+    if (hasStoredAppointments && initialAppointments.length === 0) {
+      setDoctorNextAppointment('');
+      setDoctorBloodTestDate('');
+      setDoctorName('');
+      setDoctorSpecialty('');
+      setDoctorHospital('');
+      setDoctorPhone('');
+      setDoctorNotes('');
+    }
+    if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
+    if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
+    if (parsed.defaultStockThreshold !== undefined) setDefaultStockThreshold(parsed.defaultStockThreshold);
+    if (parsed.stockAlertsEnabled !== undefined) setStockAlertsEnabled(parsed.stockAlertsEnabled);
+    if (parsed.hideDoseAmount !== undefined) setHideDoseAmount(parsed.hideDoseAmount);
+    if (parsed.autoCollapseTaken !== undefined) setAutoCollapseTaken(parsed.autoCollapseTaken);
+    if (parsed.showAppointmentCard !== undefined) setShowAppointmentCard(parsed.showAppointmentCard);
+    if (parsed.hapticsEnabled !== undefined) setHapticsEnabled(parsed.hapticsEnabled);
+    if (parsed.repeatNagEnabled !== undefined) setRepeatNagEnabled(parsed.repeatNagEnabled);
+    if (parsed.repeatNagCount !== undefined) setRepeatNagCount(parsed.repeatNagCount);
+    if (parsed.batteryExemptionEnabled !== undefined) setBatteryExemptionEnabled(parsed.batteryExemptionEnabled);
+    if (parsed.exactAlarmEnabled !== undefined) setExactAlarmEnabled(parsed.exactAlarmEnabled);
+    if (parsed.autoRescheduleOnBoot !== undefined) setAutoRescheduleOnBoot(parsed.autoRescheduleOnBoot);
+    if (parsed.wakeScreenOnAlarm !== undefined) setWakeScreenOnAlarm(parsed.wakeScreenOnAlarm);
+  };
+
   // Hydrate before writing defaults or rebuilding the device notification queue.
   useEffect(() => {
     let mounted = true;
@@ -933,82 +1024,7 @@ function MainApp() {
             }
           } catch {}
         }
-        if (settingData) {
-          const parsed = JSON.parse(settingData);
-          if (parsed.privateMode !== undefined) setPrivateMode(parsed.privateMode);
-          if (parsed.notifications !== undefined) setNotifications(parsed.notifications);
-          if (parsed.soundEnabled !== undefined) setSoundEnabled(parsed.soundEnabled);
-          if (parsed.soundType !== undefined) setSoundType(parsed.soundType);
-          if (parsed.userName !== undefined) setUserName(parsed.userName);
-          if (parsed.doctorName !== undefined) setDoctorName(parsed.doctorName);
-          if (parsed.doctorSpecialty !== undefined) setDoctorSpecialty(parsed.doctorSpecialty);
-          if (parsed.doctorHospital !== undefined) setDoctorHospital(parsed.doctorHospital);
-          if (parsed.doctorPhone !== undefined) setDoctorPhone(parsed.doctorPhone);
-          if (parsed.doctorNextAppointment !== undefined) setDoctorNextAppointment(parsed.doctorNextAppointment);
-          if (parsed.doctorAppointmentTime !== undefined) {
-            setDoctorAppointmentTime(parsed.doctorAppointmentTime === '09:00' ? '13:00' : parsed.doctorAppointmentTime);
-          }
-          if (parsed.doctorApptLeadOptions !== undefined && Array.isArray(parsed.doctorApptLeadOptions)) setDoctorApptLeadOptions(parsed.doctorApptLeadOptions);
-          if (parsed.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(parsed.doctorBloodTestDate);
-          if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
-
-          let initialAppointments: AppointmentItem[] = [];
-          const hasStoredAppointments = parsed.appointments !== undefined;
-          if (hasStoredAppointments) {
-            try {
-              const apptsParsed = typeof parsed.appointments === 'string' ? JSON.parse(parsed.appointments) : parsed.appointments;
-              if (Array.isArray(apptsParsed)) {
-                initialAppointments = apptsParsed;
-              }
-            } catch {}
-          }
-          if (!hasStoredAppointments && parsed.doctorNextAppointment) {
-            // Seamlessly migrate legacy single-appointment user
-            initialAppointments = [{
-              id: 'appt-legacy-1',
-              doctorName: parsed.doctorName || '',
-              specialty: parsed.doctorSpecialty || 'Göz',
-              hospital: parsed.doctorHospital || '',
-              phone: parsed.doctorPhone || '',
-              date: parsed.doctorNextAppointment,
-              time: parsed.doctorAppointmentTime === '09:00' ? '13:00' : (parsed.doctorAppointmentTime || '13:00'),
-              leadOptions: parsed.doctorApptLeadOptions || ['1d', '0d'],
-              hasBloodTest: !!parsed.doctorBloodTestDate,
-              bloodTestDate: parsed.doctorBloodTestDate || '',
-              bloodTestFasting: true,
-              bloodTestTime: '08:30',
-              bloodTestNotes: parsed.doctorNotes || '',
-              notes: parsed.doctorNotes || '',
-              completed: false,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }];
-          }
-          setAppointments(initialAppointments);
-          if (hasStoredAppointments && initialAppointments.length === 0) {
-            setDoctorNextAppointment('');
-            setDoctorBloodTestDate('');
-            setDoctorName('');
-            setDoctorSpecialty('');
-            setDoctorHospital('');
-            setDoctorPhone('');
-            setDoctorNotes('');
-          }
-          if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
-          if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
-          if (parsed.defaultStockThreshold !== undefined) setDefaultStockThreshold(parsed.defaultStockThreshold);
-          if (parsed.stockAlertsEnabled !== undefined) setStockAlertsEnabled(parsed.stockAlertsEnabled);
-          if (parsed.hideDoseAmount !== undefined) setHideDoseAmount(parsed.hideDoseAmount);
-          if (parsed.autoCollapseTaken !== undefined) setAutoCollapseTaken(parsed.autoCollapseTaken);
-          if (parsed.showAppointmentCard !== undefined) setShowAppointmentCard(parsed.showAppointmentCard);
-          if (parsed.hapticsEnabled !== undefined) setHapticsEnabled(parsed.hapticsEnabled);
-          if (parsed.repeatNagEnabled !== undefined) setRepeatNagEnabled(parsed.repeatNagEnabled);
-          if (parsed.repeatNagCount !== undefined) setRepeatNagCount(parsed.repeatNagCount);
-          if (parsed.batteryExemptionEnabled !== undefined) setBatteryExemptionEnabled(parsed.batteryExemptionEnabled);
-          if (parsed.exactAlarmEnabled !== undefined) setExactAlarmEnabled(parsed.exactAlarmEnabled);
-          if (parsed.autoRescheduleOnBoot !== undefined) setAutoRescheduleOnBoot(parsed.autoRescheduleOnBoot);
-          if (parsed.wakeScreenOnAlarm !== undefined) setWakeScreenOnAlarm(parsed.wakeScreenOnAlarm);
-        }
+        if (settingData) applyStoredSettings(JSON.parse(settingData));
         setHydrated(true);
       }).catch(error => {
         console.error('Storage hydration failed', error);
@@ -1066,45 +1082,38 @@ function MainApp() {
     ).catch(() => {});
   }, [hydrated, serverUrl, autoSync, syncIntervalMin, lastSyncAt]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    AsyncStorage.setItem(
-      STORAGE_KEY_SETTINGS,
-      JSON.stringify({
-        privateMode,
-        notifications,
-        soundEnabled,
-        soundType,
-        userName,
-        doctorName,
-        doctorSpecialty,
-        doctorHospital,
-        doctorPhone,
-        doctorNextAppointment,
-        doctorAppointmentTime,
-        doctorApptLeadOptions,
-        appointments: JSON.stringify(appointments),
-        doctorBloodTestDate,
-        doctorNotes,
-        snoozeMinutes,
-        leadTimeMinutes,
-        defaultStockThreshold,
-        stockAlertsEnabled,
-        hideDoseAmount,
-        autoCollapseTaken,
-        showAppointmentCard,
-        hapticsEnabled,
-        repeatNagEnabled,
-        repeatNagCount,
-        batteryExemptionEnabled,
-        exactAlarmEnabled,
-        autoRescheduleOnBoot,
-        wakeScreenOnAlarm,
-      })
-    ).catch(() => {});
-    updateNotificationHandler(soundEnabled, soundType);
-  }, [
-    hydrated,
+  // The persisted settings object doubles as the settings section of a backup file.
+  const storedSettings = useMemo(() => ({
+    privateMode,
+    notifications,
+    soundEnabled,
+    soundType,
+    userName,
+    doctorName,
+    doctorSpecialty,
+    doctorHospital,
+    doctorPhone,
+    doctorNextAppointment,
+    doctorAppointmentTime,
+    doctorApptLeadOptions,
+    appointments: JSON.stringify(appointments),
+    doctorBloodTestDate,
+    doctorNotes,
+    snoozeMinutes,
+    leadTimeMinutes,
+    defaultStockThreshold,
+    stockAlertsEnabled,
+    hideDoseAmount,
+    autoCollapseTaken,
+    showAppointmentCard,
+    hapticsEnabled,
+    repeatNagEnabled,
+    repeatNagCount,
+    batteryExemptionEnabled,
+    exactAlarmEnabled,
+    autoRescheduleOnBoot,
+    wakeScreenOnAlarm,
+  }), [
     appointments,
     privateMode,
     notifications,
@@ -1135,6 +1144,12 @@ function MainApp() {
     autoRescheduleOnBoot,
     wakeScreenOnAlarm,
   ]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    AsyncStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(storedSettings)).catch(() => {});
+    updateNotificationHandler(soundEnabled, soundType);
+  }, [hydrated, storedSettings]);
 
   // Sync doctor appointment and lab test notifications
   useEffect(() => {
@@ -2314,41 +2329,116 @@ function MainApp() {
     }
   };
 
+  const errorTitle = language === 'en' ? 'Error' : 'Hata';
+
   const handleExportBackup = async () => {
     triggerHaptic();
-    const backup = createBackupPayload({
+    const backup = buildBackupFile({
       ownerId: session?.user.id,
+      appVersion: CURRENT_APP_VERSION,
+      language,
       doses,
-      settings: {
-        userName,
-        doctorName,
-        doctorSpecialty,
-        doctorHospital,
-        doctorPhone,
-        doctorNextAppointment,
-        doctorNotes,
-        notifications,
-        soundEnabled,
-        soundType,
-        snoozeMinutes,
-        leadTimeMinutes,
-        defaultStockThreshold,
-        stockAlertsEnabled,
-        hideDoseAmount,
-        autoCollapseTaken,
-        hapticsEnabled,
-      },
+      settings: storedSettings,
       learnedMeds,
     });
-    const jsonStr = JSON.stringify(backup, null, 2);
     try {
-      await Share.share({
-        title: language === 'en' ? 'Reminder Health Backup' : 'Reminder Health İlaç Yedeklemesi',
-        message: jsonStr,
-      });
-    } catch {
-      Alert.alert(language === 'en' ? 'Error' : 'Hata', language === 'en' ? 'Backup file could not be shared.' : 'Yedek dosyası paylaşılamadı.');
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert(errorTitle, t.backupShareUnavailable);
+        return;
+      }
+      // Only the latest export stays in the cache: the file holds health data.
+      const exportDir = new Directory(Paths.cache, BACKUP_CACHE_DIR);
+      if (exportDir.exists) exportDir.delete();
+      exportDir.create();
+      const file = new File(exportDir, backupFileName());
+      file.create();
+      file.write(JSON.stringify(backup, null, 2));
+      await Sharing.shareAsync(file.uri, { mimeType: BACKUP_MIME_TYPE, UTI: 'public.json', dialogTitle: t.backupTitle });
+      logger.info('Backup', 'Yedek dışa aktarıldı', { medicines: backup.doses.length });
+    } catch (error) {
+      logger.error('Backup', 'Yedek dışa aktarılamadı', error);
+      Alert.alert(errorTitle, t.backupExportFailed);
     }
+  };
+
+  const backupErrorMessage = (result: Extract<ParseBackupResult, { ok: false }>): string => {
+    switch (result.error) {
+      case 'too-large': return t.backupErrorTooLarge;
+      case 'invalid-json': return t.backupErrorInvalidJson;
+      case 'not-object': return t.backupErrorNotObject;
+      case 'unsupported-version': return t.backupErrorVersion.replace('{version}', result.detail ?? '?');
+      case 'missing-doses': return t.backupErrorNoDoses;
+      case 'invalid-dose': return t.backupErrorInvalidDose.replace('{n}', result.detail ?? '?');
+      case 'invalid-appointments': return t.backupErrorInvalidAppointments;
+    }
+  };
+
+  const applyRestoredBackup = (backup: RestorableBackup) => {
+    setDoses(prepareRestoredDoses(backup.doses).map(dose => normalizeDoseDay(dose as Dose)));
+    setLearnedMeds(backup.learnedMeds as Record<string, Partial<CatalogMedicine>>);
+    applyStoredSettings(settingsForRestore(backup, {
+      appointments: storedSettings.appointments,
+      deviceBound: { batteryExemptionEnabled, exactAlarmEnabled },
+    }));
+    if (backup.language && backup.language !== language) void updateLanguage(backup.language);
+    triggerDebouncedSyncRef.current();
+    logger.info('Backup', 'Yedek geri yüklendi', { version: backup.version, medicines: backup.doses.length });
+    showToast(getTranslations(backup.language ?? language).restoreSuccess);
+  };
+
+  const confirmRestore = (backup: RestorableBackup) => {
+    const summary = summarizeBackup(backup);
+    const exportedDate = summary.exportedAt ? new Date(summary.exportedAt) : null;
+    const dateLabel = exportedDate && !Number.isNaN(exportedDate.getTime())
+      ? formatLocalizedDate(localDateKey(exportedDate), language)
+      : '?';
+    const lines = [
+      t.restoreConfirmDesc
+        .replace('{date}', dateLabel)
+        .replace('{meds}', String(summary.medicines))
+        .replace('{appts}', summary.appointments === null ? '—' : String(summary.appointments)),
+    ];
+    if (summary.appointments === null) lines.push(t.restoreConfirmNoAppointments);
+    if (session) lines.push(t.restoreConfirmSyncNote);
+    Alert.alert(t.restoreConfirmTitle, lines.join('\n\n'), [
+      { text: t.cancel, style: 'cancel' },
+      { text: t.restoreAction, style: 'destructive', onPress: () => applyRestoredBackup(backup) },
+    ]);
+  };
+
+  const handleImportBackup = async () => {
+    triggerHaptic();
+    // A sync or account switch finishing after the restore would overwrite the restored doses.
+    if (isSyncingRef.current || authBusy) {
+      Alert.alert(errorTitle, t.restoreBusy);
+      return;
+    }
+    let text: string;
+    try {
+      // Android providers label .json files inconsistently, so any file is accepted and validated.
+      const picked = await File.pickFileAsync({ mimeTypes: '*/*' });
+      if (picked.canceled) return;
+      if (picked.result.size > MAX_BACKUP_CHARS) {
+        Alert.alert(errorTitle, t.backupErrorTooLarge);
+        return;
+      }
+      text = await picked.result.text();
+    } catch (error) {
+      logger.error('Backup', 'Yedek dosyası okunamadı', error);
+      Alert.alert(errorTitle, t.backupReadFailed);
+      return;
+    }
+    const result = parseBackup(text);
+    if (!result.ok) {
+      logger.warn('Backup', 'Geçersiz yedek dosyası', { error: result.error, detail: result.detail });
+      Alert.alert(errorTitle, backupErrorMessage(result));
+      return;
+    }
+    if (isBackupForeignToAccount(result.backup.ownerId, session?.user.id)) {
+      Alert.alert(errorTitle, t.backupForeignAccount);
+      return;
+    }
+    confirmRestore(result.backup);
   };
 
   const resetAllData = () => {
@@ -4752,22 +4842,25 @@ function MainApp() {
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="save-outline" size={16} color="#a9dfca" />
                     <Text style={styles.settingGroupTitle}>
-                      {language === 'en' ? 'OFFLINE JSON BACKUP' : 'ÇEVRİMDIŞI JSON YEDEKLEME'}
+                      {t.backupTitle.toLocaleUpperCase(language === 'en' ? 'en-US' : 'tr-TR')}
                     </Text>
                   </View>
 
                   <View style={styles.syncCard}>
-                    <Text style={styles.syncCardDesc}>
-                      {language === 'en'
-                        ? 'Even without a server, you can export and backup all your medications, history, and settings as a .json file on your phone.'
-                        : 'Sunucunuz olmasa dahi telefonunuzdaki tüm ilaçları, kullanım geçmişini ve ayarları .json dosyası olarak telefonunuza kaydedebilir veya geri yükleyebilirsiniz.'}
-                    </Text>
+                    <Text style={styles.syncCardDesc}>{t.backupDesc}</Text>
 
                     <TouchableOpacity style={styles.backupExportBtn} onPress={handleExportBackup}>
+                      <Ionicons name="share-outline" size={18} color="#a9dfca" />
+                      <Text style={styles.backupExportBtnText}>{t.backupExport}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.backupExportBtn, { marginTop: 10 }]}
+                      onPress={handleImportBackup}
+                      accessibilityLabel={t.backupImport}
+                    >
                       <Ionicons name="download-outline" size={18} color="#a9dfca" />
-                      <Text style={styles.backupExportBtnText}>
-                        {language === 'en' ? 'Export Backup (.json)' : 'Yedeği Dışa Aktar (.json)'}
-                      </Text>
+                      <Text style={styles.backupExportBtnText}>{t.backupImport}</Text>
                     </TouchableOpacity>
                   </View>
                 </>

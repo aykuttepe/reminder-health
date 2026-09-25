@@ -270,6 +270,30 @@ export interface Translations {
   confirmDeleteDesc: string;
   confirmResetTitle: string;
   confirmResetDesc: string;
+
+  // Backup & restore ({placeholders} are filled in App.tsx)
+  backupTitle: string;
+  backupDesc: string;
+  backupExport: string;
+  backupImport: string;
+  backupExportFailed: string;
+  backupShareUnavailable: string;
+  backupReadFailed: string;
+  backupErrorTooLarge: string;
+  backupErrorInvalidJson: string;
+  backupErrorNotObject: string;
+  backupErrorVersion: string;
+  backupErrorNoDoses: string;
+  backupErrorInvalidDose: string;
+  backupErrorInvalidAppointments: string;
+  backupForeignAccount: string;
+  restoreConfirmTitle: string;
+  restoreConfirmDesc: string;
+  restoreConfirmNoAppointments: string;
+  restoreConfirmSyncNote: string;
+  restoreAction: string;
+  restoreSuccess: string;
+  restoreBusy: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -543,6 +567,29 @@ export const translations: Record<Language, Translations> = {
     confirmDeleteDesc: 'Bu ilacı silmek istediğinizden emin misiniz?',
     confirmResetTitle: 'Verileri Sıfırla',
     confirmResetDesc: 'Tüm ilaç kayıtlarınız ve ayarlarınız silinecektir. Devam edilsin mi?',
+
+    backupTitle: 'Cihaz Dışı Yedek',
+    backupDesc: 'İlaçlarınızı, geçmişinizi, randevularınızı ve ayarlarınızı tek bir .json dosyasına kaydedin; telefon değişirse veya uygulama silinirse bu dosyadan geri yükleyin. Dosyayı telefonun dışında (e-posta, bulut sürücü, bilgisayar) saklayın. Dosya şifreli değildir ve sağlık bilgisi içerir.',
+    backupExport: 'Yedeği Dışa Aktar (.json)',
+    backupImport: 'Yedekten Geri Yükle',
+    backupExportFailed: 'Yedek dosyası oluşturulamadı.',
+    backupShareUnavailable: 'Bu cihazda dosya paylaşımı kullanılamıyor.',
+    backupReadFailed: 'Seçilen dosya okunamadı.',
+    backupErrorTooLarge: 'Dosya bir yedek için fazla büyük.',
+    backupErrorInvalidJson: 'Dosya bozuk veya bir yedek dosyası değil.',
+    backupErrorNotObject: 'Dosya bir yedek dosyası değil.',
+    backupErrorVersion: 'Bu yedek, uygulamanın bu sürümünün tanımadığı bir biçimde ({version}). Uygulamayı güncelleyip tekrar deneyin.',
+    backupErrorNoDoses: 'Dosyada ilaç listesi bulunamadı.',
+    backupErrorInvalidDose: 'Yedekteki {n}. ilaç kaydı hatalı. Hiçbir veri değiştirilmedi.',
+    backupErrorInvalidAppointments: 'Yedekteki randevu listesi hatalı. Hiçbir veri değiştirilmedi.',
+    backupForeignAccount: 'Bu yedek başka bir eşitleme hesabına ait; hesaplar karışmasın diye geri yüklenmedi. O hesaba bağlanın ya da bu hesaptan çıkış yapıp tekrar deneyin.',
+    restoreConfirmTitle: 'Yedeği Geri Yükle',
+    restoreConfirmDesc: '{date} tarihli yedek: {meds} ilaç, {appts} randevu.\n\nBu telefondaki ilaçlar, geçmiş ve ayarlar yedektekilerle değiştirilecek.',
+    restoreConfirmNoAppointments: 'Bu yedekte randevu yok; mevcut randevularınız korunacak.',
+    restoreConfirmSyncNote: 'Eşitleme hesabınız bağlı: geri yüklenen veriler diğer cihazlarınıza da gönderilecek.',
+    restoreAction: 'Geri Yükle',
+    restoreSuccess: 'Yedek geri yüklendi',
+    restoreBusy: 'Eşitleme veya hesap işlemi sürüyor. Bitince tekrar deneyin.',
   },
 
   en: {
@@ -815,6 +862,29 @@ export const translations: Record<Language, Translations> = {
     confirmDeleteDesc: 'Are you sure you want to delete this medication?',
     confirmResetTitle: 'Reset Data',
     confirmResetDesc: 'All medications and settings will be permanently erased. Continue?',
+
+    backupTitle: 'Off-Device Backup',
+    backupDesc: 'Save your medications, history, appointments and settings to a single .json file, and restore from it if you change phones or remove the app. Keep the file off this phone (email, cloud drive, computer). The file is not encrypted and contains health information.',
+    backupExport: 'Export Backup (.json)',
+    backupImport: 'Restore from Backup',
+    backupExportFailed: 'The backup file could not be created.',
+    backupShareUnavailable: 'File sharing is not available on this device.',
+    backupReadFailed: 'The selected file could not be read.',
+    backupErrorTooLarge: 'The file is too large to be a backup.',
+    backupErrorInvalidJson: 'The file is damaged or is not a backup file.',
+    backupErrorNotObject: 'The file is not a backup file.',
+    backupErrorVersion: 'This backup uses a format this version of the app does not know ({version}). Update the app and try again.',
+    backupErrorNoDoses: 'No medication list was found in the file.',
+    backupErrorInvalidDose: 'Medication record {n} in the backup is invalid. Nothing was changed.',
+    backupErrorInvalidAppointments: 'The appointment list in the backup is invalid. Nothing was changed.',
+    backupForeignAccount: 'This backup belongs to another sync account, so it was not restored to keep accounts separate. Connect to that account, or disconnect from this one and try again.',
+    restoreConfirmTitle: 'Restore Backup',
+    restoreConfirmDesc: 'Backup from {date}: {meds} medications, {appts} appointments.\n\nMedications, history and settings on this phone will be replaced with those in the backup.',
+    restoreConfirmNoAppointments: 'This backup has no appointments; your current appointments will be kept.',
+    restoreConfirmSyncNote: 'Your sync account is connected: the restored data will also be sent to your other devices.',
+    restoreAction: 'Restore',
+    restoreSuccess: 'Backup restored',
+    restoreBusy: 'A sync or account operation is in progress. Try again when it finishes.',
   },
 };
 

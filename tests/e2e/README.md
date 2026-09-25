@@ -3,6 +3,16 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Yedekten geri yükleme — 26 Eylül 2026 (v1.2.6)
+
+- Emulator'da elle doğrulandı (release APK): "Yedeği Dışa Aktar" `reminder-health-yedek-<tarih>.json` dosyasıyla
+  paylaşım ekranını açar. İndirilenler'e konan bozuk dosya "Dosya bozuk veya bir yedek dosyası değil." ile
+  reddedildi, veri değişmedi. Geçerli v3 yedek onay ekranında tarih, ilaç ve randevu sayısını gösterdi; geri
+  yüklemeden ve uygulama kapatılıp açıldıktan sonra ilaçlar, stoklar, randevu, kullanıcı adı ve erteleme süresi
+  yedektekiydi; silinmiş ilaç görünmedi; yedekteki `exactAlarmEnabled: false` cihazın açık ayarını değiştirmedi.
+- Doğrulama ve birleştirme kuralları `mobile-app/tests/backup.test.cjs` birim testlerinde (10 test).
+- Hesaplı telefonda geri yükleme sonrası eşitleme henüz denenmedi.
+
 ## İlaç başına sessize alma — 18 Eylül 2026 (v1.2.5)
 
 - `medication_mute.robot` (`npm --prefix tests/e2e run test:mute`, uygulama verisini siler): yeni ilaç alarm
