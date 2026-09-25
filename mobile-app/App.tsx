@@ -46,7 +46,6 @@ import {
   snoozeNotification,
   buildNotificationContent,
   addNotificationResponseListener,
-  addNotificationReceivedListener,
   createNotificationResponseGate,
   takeLaunchNotificationResponse,
   type NotificationActionResponse,
@@ -62,7 +61,6 @@ import {
   snoozeDoctorAppointmentNotification,
   cancelDoctorAppointmentNotifications,
   NotificationSoundType,
-  ActiveNotificationPayload,
 } from './src/notifications';
 import { CameraScannerModal } from './src/components/CameraScannerModal';
 import { CalendarModal, formatLocalizedDate, formatTurkishDate } from './src/components/CalendarModal';
@@ -689,7 +687,6 @@ function MainApp() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundType, setSoundType] = useState<NotificationSoundType>('default');
   const [hasNotificationPermission, setHasNotificationPermission] = useState<boolean | null>(null);
-  const [activeBannerNotification, setActiveBannerNotification] = useState<ActiveNotificationPayload | null>(null);
 
   // Customizable Feature States
   const [userName, setUserName] = useState('');
@@ -865,11 +862,9 @@ function MainApp() {
     } else if (actionId === ACTION_SNOOZE) {
       void snoozeDose(dose, time, doseDate);
     } else if (slotStatus(dose, time, doseDate) === 'pending') {
-      // Tapping the notification itself only opens the app, so offer the dose instead of leaving it
-      // silently unmarked while the user believes it was handled.
+      // Tapping the notification itself only opens the app; Today shows the pending dose with its
+      // Al / Ertele / Atla buttons so it is not left silently unmarked.
       setTab('Bugün');
-      setActiveBannerNotification({ title: res.title ?? dose.name, body: res.body ?? '', doseId: dose.id,
-        time, date: doseDate, isRepeat: res.isRepeat });
     }
   };
 
@@ -891,16 +886,9 @@ function MainApp() {
 
     const removeListener = addNotificationResponseListener(res => notificationResponseGate.push(res));
 
-    const removeReceivedListener = addNotificationReceivedListener(payload => {
-      const dose = dosesRef.current.find(d => d.id === payload.doseId);
-      if (dose && slotStatus(dose, payload.time || dose.time, payload.date ?? localDateKey()) !== 'pending') return;
-      setActiveBannerNotification(payload);
-    });
-
     return () => {
       mounted = false;
       removeListener();
-      removeReceivedListener();
       registerDoseStatusChecker(null);
     };
   }, []);
@@ -1719,7 +1707,6 @@ function MainApp() {
       if (snapshot.settings.showAppointmentCard !== undefined) setShowAppointmentCard(snapshot.settings.showAppointmentCard);
       if (snapshot.settings.hapticsEnabled !== undefined) setHapticsEnabled(snapshot.settings.hapticsEnabled);
       setUndoAction(null);
-      setActiveBannerNotification(null);
       setLastSyncAt(null);
       setSession(next);
     } finally { switchingAccount.current = false; }
@@ -2542,92 +2529,6 @@ function MainApp() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
-
-        {/* Floating Push Notification Banner */}
-        {activeBannerNotification && (
-          <View style={styles.pushNotificationBanner}>
-            <View style={styles.pushBannerHeader}>
-              <View style={styles.pushBannerAppRow}>
-                <Ionicons name="medical" size={13} color="#a9dfca" />
-                <Text style={styles.pushBannerAppName}>
-                  {activeBannerNotification.isRepeat
-                    ? (language === 'en' ? '⚠️ ROUTINE · REPEAT ALERT (+3 MIN)' : '⚠️ RUTİN · TEKRAR UYARISI (+3 DK)')
-                    : (language === 'en' ? 'ROUTINE · NOTIFICATION' : 'RUTİN · BİLDİRİM')}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setActiveBannerNotification(null)}>
-                <Ionicons name="close" size={16} color="#adb3bf" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.pushBannerTitle}>{activeBannerNotification.title}</Text>
-            <Text style={styles.pushBannerBody}>{activeBannerNotification.body}</Text>
-            {activeBannerNotification.isAppointment ? (
-              <View style={styles.pushBannerActions}>
-                <TouchableOpacity
-                  style={styles.pushBannerActionTake}
-                  onPress={() => {
-                    triggerHaptic();
-                    setActiveBannerNotification(null);
-                    showToast(language === 'en' ? '✅ Appointment confirmed' : '✅ Randevu bildirimi onaylandı');
-                  }}
-                >
-                  <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                  <Text style={styles.pushBannerActionTakeText}>{language === 'en' ? 'Tamam / Anlaşıldı' : 'Tamam / Anlaşıldı'}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.pushBannerActions}>
-                <TouchableOpacity
-                  style={styles.pushBannerActionTake}
-                  onPress={() => {
-                    triggerHaptic();
-                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                    const targetTime = activeBannerNotification.time || targetDose?.time;
-                    if (targetDose) {
-                      applyRecord(targetDose.id, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey(), 'taken');
-                    }
-                    setActiveBannerNotification(null);
-                  }}
-                >
-                  <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                  <Text style={styles.pushBannerActionTakeText}>{t.take}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.pushBannerActionSnooze}
-                  onPress={() => {
-                    triggerHaptic();
-                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                    const targetTime = activeBannerNotification.time || targetDose?.time;
-                    if (targetDose) {
-                      void snoozeDose(targetDose, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey());
-                    }
-                    setActiveBannerNotification(null);
-                  }}
-                >
-                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
-                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3m' : '3 Dk Ertele'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.pushBannerActionSkip}
-                  onPress={() => {
-                    triggerHaptic();
-                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                    const targetTime = activeBannerNotification.time || targetDose?.time;
-                    if (targetDose) {
-                      applyRecord(targetDose.id, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey(), 'skipped');
-                    }
-                    setActiveBannerNotification(null);
-                  }}
-                >
-                  <Ionicons name="close-circle-outline" size={15} color="#f87171" />
-                  <Text style={styles.pushBannerActionSkipText}>{t.skip}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
 
       <View style={styles.container}>
         {/* Header */}
@@ -4058,12 +3959,6 @@ function MainApp() {
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
-                          payload => {
-                            try {
-                              Vibration.vibrate([0, 500, 200, 500]);
-                            } catch {}
-                            setActiveBannerNotification(payload);
-                          },
                           { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled }
                         );
                       }}
@@ -4252,9 +4147,6 @@ function MainApp() {
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
-                          payload => {
-                            setActiveBannerNotification(payload);
-                          },
                           { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled }
                         );
                       }}
@@ -6232,37 +6124,6 @@ const styles = StyleSheet.create({
   toastUndo: { color: '#a9dfca', fontSize: 13, fontWeight: '700' },
 
   // Floating Push Banner
-  pushNotificationBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    left: 14,
-    right: 14,
-    maxWidth: 600,
-    alignSelf: 'center',
-    zIndex: 9999,
-    backgroundColor: '#152535',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#a9dfca',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 12,
-  },
-  pushBannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  pushBannerAppRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pushBannerAppName: { color: '#a9dfca', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  pushBannerTitle: { color: '#f5f3f0', fontSize: 16, fontWeight: '700' },
-  pushBannerBody: { color: '#adb3bf', fontSize: 13, marginTop: 4, marginBottom: 12 },
-  pushBannerActions: { flexDirection: 'row', gap: 10 },
-  pushBannerActionTake: { flex: 1.2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#a9dfca', height: 38, borderRadius: 8 },
-  pushBannerActionTakeText: { color: '#081624', fontSize: 13, fontWeight: '700' },
-  pushBannerActionSnooze: { flex: 1.1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#213244', height: 38, borderRadius: 8, borderWidth: 1, borderColor: '#33485c' },
-  pushBannerActionSnoozeText: { color: '#f5f3f0', fontSize: 13, fontWeight: '600' },
-  pushBannerActionSkip: { paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#2b161f', height: 38, borderRadius: 8, borderWidth: 1, borderColor: '#5c2234' },
-  pushBannerActionSkipText: { color: '#f87171', fontSize: 13, fontWeight: '600' },
   notifRepeatNagBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#112926', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#1d4d42' },
   notifRepeatNagBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '600' },
 
