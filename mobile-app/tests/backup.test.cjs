@@ -31,7 +31,7 @@ const doses = [
 ];
 const settings = {
   userName: 'Ayşe', notifications: true, soundType: 'chime', snoozeMinutes: 10, doctorApptLeadOptions: ['1d', '0d'],
-  appointments: JSON.stringify([appointment]), exactAlarmEnabled: false, batteryExemptionEnabled: false,
+  appointments: JSON.stringify([appointment]),
 };
 
 test('an exported backup restores medicines, history, appointments and settings unchanged', () => {
@@ -51,14 +51,15 @@ test('an exported backup restores medicines, history, appointments and settings 
   assert.deepEqual(plain(summarizeBackup(backup)), { medicines: 1, appointments: 1, exportedAt: '2026-09-26T08:00:00.000Z' });
 });
 
-test('restore keeps this phone\'s permission toggles instead of the exporting phone\'s', () => {
+test('a backup with appointments replaces the current ones on restore', () => {
   const { backup } = parseBackup(JSON.stringify(buildBackupFile({ doses, settings, learnedMeds: {} })));
-  const restored = settingsForRestore(backup, {
-    appointments: '[]', deviceBound: { exactAlarmEnabled: true, batteryExemptionEnabled: true },
-  });
-  assert.equal(restored.exactAlarmEnabled, true);
-  assert.equal(restored.batteryExemptionEnabled, true);
-  assert.deepEqual(JSON.parse(restored.appointments), [appointment]);
+  assert.deepEqual(JSON.parse(settingsForRestore(backup, '[]').appointments), [appointment]);
+});
+
+test('permission toggles from 1.2.6 backups are ignored', () => {
+  const { backup } = parseBackup(JSON.stringify({ version: 3, doses: [],
+    settings: { exactAlarmEnabled: false, batteryExemptionEnabled: false, wakeScreenOnAlarm: false } }));
+  assert.deepEqual(plain(backup.settings), {});
 });
 
 test('an old backup without appointments keeps the current appointments', () => {
@@ -67,7 +68,7 @@ test('an old backup without appointments keeps the current appointments', () => 
   assert.equal(backup.hasAppointments, false);
   assert.equal(summarizeBackup(backup).appointments, null);
   const current = JSON.stringify([appointment]);
-  assert.equal(settingsForRestore(backup, { appointments: current, deviceBound: {} }).appointments, current);
+  assert.equal(settingsForRestore(backup, current).appointments, current);
 });
 
 test('appointments exported as an array by older builds are accepted', () => {

@@ -41,14 +41,7 @@ const SETTING_KINDS: Record<string, SettingKind> = {
   hapticsEnabled: 'boolean',
   repeatNagEnabled: 'boolean',
   repeatNagCount: 'number',
-  batteryExemptionEnabled: 'boolean',
-  exactAlarmEnabled: 'boolean',
-  autoRescheduleOnBoot: 'boolean',
-  wakeScreenOnAlarm: 'boolean',
 };
-
-// These reflect OS permissions granted on the exporting phone, not a choice that travels.
-const DEVICE_BOUND_SETTING_KEYS = ['batteryExemptionEnabled', 'exactAlarmEnabled'];
 
 const SOUND_TYPES = ['default', 'alarm', 'gentle', 'chime', 'system_custom', 'silent'];
 
@@ -227,19 +220,12 @@ export function summarizeBackup(backup: RestorableBackup): BackupSummary {
 }
 
 /**
- * Settings to apply on restore. Device-bound permission toggles stay as they are on this phone,
- * and when the file predates appointment export the current appointments are kept rather than wiped.
+ * Settings to apply on restore. When the file predates appointment export, the current
+ * appointments (stored as a JSON string) are kept rather than wiped.
  */
-export function settingsForRestore(
-  backup: RestorableBackup,
-  current: { appointments: string; deviceBound: Record<string, unknown> },
-): Record<string, unknown> {
+export function settingsForRestore(backup: RestorableBackup, currentAppointments: string): Record<string, unknown> {
   const settings = { ...backup.settings };
-  for (const key of DEVICE_BOUND_SETTING_KEYS) {
-    if (current.deviceBound[key] !== undefined) settings[key] = current.deviceBound[key];
-    else delete settings[key];
-  }
-  if (!backup.hasAppointments) settings.appointments = current.appointments;
+  if (!backup.hasAppointments) settings.appointments = currentAppointments;
   return settings;
 }
 

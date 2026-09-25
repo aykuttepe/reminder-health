@@ -9,17 +9,20 @@ Test Tags        android    notification
 ${APP}           ${CURDIR}/../../mobile-app/android/app/build/outputs/apk/release/app-release.apk
 
 *** Test Cases ***
-Test Notification Is Delivered In Foreground
+Test Notification Is Shown By Android In Foreground
+    [Documentation]    Since v1.2.7 there is no in-app banner; Android's own heads-up carries the reminder.
     Click Element    android=new UiSelector().descriptionContains(", Ayarlar").clickable(true)
     Wait Until Page Contains    Kullanıcı Profili    15s
-    Click Element    android=new UiSelector().text("Gizlilik & Kilit Ekranı")
+    Click Element    android=new UiSelector().text("Görünüm")
     Wait Until Page Contains    İlaç Adını Gizle    15s
     ${test_notification}=    Set Variable    android=new UiSelector().text("3 Sn Sonra Test Bildirimi Gönder")
     Scroll Down    ${test_notification}    20s    1s
     Click Element    ${test_notification}
     Wait Until Page Contains    Test bildirimi zamanlandı    5s
-    Wait Until Page Contains    RUTİN · BİLDİRİM    10s
-    Page Should Contain Text    ⏰ İlaç Vakti
+    Open Notifications
+    Wait Until Page Contains    ⏰ İlaç Vakti    15s
+    Page Should Not Contain Text    RUTİN · BİLDİRİM
+    Press Keycode    4
 
 *** Keywords ***
 Open Clean Reminder Application

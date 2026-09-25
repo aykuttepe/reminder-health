@@ -1,6 +1,6 @@
 import {Keyboard} from 'react-native';
 import {setNotificationIdMap} from './src/notifications';
-import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, type Session, type Snapshot} from './src/account';
+import {newId, migrateDoseIds, switchAccount, finishSwitch, assertAccount, accountKey, boundAccountId, type Session, type Snapshot} from './src/account';
 import {login, recover, registerAccount, updateUserEmail, getStoredSyncCode, getSession, logout, authRequest, localStore} from './src/authClient';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -46,7 +46,6 @@ import {
   snoozeNotification,
   buildNotificationContent,
   addNotificationResponseListener,
-  addNotificationReceivedListener,
   createNotificationResponseGate,
   takeLaunchNotificationResponse,
   type NotificationActionResponse,
@@ -62,7 +61,6 @@ import {
   snoozeDoctorAppointmentNotification,
   cancelDoctorAppointmentNotifications,
   NotificationSoundType,
-  ActiveNotificationPayload,
 } from './src/notifications';
 import { CameraScannerModal } from './src/components/CameraScannerModal';
 import { CalendarModal, formatLocalizedDate, formatTurkishDate } from './src/components/CalendarModal';
@@ -110,10 +108,8 @@ export type SettingsSubPage =
   | 'profile'
   | 'language'
   | 'notifications'
-  | 'reminders'
   | 'reliability'
   | 'stock'
-  | 'privacy'
   | 'experience'
   | 'sync'
   | 'reset'
@@ -149,6 +145,12 @@ const STORAGE_KEY_LEARNED_MEDS = 'rutin_native_learned_meds';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_native_sync_config';
 const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
 const BACKUP_CACHE_DIR = 'backup-export';
+// Server sync (account, cloud switch, manual/auto sync) is parked until a later update: the app runs
+// in local mode and its sync UI is hidden. The user's stored cloud choice and account link are kept,
+// so flipping this back to true restores the previous behavior without a migration.
+const CLOUD_SYNC_AVAILABLE = false;
+// The diagnostics log screen is hidden from the settings menu for now; the logger keeps recording.
+const DIAGNOSTICS_AVAILABLE = false;
 
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 
@@ -683,7 +685,6 @@ function MainApp() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundType, setSoundType] = useState<NotificationSoundType>('default');
   const [hasNotificationPermission, setHasNotificationPermission] = useState<boolean | null>(null);
-  const [activeBannerNotification, setActiveBannerNotification] = useState<ActiveNotificationPayload | null>(null);
 
   // Customizable Feature States
   const [userName, setUserName] = useState('');
@@ -709,10 +710,6 @@ function MainApp() {
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [repeatNagEnabled, setRepeatNagEnabled] = useState(true);
   const [repeatNagCount, setRepeatNagCount] = useState(5);
-  const [batteryExemptionEnabled, setBatteryExemptionEnabled] = useState(true);
-  const [exactAlarmEnabled, setExactAlarmEnabled] = useState(true);
-  const [autoRescheduleOnBoot, setAutoRescheduleOnBoot] = useState(true);
-  const [wakeScreenOnAlarm, setWakeScreenOnAlarm] = useState(true);
 
   // Sync & Backup States
   const [serverUrl, setServerUrl] = useState(DEFAULT_SYNC_SERVER_URL);
@@ -726,6 +723,12 @@ function MainApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const switchingAccount = useRef(false);
+  // Master switch for everything that talks to the sync server. Off = local mode: nothing is sent,
+  // the stored account link is kept so switching back on resumes the same account.
+  const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
+  const cloudEpochRef = useRef(0);
+  const resumeCloudSyncRef = useRef(false);
+  const cloudActive = CLOUD_SYNC_AVAILABLE && cloudSyncEnabled;
   const [autoSync, setAutoSync] = useState(false);
   const [syncIntervalMin, setSyncIntervalMin] = useState(5);
   const [customIntervalText, setCustomIntervalText] = useState('5');
@@ -853,11 +856,9 @@ function MainApp() {
     } else if (actionId === ACTION_SNOOZE) {
       void snoozeDose(dose, time, doseDate);
     } else if (slotStatus(dose, time, doseDate) === 'pending') {
-      // Tapping the notification itself only opens the app, so offer the dose instead of leaving it
-      // silently unmarked while the user believes it was handled.
+      // Tapping the notification itself only opens the app; Today shows the pending dose with its
+      // Al / Ertele / Atla buttons so it is not left silently unmarked.
       setTab('Bugün');
-      setActiveBannerNotification({ title: res.title ?? dose.name, body: res.body ?? '', doseId: dose.id,
-        time, date: doseDate, isRepeat: res.isRepeat });
     }
   };
 
@@ -879,16 +880,9 @@ function MainApp() {
 
     const removeListener = addNotificationResponseListener(res => notificationResponseGate.push(res));
 
-    const removeReceivedListener = addNotificationReceivedListener(payload => {
-      const dose = dosesRef.current.find(d => d.id === payload.doseId);
-      if (dose && slotStatus(dose, payload.time || dose.time, payload.date ?? localDateKey()) !== 'pending') return;
-      setActiveBannerNotification(payload);
-    });
-
     return () => {
       mounted = false;
       removeListener();
-      removeReceivedListener();
       registerDoseStatusChecker(null);
     };
   }, []);
@@ -964,10 +958,6 @@ function MainApp() {
     if (parsed.hapticsEnabled !== undefined) setHapticsEnabled(parsed.hapticsEnabled);
     if (parsed.repeatNagEnabled !== undefined) setRepeatNagEnabled(parsed.repeatNagEnabled);
     if (parsed.repeatNagCount !== undefined) setRepeatNagCount(parsed.repeatNagCount);
-    if (parsed.batteryExemptionEnabled !== undefined) setBatteryExemptionEnabled(parsed.batteryExemptionEnabled);
-    if (parsed.exactAlarmEnabled !== undefined) setExactAlarmEnabled(parsed.exactAlarmEnabled);
-    if (parsed.autoRescheduleOnBoot !== undefined) setAutoRescheduleOnBoot(parsed.autoRescheduleOnBoot);
-    if (parsed.wakeScreenOnAlarm !== undefined) setWakeScreenOnAlarm(parsed.wakeScreenOnAlarm);
   };
 
   // Hydrate before writing defaults or rebuilding the device notification queue.
@@ -1005,6 +995,7 @@ function MainApp() {
             const parsed = JSON.parse(syncData);
             const activeUrl = restoreServerUrl(parsed?.serverUrl);
             setServerUrl(activeUrl);
+            if (parsed.cloudSyncEnabled === false) setCloudSyncEnabled(false);
             if (parsed.autoSync !== undefined) setAutoSync(parsed.autoSync);
             if (parsed.syncIntervalMin !== undefined && typeof parsed.syncIntervalMin === 'number' && parsed.syncIntervalMin > 0) {
               setSyncIntervalMin(parsed.syncIntervalMin);
@@ -1016,6 +1007,7 @@ function MainApp() {
                 STORAGE_KEY_SYNC_CONFIG,
                 JSON.stringify({
                   serverUrl: activeUrl,
+                  cloudSyncEnabled: parsed.cloudSyncEnabled,
                   autoSync: parsed.autoSync,
                   syncIntervalMin: parsed.syncIntervalMin,
                   lastSyncAt: parsed.lastSyncAt,
@@ -1075,12 +1067,13 @@ function MainApp() {
       STORAGE_KEY_SYNC_CONFIG,
       JSON.stringify({
         serverUrl,
+        cloudSyncEnabled,
         autoSync,
         syncIntervalMin,
         lastSyncAt,
       })
     ).catch(() => {});
-  }, [hydrated, serverUrl, autoSync, syncIntervalMin, lastSyncAt]);
+  }, [hydrated, serverUrl, cloudSyncEnabled, autoSync, syncIntervalMin, lastSyncAt]);
 
   // The persisted settings object doubles as the settings section of a backup file.
   const storedSettings = useMemo(() => ({
@@ -1109,10 +1102,6 @@ function MainApp() {
     hapticsEnabled,
     repeatNagEnabled,
     repeatNagCount,
-    batteryExemptionEnabled,
-    exactAlarmEnabled,
-    autoRescheduleOnBoot,
-    wakeScreenOnAlarm,
   }), [
     appointments,
     privateMode,
@@ -1139,10 +1128,6 @@ function MainApp() {
     hapticsEnabled,
     repeatNagEnabled,
     repeatNagCount,
-    batteryExemptionEnabled,
-    exactAlarmEnabled,
-    autoRescheduleOnBoot,
-    wakeScreenOnAlarm,
   ]);
 
   useEffect(() => {
@@ -1704,13 +1689,13 @@ function MainApp() {
       if (snapshot.settings.showAppointmentCard !== undefined) setShowAppointmentCard(snapshot.settings.showAppointmentCard);
       if (snapshot.settings.hapticsEnabled !== undefined) setHapticsEnabled(snapshot.settings.hapticsEnabled);
       setUndoAction(null);
-      setActiveBannerNotification(null);
       setLastSyncAt(null);
       setSession(next);
     } finally { switchingAccount.current = false; }
   };
 
   const syncWithServer = async (activeSession?: Session | null, showToastNotification = true) => {
+    if (!cloudActive) return;
     const s = activeSession || session;
     if (!s) {
       if (showToastNotification) throw new Error(language === 'en' ? 'Connect with your personal sync code first.' : 'Önce kişisel eşitleme kodunuzla bağlanın.');
@@ -1723,6 +1708,7 @@ function MainApp() {
       return;
     }
     isSyncingRef.current = true;
+    const epoch = cloudEpochRef.current;
     setSyncStatus('syncing');
     setSyncStatusMsg(language === 'en' ? 'Syncing...' : 'Eşitleniyor...');
     const targetUrl = restoreServerUrl(serverUrl);
@@ -1764,8 +1750,15 @@ function MainApp() {
         settings: payloadSettings,
       }, currentSession);
 
+      // The server may already have stored this write; only its reply is dropped.
+      if (epoch !== cloudEpochRef.current) {
+        logger.info('Sync', 'Bulut kapatıldığı için eşitleme yanıtı yerel veriye uygulanmadı');
+        return;
+      }
+
       if (response.success) {
-        const merged = smartMergeDoses(activeDoses as SyncDose[], response.doses);
+        // Merge into the latest local list so doses marked while the request ran are kept.
+        const merged = smartMergeDoses(dosesRef.current as SyncDose[], response.doses);
         const normalized = merged.map(d => normalizeDoseDay(d, today));
         dosesRef.current = normalized;
         setDoses(normalized);
@@ -1856,6 +1849,7 @@ function MainApp() {
         logger.warn('Sync', `Sunucu eşitleme başarısız yanıt döndü: ${response.message}`, { serverUrl });
       }
     } catch (err: any) {
+      if (epoch !== cloudEpochRef.current) return;
       setSyncStatus('error');
       setSyncStatusMsg(err.message || (language === 'en' ? 'Connection error' : 'Bağlantı hatası'));
       if (showToastNotification) showToast(t.toastSyncFailed);
@@ -2000,18 +1994,48 @@ function MainApp() {
     if (!hydrated) return;
     let active = true;
     setSession(null);
+    // Local mode never waits on the network: notification actions must not depend on a server reply.
+    if (!cloudActive) {
+      setAccountChecked(true);
+      return;
+    }
+    const epoch = cloudEpochRef.current;
     getSession(serverUrl).then(async next => {
       if(active) {
         setAuthBusy(true);
         try {
           await bindAccount(next);
+          // Cloud was switched off while binding: keep the local data but not the session.
+          if (epoch !== cloudEpochRef.current) setSession(null);
           const savedCode = await getStoredSyncCode();
           if (active) setActiveSyncCode(savedCode);
         } finally {setAuthBusy(false);}
       }
     }).catch(() => {}).finally(() => { if (active) setAccountChecked(true); });
     return () => {active=false;};
-  }, [serverUrl, hydrated]);
+  }, [serverUrl, hydrated, cloudActive]);
+
+  // Switching the cloud back on merges once the account is verified again.
+  useEffect(() => {
+    if (!session || !resumeCloudSyncRef.current) return;
+    resumeCloudSyncRef.current = false;
+    syncWithServer(session, false).catch(err => {
+      logger.warn('Sync', 'Bulut yeniden açıldıktan sonraki eşitleme başarısız', { error: String(err) });
+    });
+  }, [session]);
+
+  const handleCloudSyncToggle = (enabled: boolean) => {
+    triggerHaptic();
+    // Any sync already on the wire checks this epoch before touching local data.
+    cloudEpochRef.current += 1;
+    if (syncDebounceTimerRef.current) clearTimeout(syncDebounceTimerRef.current);
+    resumeCloudSyncRef.current = enabled;
+    setSyncStatus('idle');
+    setSyncStatusMsg('');
+    setCloudSyncEnabled(enabled);
+    logger.info('Sync', enabled ? 'Bulut eşitleme açıldı' : 'Bulut eşitleme kapatıldı (yerel mod)');
+    showToast(enabled ? t.toastCloudOn : t.toastCloudOff);
+  };
 
   const handleTestConnection = async () => {
     triggerHaptic();
@@ -2054,7 +2078,7 @@ function MainApp() {
     doctorNotes: string;
     appointments: AppointmentItem[];
   }>) => {
-    if (session) {
+    if (session && cloudActive) {
       const activeUserName = (overrides?.userName !== undefined ? overrides.userName : userName).trim();
       const activeDocName = (overrides?.doctorName !== undefined ? overrides.doctorName : doctorName).trim();
       const activeDocSpecialty = (overrides?.doctorSpecialty !== undefined ? overrides.doctorSpecialty : doctorSpecialty).trim();
@@ -2083,7 +2107,9 @@ function MainApp() {
 
       authRequest(serverUrl, '/api/sync', {
         settings: payload
-      }, session).catch(() => {});
+      }, session).catch(err => {
+        logger.warn('Sync', 'Profil ayarları sunucuya gönderilemedi', { error: String(err) });
+      });
     }
   };
 
@@ -2376,10 +2402,7 @@ function MainApp() {
   const applyRestoredBackup = (backup: RestorableBackup) => {
     setDoses(prepareRestoredDoses(backup.doses).map(dose => normalizeDoseDay(dose as Dose)));
     setLearnedMeds(backup.learnedMeds as Record<string, Partial<CatalogMedicine>>);
-    applyStoredSettings(settingsForRestore(backup, {
-      appointments: storedSettings.appointments,
-      deviceBound: { batteryExemptionEnabled, exactAlarmEnabled },
-    }));
+    applyStoredSettings(settingsForRestore(backup, storedSettings.appointments));
     if (backup.language && backup.language !== language) void updateLanguage(backup.language);
     triggerDebouncedSyncRef.current();
     logger.info('Backup', 'Yedek geri yüklendi', { version: backup.version, medicines: backup.doses.length });
@@ -2399,7 +2422,7 @@ function MainApp() {
         .replace('{appts}', summary.appointments === null ? '—' : String(summary.appointments)),
     ];
     if (summary.appointments === null) lines.push(t.restoreConfirmNoAppointments);
-    if (session) lines.push(t.restoreConfirmSyncNote);
+    if (session && cloudActive) lines.push(t.restoreConfirmSyncNote);
     Alert.alert(t.restoreConfirmTitle, lines.join('\n\n'), [
       { text: t.cancel, style: 'cancel' },
       { text: t.restoreAction, style: 'destructive', onPress: () => applyRestoredBackup(backup) },
@@ -2434,7 +2457,9 @@ function MainApp() {
       Alert.alert(errorTitle, backupErrorMessage(result));
       return;
     }
-    if (isBackupForeignToAccount(result.backup.ownerId, session?.user.id)) {
+    // Without a verified session (local mode, signed out) the phone is still bound to its last account.
+    const accountId = session?.user.id ?? await boundAccountId(localStore);
+    if (isBackupForeignToAccount(result.backup.ownerId, accountId)) {
       Alert.alert(errorTitle, t.backupForeignAccount);
       return;
     }
@@ -2483,92 +2508,6 @@ function MainApp() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
-
-        {/* Floating Push Notification Banner */}
-        {activeBannerNotification && (
-          <View style={styles.pushNotificationBanner}>
-            <View style={styles.pushBannerHeader}>
-              <View style={styles.pushBannerAppRow}>
-                <Ionicons name="medical" size={13} color="#a9dfca" />
-                <Text style={styles.pushBannerAppName}>
-                  {activeBannerNotification.isRepeat
-                    ? (language === 'en' ? '⚠️ ROUTINE · REPEAT ALERT (+3 MIN)' : '⚠️ RUTİN · TEKRAR UYARISI (+3 DK)')
-                    : (language === 'en' ? 'ROUTINE · NOTIFICATION' : 'RUTİN · BİLDİRİM')}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setActiveBannerNotification(null)}>
-                <Ionicons name="close" size={16} color="#adb3bf" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.pushBannerTitle}>{activeBannerNotification.title}</Text>
-            <Text style={styles.pushBannerBody}>{activeBannerNotification.body}</Text>
-            {activeBannerNotification.isAppointment ? (
-              <View style={styles.pushBannerActions}>
-                <TouchableOpacity
-                  style={styles.pushBannerActionTake}
-                  onPress={() => {
-                    triggerHaptic();
-                    setActiveBannerNotification(null);
-                    showToast(language === 'en' ? '✅ Appointment confirmed' : '✅ Randevu bildirimi onaylandı');
-                  }}
-                >
-                  <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                  <Text style={styles.pushBannerActionTakeText}>{language === 'en' ? 'Tamam / Anlaşıldı' : 'Tamam / Anlaşıldı'}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.pushBannerActions}>
-                <TouchableOpacity
-                  style={styles.pushBannerActionTake}
-                  onPress={() => {
-                    triggerHaptic();
-                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                    const targetTime = activeBannerNotification.time || targetDose?.time;
-                    if (targetDose) {
-                      applyRecord(targetDose.id, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey(), 'taken');
-                    }
-                    setActiveBannerNotification(null);
-                  }}
-                >
-                  <Ionicons name="checkmark-circle" size={15} color="#081624" />
-                  <Text style={styles.pushBannerActionTakeText}>{t.take}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.pushBannerActionSnooze}
-                  onPress={() => {
-                    triggerHaptic();
-                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                    const targetTime = activeBannerNotification.time || targetDose?.time;
-                    if (targetDose) {
-                      void snoozeDose(targetDose, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey());
-                    }
-                    setActiveBannerNotification(null);
-                  }}
-                >
-                  <Ionicons name="alarm-outline" size={15} color="#f5f3f0" />
-                  <Text style={styles.pushBannerActionSnoozeText}>{language === 'en' ? 'Snooze 3m' : '3 Dk Ertele'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.pushBannerActionSkip}
-                  onPress={() => {
-                    triggerHaptic();
-                    const targetDose = doses.find(d => d.id === activeBannerNotification.doseId);
-                    const targetTime = activeBannerNotification.time || targetDose?.time;
-                    if (targetDose) {
-                      applyRecord(targetDose.id, targetTime || targetDose.time, activeBannerNotification.date ?? localDateKey(), 'skipped');
-                    }
-                    setActiveBannerNotification(null);
-                  }}
-                >
-                  <Ionicons name="close-circle-outline" size={15} color="#f87171" />
-                  <Text style={styles.pushBannerActionSkipText}>{t.skip}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
 
       <View style={styles.container}>
         {/* Header */}
@@ -2710,12 +2649,10 @@ function MainApp() {
                     {settingsSubPage === 'profile' && t.settingsProfile}
                     {settingsSubPage === 'language' && t.settingsLanguage}
                     {settingsSubPage === 'notifications' && t.settingsNotifications}
-                    {settingsSubPage === 'reminders' && t.settingsReminders}
                     {settingsSubPage === 'reliability' && t.settingsReliability}
                     {settingsSubPage === 'stock' && t.settingsStock}
-                    {settingsSubPage === 'privacy' && t.settingsPrivacy}
                     {settingsSubPage === 'experience' && t.settingsExperience}
-                    {settingsSubPage === 'sync' && t.settingsSync}
+                    {settingsSubPage === 'sync' && (CLOUD_SYNC_AVAILABLE ? t.settingsSync : t.settingsBackup)}
                     {settingsSubPage === 'reset' && t.settingsReset}
                     {settingsSubPage === 'diagnostics' && t.settingsDiagnostics}
                   </Text>
@@ -2806,27 +2743,11 @@ function MainApp() {
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsNotifications}</Text>
                         <Text style={styles.menuItemSub}>
-                          {notifications ? (soundEnabled ? (language === 'en' ? 'Sound notifications on' : 'Sesli bildirimler açık') : (language === 'en' ? 'Silent notifications' : 'Sessiz bildirim')) : (language === 'en' ? 'Notifications off' : 'Bildirimler kapalı')}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuListDivider} />
-
-                    {/* 3. Hatırlatıcı & Erteleme */}
-                    <TouchableOpacity
-                      style={styles.menuListItem}
-                      onPress={() => { triggerHaptic(); setSettingsSubPage('reminders'); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#262f3a' }]}>
-                        <Ionicons name="time-outline" size={22} color="#a9dfca" />
-                      </View>
-                      <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>{t.settingsReminders}</Text>
-                        <Text style={styles.menuItemSub}>
-                          {language === 'en' ? `${snoozeMinutes} min snooze · ${repeatNagEnabled ? `${repeatNagCount} repeats` : 'No repeats'}` : `${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
+                          {!notifications
+                            ? (language === 'en' ? 'Notifications off' : 'Bildirimler kapalı')
+                            : language === 'en'
+                              ? `${soundEnabled ? 'Sound on' : 'Silent'} · ${snoozeMinutes} min snooze · ${repeatNagEnabled ? `${repeatNagCount} repeats` : 'No repeats'}`
+                              : `${soundEnabled ? 'Sesli' : 'Sessiz'} · ${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
@@ -2870,24 +2791,6 @@ function MainApp() {
 
                     <View style={styles.menuListDivider} />
 
-                    {/* 6. Gizlilik ve Kilit Ekranı */}
-                    <TouchableOpacity
-                      style={styles.menuListItem}
-                      onPress={() => { triggerHaptic(); setSettingsSubPage('privacy'); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#1d2c38' }]}>
-                        <Ionicons name="lock-closed-outline" size={22} color="#7dd3fc" />
-                      </View>
-                      <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>{t.settingsPrivacy}</Text>
-                        <Text style={styles.menuItemSub}>{privateMode ? (language === 'en' ? 'Privacy mode on (Med hidden)' : 'Gizlilik modu aktif (İlaç gizli)') : (language === 'en' ? 'Detailed notifications' : 'Detaylı bildirimler')}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuListDivider} />
-
                     {/* 7. Uygulama Deneyimi */}
                     <TouchableOpacity
                       style={styles.menuListItem}
@@ -2899,7 +2802,11 @@ function MainApp() {
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsExperience}</Text>
-                        <Text style={styles.menuItemSub}>{t.settingsExperienceDesc}</Text>
+                        <Text style={styles.menuItemSub}>
+                          {privateMode
+                            ? (language === 'en' ? 'Medicine names hidden in notifications' : 'Bildirimlerde ilaç adı gizli')
+                            : t.settingsExperienceDesc}
+                        </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
@@ -2914,40 +2821,44 @@ function MainApp() {
                         <Ionicons name="cloud-upload-outline" size={22} color="#38bdf8" />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={styles.menuItemTitle}>{t.settingsSync}</Text>
+                        <Text style={styles.menuItemTitle}>{CLOUD_SYNC_AVAILABLE ? t.settingsSync : t.settingsBackup}</Text>
                         <Text style={styles.menuItemSub}>
-                          {lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
+                          {!cloudActive ? t.settingsSyncLocalDesc : lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
                     </TouchableOpacity>
 
-                    {/* 9. Hata & Tanılama Günlüğü */}
-                    <TouchableOpacity
-                      style={styles.menuListItem}
-                      onPress={() => { triggerHaptic(); setSettingsSubPage('diagnostics'); }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#281a17' }]}>
-                        <Ionicons name="bug-outline" size={22} color="#f0b484" />
-                      </View>
-                      <View style={styles.menuTextContainer}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.menuItemTitle}>{t.settingsDiagnostics}</Text>
-                          {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
-                            <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                              <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
-                                {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} {language === 'en' ? 'Errors' : 'Hata'}
-                              </Text>
-                            </View>
-                          )}
+                    {DIAGNOSTICS_AVAILABLE && (
+                      <>
+                      {/* 9. Hata & Tanılama Günlüğü */}
+                      <TouchableOpacity
+                        style={styles.menuListItem}
+                        onPress={() => { triggerHaptic(); setSettingsSubPage('diagnostics'); }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.menuIconBox, { backgroundColor: '#281a17' }]}>
+                          <Ionicons name="bug-outline" size={22} color="#f0b484" />
                         </View>
-                        <Text style={styles.menuItemSub}>{t.settingsDiagnosticsDesc}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
-                    </TouchableOpacity>
+                        <View style={styles.menuTextContainer}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={styles.menuItemTitle}>{t.settingsDiagnostics}</Text>
+                            {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
+                              <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
+                                  {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} {language === 'en' ? 'Errors' : 'Hata'}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.menuItemSub}>{t.settingsDiagnosticsDesc}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      </TouchableOpacity>
 
-                    <View style={styles.menuListDivider} />
+                      <View style={styles.menuListDivider} />
+                      </>
+                    )}
 
                     {/* 10. Veri & Sıfırlama */}
                     <TouchableOpacity
@@ -2970,13 +2881,11 @@ function MainApp() {
                   <View style={styles.updateCard}>
                     <View style={styles.updateHeaderRow}>
                       <View style={styles.updateIconBox}>
-                        <Ionicons name="git-branch-outline" size={20} color="#a9dfca" />
+                        <Ionicons name="information-circle-outline" size={20} color="#a9dfca" />
                       </View>
                       <View style={styles.updateTextBox}>
                         <Text style={styles.updateTitle}>Rutin v{CURRENT_APP_VERSION}</Text>
-                        <Text style={styles.updateSub}>
-                          {language === 'en' ? 'GitHub Releases & Local Server' : 'GitHub Releases & Yerel Sunucu'}
-                        </Text>
+                        <Text style={styles.updateSub}>{language === 'en' ? 'App version' : 'Uygulama sürümü'}</Text>
                       </View>
                       <TouchableOpacity
                         style={[styles.checkUpdateBtn, isCompactText && styles.checkUpdateBtnStacked, checkingUpdate && { opacity: 0.6 }]}
@@ -3707,7 +3616,7 @@ function MainApp() {
               )}
 
               {/* SUB PAGE 3: HATIRLATICI & ERTELEME */}
-              {settingsSubPage === 'reminders' && (
+              {settingsSubPage === 'notifications' && (
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="time-outline" size={16} color="#a9dfca" />
@@ -3835,178 +3744,55 @@ function MainApp() {
                     <Text style={styles.settingGroupTitle}>{t.settingsReliability.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
-                    <View style={styles.reliabilityHeaderRow}>
-                      <View style={batteryExemptionEnabled && exactAlarmEnabled ? styles.reliabilityBadgeActive : [styles.reliabilityBadgeActive, { backgroundColor: '#2d2516', borderColor: '#59441f' }]}>
-                        <View style={[styles.reliabilityBadgeDot, (!batteryExemptionEnabled || !exactAlarmEnabled) && { backgroundColor: '#f0b484' }]} />
-                        <Text style={[styles.reliabilityBadgeActiveText, (!batteryExemptionEnabled || !exactAlarmEnabled) && { color: '#f0b484' }]}>
-                          {language === 'en'
-                            ? (batteryExemptionEnabled && exactAlarmEnabled ? 'Full Background Protection' : 'Partial Protection')
-                            : (batteryExemptionEnabled && exactAlarmEnabled ? 'Arka Plan Koruması Tam' : 'Kısmi Koruma')}
-                        </Text>
-                      </View>
-                      <Text style={styles.reliabilityVersionText}>{language === 'en' ? 'Android 14+ / iOS Compatible' : 'Android 14+ / iOS Uyumlu'}</Text>
-                    </View>
-
-                    {/* 1. Pil Optimizasyonu Muafiyeti (Doze Mode) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="battery-charging" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Battery Optimization Exemption' : 'Pil Optimizasyonu Muafiyeti'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'Prevents alarms from being delayed or missed when phone is in deep sleep (Doze)'
-                            : 'Telefon Doze (derin uyku) modundayken alarmların gecikmesini veya atlanmasını engeller'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={batteryExemptionEnabled}
-                        onValueChange={async (val) => {
-                          triggerHaptic();
-                          setBatteryExemptionEnabled(val);
-                          if (val) {
-                            const ok = await openBatteryOptimizationSettings();
-                            if (ok) showToast(language === 'en' ? '⚡ Battery settings opened. Select "No restrictions".' : '⚡ Pil ayarları açıldı. "Kısıtlama Yok" seçiniz.');
-                          } else {
-                            showToast(language === 'en' ? 'Battery exemption disabled (Standard mode)' : 'Pil muafiyeti kapatıldı (Standart mod)');
-                          }
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 2. Exact Alarm (Hassas Zamanlama) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="alarm" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Exact Alarm Permission' : 'Hassas Alarm İzni (Exact Alarm)'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'System permission for timers to fire precisely on the second with high priority'
-                            : 'İlaç zamanlayıcılarının saniyesi saniyesine ve yüksek öncelikli çalması için sistem alarm izni'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={exactAlarmEnabled}
-                        onValueChange={async (val) => {
-                          triggerHaptic();
-                          setExactAlarmEnabled(val);
-                          if (val) {
-                            const ok = await openExactAlarmSettings();
-                            if (ok) showToast(language === 'en' ? '⏰ Alarm permissions opened.' : '⏰ Alarm izinleri açıldı.');
-                          } else {
-                            showToast(language === 'en' ? 'Exact alarm disabled' : 'Hassas alarm kapatıldı');
-                          }
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 3. Yeniden Başlatma Koruması (Boot) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="sync-circle" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Auto Reschedule on Reboot (Boot)' : 'Yeniden Başlatma Koruması (Boot)'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'When the phone restarts, all active daily medication alarms are automatically restored'
-                            : 'Telefon kapatılıp açıldığında aktif tüm günlük ilaç alarmları işletim sistemince otomatik baştan kurulur'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={autoRescheduleOnBoot}
-                        onValueChange={(val) => {
-                          triggerHaptic();
-                          setAutoRescheduleOnBoot(val);
-                          showToast(val ? (language === 'en' ? '🔄 Reboot protection active' : '🔄 Yeniden başlatma koruması devrede') : (language === 'en' ? 'Reboot protection disabled' : 'Yeniden başlatma koruması kapatıldı'));
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 4. Ekran Kapalıyken Uyandırma (Wake Screen) */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="phone-portrait-outline" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Wake Screen on Alarm' : 'Ekran Kapalıyken Uyandır'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'If phone is locked at alarm time, lights up screen and displays full-screen alert'
-                            : 'Alarm saatinde telefon kilitliyse ekranı aydınlatıp tam ekran ilaç uyarısını gösterir'}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={wakeScreenOnAlarm}
-                        onValueChange={(val) => {
-                          triggerHaptic();
-                          setWakeScreenOnAlarm(val);
-                          showToast(val ? (language === 'en' ? '💡 Screen wake active' : '💡 Ekran uyandırma aktif') : (language === 'en' ? 'Screen wake disabled' : 'Ekran uyandırma kapatıldı'));
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
-                    </View>
-
-                    <View style={styles.settingDivider} />
-
-                    {/* 5. Üretici Özel Koruması */}
-                    <View style={styles.reliabilityItem}>
-                      <View style={styles.reliabilityItemIconWrap}>
-                        <Ionicons name="hardware-chip-outline" size={18} color="#a9dfca" />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
-                        <Text style={styles.settingTitle}>{language === 'en' ? 'Manufacturer Background Settings' : 'Üretici Arka Plan Ayarları'}</Text>
-                        <Text style={styles.settingSub}>
-                          {language === 'en'
-                            ? 'On Xiaomi (MIUI/HyperOS), Samsung (OneUI), or Huawei devices, grant "Auto-start" and unrestricted background'
-                            : 'Xiaomi (MIUI/HyperOS), Samsung (OneUI) veya Huawei cihazlarda "Otomatik Başlatma" ve kısıtlamasız arka plan izni verin'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.reliabilityActionBtn}
-                        onPress={async () => {
-                          triggerHaptic();
-                          const ok = await openChannelNotificationSettings();
-                          if (ok) showToast(language === 'en' ? '⚙️ Device and notification permissions opened.' : '⚙️ Cihaz ve bildirim izinleri açıldı.');
-                        }}
-                      >
-                        <Text style={styles.reliabilityActionBtnText}>{language === 'en' ? 'Open Settings' : 'İzinleri Aç'}</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* 6. Canlı Alarm & Titreşim Testi */}
+                    {/* The app cannot read these permissions, so it only opens the right screen instead of
+                        showing switches that would pretend to know their state. */}
+                    {Platform.OS === 'android' && (
+                      <>
+                        <Text style={[styles.settingSub, { marginBottom: 12 }]}>{t.reliabilityIntro}</Text>
+                        {[
+                          { icon: 'battery-charging' as const, title: t.reliabilityBatteryTitle, desc: t.reliabilityBatteryDesc, open: openBatteryOptimizationSettings },
+                          { icon: 'alarm' as const, title: t.reliabilityExactTitle, desc: t.reliabilityExactDesc, open: openExactAlarmSettings },
+                          { icon: 'hardware-chip-outline' as const, title: t.reliabilityVendorTitle, desc: t.reliabilityVendorDesc, open: () => openChannelNotificationSettings() },
+                        ].map((item, index) => (
+                          <React.Fragment key={item.title}>
+                            {index > 0 && <View style={styles.settingDivider} />}
+                            <View style={styles.reliabilityItem}>
+                              <View style={styles.reliabilityItemIconWrap}>
+                                <Ionicons name={item.icon} size={18} color="#a9dfca" />
+                              </View>
+                              <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
+                                <Text style={styles.settingTitle}>{item.title}</Text>
+                                <Text style={styles.settingSub}>{item.desc}</Text>
+                              </View>
+                              <TouchableOpacity
+                                style={styles.reliabilityActionBtn}
+                                accessibilityLabel={`${item.title}: ${t.reliabilityOpenSettings}`}
+                                onPress={async () => {
+                                  triggerHaptic();
+                                  if (await item.open()) showToast(t.reliabilityOpened);
+                                }}
+                              >
+                                <Text style={styles.reliabilityActionBtnText}>{t.reliabilityOpenSettings}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </React.Fragment>
+                        ))}
+                      </>
+                    )}
                     <TouchableOpacity
                       style={styles.reliabilityTestBtn}
                       onPress={() => {
                         triggerHaptic();
-                        showToast(language === 'en' ? '⏱️ Test alarm will sound in 5 seconds! You can lock your phone to test.' : '⏱️ 5 saniye sonra test alarmı çalacak! Telefonu kilitleyip deneyebilirsiniz.');
+                        showToast(t.reliabilityTestToast);
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
-                          payload => {
-                            try {
-                              Vibration.vibrate([0, 500, 200, 500]);
-                            } catch {}
-                            setActiveBannerNotification(payload);
-                          },
                           { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled }
                         );
                       }}
                     >
                       <Ionicons name="flash" size={18} color="#081624" />
-                      <Text style={styles.reliabilityTestBtnText}>{language === 'en' ? 'Test Live Alarm in 5s (Lock Screen)' : '5 Sn Sonra Canlı Alarmı Test Et (Kilit Ekranı)'}</Text>
+                      <Text style={styles.reliabilityTestBtnText}>{t.reliabilityTestButton}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -4071,7 +3857,7 @@ function MainApp() {
               )}
 
               {/* SUB PAGE 6: GİZLİLİK VE KİLİT EKRANI */}
-              {settingsSubPage === 'privacy' && (
+              {settingsSubPage === 'experience' && (
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="shield-checkmark-outline" size={16} color="#a9dfca" />
@@ -4189,9 +3975,6 @@ function MainApp() {
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
-                          payload => {
-                            setActiveBannerNotification(payload);
-                          },
                           { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled }
                         );
                       }}
@@ -4230,8 +4013,8 @@ function MainApp() {
 
                     <View style={styles.settingRow}>
                       <View style={styles.settingRowText}>
-                        <Text style={styles.settingTitle}>Dokunsal Titreşim (Haptics)</Text>
-                        <Text style={styles.settingSub}>İşlem butonlarına dokunulduğunda hafif geri bildirim</Text>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Vibrate on Tap' : 'Dokununca Titreşim'}</Text>
+                        <Text style={styles.settingSub}>{language === 'en' ? 'A light vibration when you press buttons' : 'Düğmelere basınca hafif titreşim'}</Text>
                       </View>
                       <Switch
                         value={hapticsEnabled}
@@ -4280,64 +4063,184 @@ function MainApp() {
               {/* SUB PAGE 8: SENKRONİZASYON & YEDEKLEME */}
               {settingsSubPage === 'sync' && (
                 <>
-                  <View style={styles.settingGroupHeader}>
-                    <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
-                    <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
-                      {language === 'en' ? 'CLOUD SYNCHRONIZATION' : 'BULUT EŞİTLEME (SENKRONİZASYON)'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.syncCard}>
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: '#071626',
-                      paddingHorizontal: 10,
-                      paddingVertical: 7,
-                      borderRadius: 8,
-                      marginBottom: 10,
-                      borderWidth: 1,
-                      borderColor: '#1e293b',
-                      gap: 8
-                    }}>
-                      <Ionicons name="cloud-done-outline" size={15} color="#38bdf8" />
-                      <Text style={{ color: '#94a3b8', fontSize: 11, flex: 1 }}>
-                        {language === 'en' ? 'Server: ' : 'Sunucu: '}
-                        <Text style={{ color: '#38bdf8', fontWeight: '700' }}>Rutin Cloud (Cloudflare & Turso)</Text>
+                  {CLOUD_SYNC_AVAILABLE && (
+                    <>
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
+                      <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
+                        {language === 'en' ? 'CLOUD SYNCHRONIZATION' : 'BULUT EŞİTLEME (SENKRONİZASYON)'}
                       </Text>
                     </View>
 
-                    <Text style={styles.syncCardDesc}>
-                      {language === 'en'
-                        ? 'Synchronize your data bi-directionally (Smart Merge) and securely across your devices.'
-                        : 'Verilerinizi cihazlarınız arasında çift yönlü ve güvenli (Smart Merge) senkronize edin.'}
-                    </Text>
+                    <View style={styles.settingCard}>
+                      <View style={styles.settingRow}>
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text style={styles.settingTitle}>{t.cloudSyncTitle}</Text>
+                          <Text style={styles.settingSub}>{cloudSyncEnabled ? t.cloudSyncOnDesc : t.cloudSyncOffDesc}</Text>
+                        </View>
+                        <Switch
+                          value={cloudSyncEnabled}
+                          onValueChange={handleCloudSyncToggle}
+                          accessibilityLabel={t.cloudSyncTitle}
+                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        />
+                      </View>
+                    </View>
+                    </>
+                  )}
 
-                    {session ? (
-                      <View>
-                        <Text style={styles.syncCardDesc}>{t.syncConnectedAccount}: <Text style={{ color: '#34d399', fontWeight: '700' }}>{session.user.name}</Text></Text>
+                  {cloudActive ? (
+                    <>
+
+                    <View style={styles.syncCard}>
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#071626',
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
+                        borderRadius: 8,
+                        marginBottom: 10,
+                        borderWidth: 1,
+                        borderColor: '#1e293b',
+                        gap: 8
+                      }}>
+                        <Ionicons name="cloud-done-outline" size={15} color="#38bdf8" />
+                        <Text style={{ color: '#94a3b8', fontSize: 11, flex: 1 }}>
+                          {language === 'en' ? 'Server: ' : 'Sunucu: '}
+                          <Text style={{ color: '#38bdf8', fontWeight: '700' }}>Rutin Cloud (Cloudflare & Turso)</Text>
+                        </Text>
+                      </View>
+
+                      <Text style={styles.syncCardDesc}>
+                        {language === 'en'
+                          ? 'Synchronize your data bi-directionally (Smart Merge) and securely across your devices.'
+                          : 'Verilerinizi cihazlarınız arasında çift yönlü ve güvenli (Smart Merge) senkronize edin.'}
+                      </Text>
+
+                      {session ? (
+                        <View>
+                          <Text style={styles.syncCardDesc}>{t.syncConnectedAccount}: <Text style={{ color: '#34d399', fontWeight: '700' }}>{session.user.name}</Text></Text>
                         
-                        <View style={{ backgroundColor: '#071626', padding: 10, borderRadius: 8, marginVertical: 6, borderWidth: 1, borderColor: '#1e293b' }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                            <Text style={{ color: '#94a3b8', fontSize: 12, flexShrink: 1 }}>
-                              ✉️ {t.syncEmailLabel}: <Text style={{ color: session.user.email ? '#38bdf8' : '#64748b', fontWeight: '600' }}>{session.user.email || (language === 'en' ? 'Not set' : 'Belirtilmedi')}</Text>
-                            </Text>
+                          <View style={{ backgroundColor: '#071626', padding: 10, borderRadius: 8, marginVertical: 6, borderWidth: 1, borderColor: '#1e293b' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                              <Text style={{ color: '#94a3b8', fontSize: 12, flexShrink: 1 }}>
+                                ✉️ {t.syncEmailLabel}: <Text style={{ color: session.user.email ? '#38bdf8' : '#64748b', fontWeight: '600' }}>{session.user.email || (language === 'en' ? 'Not set' : 'Belirtilmedi')}</Text>
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setAuthEmail(session.user.email || '');
+                                  setEditingEmail(!editingEmail);
+                                }}
+                                style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+                              >
+                                <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>
+                                  {editingEmail ? t.cancel : (session.user.email ? (language === 'en' ? 'Edit' : 'Değiştir') : (language === 'en' ? '+ Add' : '+ Ekle'))}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                            {editingEmail && (
+                              <View style={{ marginTop: 8, gap: 6 }}>
+                                <TextInput
+                                  style={[styles.textInput, { minHeight: 38, paddingVertical: 8, fontSize: 12 }]}
+                                  value={authEmail}
+                                  onChangeText={setAuthEmail}
+                                  placeholder={t.syncEmailPlaceholder}
+                                  placeholderTextColor="#667"
+                                  autoCapitalize="none"
+                                  keyboardType="email-address"
+                                  autoCorrect={false}
+                                />
+                                <TouchableOpacity
+                                  style={[styles.syncPrimaryBtn, { minHeight: 36, marginTop: 4 }]}
+                                  onPress={handleUpdateEmail}
+                                  disabled={authBusy || !authEmail.trim()}
+                                >
+                                  <Text style={[styles.syncPrimaryBtnText, { fontSize: 12 }]}>
+                                    {authBusy ? '...' : t.syncUpdateEmail}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        
+                          {activeSyncCode && (
+                            <View style={{ backgroundColor: '#071626', padding: 12, borderRadius: 8, marginVertical: 10, borderWidth: 1, borderColor: '#1e293b' }}>
+                              <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
+                                {language === 'en' ? '📱 SYNC CODE FOR 2ND DEVICE:' : '📱 2. CİHAZ İÇİN EŞİTLEME KODUNUZ:'}
+                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#030c14', padding: 8, borderRadius: 6, gap: 8 }}>
+                                <Text selectable style={{ color: '#f8fafc', fontSize: 11, flex: 1 }}>
+                                  {activeSyncCode}
+                                </Text>
+                                <TouchableOpacity
+                                  style={{ backgroundColor: '#38bdf8', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4 }}
+                                  onPress={() => Share.share({ message: language === 'en' ? `Reminder Sync Code: ${activeSyncCode}` : `Reminder Eşitleme Kodu: ${activeSyncCode}` })}
+                                >
+                                  <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                                </TouchableOpacity>
+                              </View>
+                              <Text style={{ color: '#64748b', fontSize: 11, marginTop: 6 }}>
+                                {language === 'en'
+                                  ? 'Enter this code on your second phone to link to the same account instantly.'
+                                  : 'İkinci telefonunuza bu kodu girerek aynı hesaba anında bağlayabilirsiniz.'}
+                              </Text>
+                            </View>
+                          )}
+
+                          <TouchableOpacity style={styles.syncSecondaryBtn} onPress={handleLogout} disabled={authBusy || syncStatus === 'syncing'}>
+                            <Text style={styles.syncSecondaryBtnText}>{t.syncDisconnect}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : recoveryMode ? (
+                        <View style={{ gap: 8 }}>
+                          <Text style={styles.inputLabel}>{t.syncRecoveryKeyLabel}</Text>
+                          <TextInput
+                            style={styles.textInput}
+                            value={recoveryKey}
+                            onChangeText={setRecoveryKey}
+                            placeholder={t.syncRecoveryKeyPlaceholder}
+                            placeholderTextColor="#667"
+                            autoCapitalize="characters"
+                            autoCorrect={false}
+                          />
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity
-                              onPress={() => {
-                                setAuthEmail(session.user.email || '');
-                                setEditingEmail(!editingEmail);
-                              }}
-                              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+                              style={[styles.syncPrimaryBtn, { flex: 1 }]}
+                              onPress={handleRecover}
+                              disabled={authBusy || !recoveryKey.trim()}
                             >
-                              <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>
-                                {editingEmail ? t.cancel : (session.user.email ? (language === 'en' ? 'Edit' : 'Değiştir') : (language === 'en' ? '+ Add' : '+ Ekle'))}
+                              <Text style={styles.syncPrimaryBtnText}>
+                                {authBusy ? (language === 'en' ? 'Recovering…' : 'Kurtarılıyor…') : t.syncRecoverBtn}
                               </Text>
                             </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.syncSecondaryBtn}
+                              onPress={() => { setRecoveryMode(false); setRecoveryKey(''); }}
+                              disabled={authBusy}
+                            >
+                              <Text style={styles.syncSecondaryBtnText}>{t.cancel}</Text>
+                            </TouchableOpacity>
                           </View>
-                          {editingEmail && (
-                            <View style={{ marginTop: 8, gap: 6 }}>
+                        </View>
+                      ) : (
+                        <View>
+                          <View style={{ backgroundColor: '#071b2e', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#38bdf8', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                              <Ionicons name="sparkles" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
+                              <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '700' }}>
+                                {language === 'en' ? 'INITIAL SETUP (DEVICE 1)' : 'İLK KURULUM (1. CİHAZ)'}
+                              </Text>
+                            </View>
+                            <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                              {language === 'en'
+                                ? 'Enter your email (optional) and generate a new sync code.'
+                                : 'E-posta adresinizi girin ve yeni bir eşitleme kodu oluşturarak başlayın.'}
+                            </Text>
+                            <View style={{ marginBottom: 10 }}>
+                              <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 4 }]}>{t.syncEmailLabel}</Text>
                               <TextInput
-                                style={[styles.textInput, { minHeight: 38, paddingVertical: 8, fontSize: 12 }]}
+                                style={[styles.textInput, { minHeight: 40, paddingVertical: 8, fontSize: 12 }]}
                                 value={authEmail}
                                 onChangeText={setAuthEmail}
                                 placeholder={t.syncEmailPlaceholder}
@@ -4346,498 +4249,409 @@ function MainApp() {
                                 keyboardType="email-address"
                                 autoCorrect={false}
                               />
-                              <TouchableOpacity
-                                style={[styles.syncPrimaryBtn, { minHeight: 36, marginTop: 4 }]}
-                                onPress={handleUpdateEmail}
-                                disabled={authBusy || !authEmail.trim()}
-                              >
-                                <Text style={[styles.syncPrimaryBtnText, { fontSize: 12 }]}>
-                                  {authBusy ? '...' : t.syncUpdateEmail}
-                                </Text>
-                              </TouchableOpacity>
                             </View>
-                          )}
-                        </View>
-                        
-                        {activeSyncCode && (
-                          <View style={{ backgroundColor: '#071626', padding: 12, borderRadius: 8, marginVertical: 10, borderWidth: 1, borderColor: '#1e293b' }}>
-                            <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
-                              {language === 'en' ? '📱 SYNC CODE FOR 2ND DEVICE:' : '📱 2. CİHAZ İÇİN EŞİTLEME KODUNUZ:'}
+                            <TouchableOpacity
+                              style={[styles.syncPrimaryBtn, { marginTop: 0 }]}
+                              onPress={handleRegister}
+                              disabled={authBusy}
+                            >
+                              <Ionicons name="key-outline" size={16} color="#081624" />
+                              <Text style={styles.syncPrimaryBtnText}>
+                                {authBusy
+                                  ? (language === 'en' ? 'Creating…' : 'Oluşturuluyor…')
+                                  : (language === 'en' ? '✨ Generate New Sync Code' : '✨ Yeni Eşitleme Kodu Oluştur')}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
+                            <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
+                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700', marginHorizontal: 10 }}>
+                              {language === 'en' ? 'OR CONNECT 2ND DEVICE' : 'VEYA 2. CİHAZI BAĞLA'}
                             </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#030c14', padding: 8, borderRadius: 6, gap: 8 }}>
-                              <Text selectable style={{ color: '#f8fafc', fontSize: 11, flex: 1 }}>
-                                {activeSyncCode}
+                            <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
+                          </View>
+
+                          <View style={{ gap: 8 }}>
+                            <Text style={styles.inputLabel}>{t.syncCodeLabel}</Text>
+                            <TextInput
+                              style={styles.textInput}
+                              value={syncCode}
+                              onChangeText={setSyncCode}
+                              placeholder={language === 'en' ? 'Enter code from 1st device here' : '1. cihazdaki kodu buraya girin'}
+                              placeholderTextColor="#667"
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              secureTextEntry
+                            />
+                            <TouchableOpacity
+                              style={styles.syncPrimaryBtn}
+                              onPress={handleLogin}
+                              disabled={authBusy || !syncCode.trim()}
+                            >
+                              <Text style={styles.syncPrimaryBtnText}>
+                                {authBusy ? (language === 'en' ? 'Connecting…' : 'Bağlanıyor…') : t.syncConnectBtn}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={{ paddingVertical: 6 }}
+                              onPress={() => setRecoveryMode(true)}
+                              disabled={authBusy}
+                            >
+                              <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '500' }}>🔑 {t.syncForgotCode}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+
+                      {recoveredCredentials && (
+                        <View style={{
+                          backgroundColor: '#0c2238',
+                          borderColor: '#38bdf8',
+                          borderWidth: 1,
+                          borderRadius: 8,
+                          padding: 12,
+                          marginTop: 12
+                        }}>
+                          <Text style={{ color: '#38bdf8', fontSize: 15, fontWeight: '700', marginBottom: 4 }}>
+                            {t.syncNewCredentialsTitle}
+                          </Text>
+                          <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                            {t.syncNewCredentialsWarning}
+                          </Text>
+                          <View style={{ marginBottom: 8 }}>
+                            <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                              {t.syncNewSyncCode}
+                            </Text>
+                            <View style={{
+                              backgroundColor: '#071626',
+                              padding: 8,
+                              borderRadius: 6,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}>
+                              <Text selectable style={{ color: '#f1f5f9', fontSize: 11, flex: 1, marginRight: 8 }}>
+                                {recoveredCredentials.syncCode}
                               </Text>
                               <TouchableOpacity
-                                style={{ backgroundColor: '#38bdf8', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4 }}
-                                onPress={() => Share.share({ message: language === 'en' ? `Reminder Sync Code: ${activeSyncCode}` : `Reminder Eşitleme Kodu: ${activeSyncCode}` })}
+                                style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                                onPress={() => {
+                                  Share.share({
+                                    message: language === 'en'
+                                      ? `Sync Code: ${recoveredCredentials.syncCode}`
+                                      : `Eşitleme Kodu: ${recoveredCredentials.syncCode}`
+                                  });
+                                }}
                               >
                                 <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
                               </TouchableOpacity>
                             </View>
-                            <Text style={{ color: '#64748b', fontSize: 11, marginTop: 6 }}>
-                              {language === 'en'
-                                ? 'Enter this code on your second phone to link to the same account instantly.'
-                                : 'İkinci telefonunuza bu kodu girerek aynı hesaba anında bağlayabilirsiniz.'}
-                            </Text>
                           </View>
-                        )}
-
-                        <TouchableOpacity style={styles.syncSecondaryBtn} onPress={handleLogout} disabled={authBusy || syncStatus === 'syncing'}>
-                          <Text style={styles.syncSecondaryBtnText}>{t.syncDisconnect}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : recoveryMode ? (
-                      <View style={{ gap: 8 }}>
-                        <Text style={styles.inputLabel}>{t.syncRecoveryKeyLabel}</Text>
-                        <TextInput
-                          style={styles.textInput}
-                          value={recoveryKey}
-                          onChangeText={setRecoveryKey}
-                          placeholder={t.syncRecoveryKeyPlaceholder}
-                          placeholderTextColor="#667"
-                          autoCapitalize="characters"
-                          autoCorrect={false}
-                        />
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <TouchableOpacity
-                            style={[styles.syncPrimaryBtn, { flex: 1 }]}
-                            onPress={handleRecover}
-                            disabled={authBusy || !recoveryKey.trim()}
-                          >
-                            <Text style={styles.syncPrimaryBtnText}>
-                              {authBusy ? (language === 'en' ? 'Recovering…' : 'Kurtarılıyor…') : t.syncRecoverBtn}
+                          <View style={{ marginBottom: 12 }}>
+                            <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                              {t.syncNewRecoveryKey}
                             </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.syncSecondaryBtn}
-                            onPress={() => { setRecoveryMode(false); setRecoveryKey(''); }}
-                            disabled={authBusy}
-                          >
-                            <Text style={styles.syncSecondaryBtnText}>{t.cancel}</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ) : (
-                      <View>
-                        <View style={{ backgroundColor: '#071b2e', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#38bdf8', marginBottom: 12 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                            <Ionicons name="sparkles" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
-                            <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '700' }}>
-                              {language === 'en' ? 'INITIAL SETUP (DEVICE 1)' : 'İLK KURULUM (1. CİHAZ)'}
-                            </Text>
-                          </View>
-                          <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
-                            {language === 'en'
-                              ? 'Enter your email (optional) and generate a new sync code.'
-                              : 'E-posta adresinizi girin ve yeni bir eşitleme kodu oluşturarak başlayın.'}
-                          </Text>
-                          <View style={{ marginBottom: 10 }}>
-                            <Text style={[styles.inputLabel, { fontSize: 11, marginBottom: 4 }]}>{t.syncEmailLabel}</Text>
-                            <TextInput
-                              style={[styles.textInput, { minHeight: 40, paddingVertical: 8, fontSize: 12 }]}
-                              value={authEmail}
-                              onChangeText={setAuthEmail}
-                              placeholder={t.syncEmailPlaceholder}
-                              placeholderTextColor="#667"
-                              autoCapitalize="none"
-                              keyboardType="email-address"
-                              autoCorrect={false}
-                            />
+                            <View style={{
+                              backgroundColor: '#071626',
+                              padding: 8,
+                              borderRadius: 6,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}>
+                              <Text selectable style={{ color: '#f1f5f9', fontSize: 11, letterSpacing: 1, flex: 1, marginRight: 8 }}>
+                                {recoveredCredentials.recoveryKey}
+                              </Text>
+                              <TouchableOpacity
+                                style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                                onPress={() => {
+                                  Share.share({
+                                    message: language === 'en'
+                                      ? `Recovery Key: ${recoveredCredentials.recoveryKey}`
+                                      : `Kurtarma Anahtarı: ${recoveredCredentials.recoveryKey}`
+                                  });
+                                }}
+                              >
+                                <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                           <TouchableOpacity
                             style={[styles.syncPrimaryBtn, { marginTop: 0 }]}
-                            onPress={handleRegister}
-                            disabled={authBusy}
+                            onPress={() => setRecoveredCredentials(null)}
                           >
-                            <Ionicons name="key-outline" size={16} color="#081624" />
-                            <Text style={styles.syncPrimaryBtnText}>
-                              {authBusy
-                                ? (language === 'en' ? 'Creating…' : 'Oluşturuluyor…')
-                                : (language === 'en' ? '✨ Generate New Sync Code' : '✨ Yeni Eşitleme Kodu Oluştur')}
-                            </Text>
+                            <Text style={styles.syncPrimaryBtnText}>{language === 'en' ? 'Done' : 'Tamam'}</Text>
                           </TouchableOpacity>
                         </View>
+                      )}
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
-                          <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
-                          <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700', marginHorizontal: 10 }}>
-                            {language === 'en' ? 'OR CONNECT 2ND DEVICE' : 'VEYA 2. CİHAZI BAĞLA'}
-                          </Text>
-                          <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
-                        </View>
-
-                        <View style={{ gap: 8 }}>
-                          <Text style={styles.inputLabel}>{t.syncCodeLabel}</Text>
-                          <TextInput
-                            style={styles.textInput}
-                            value={syncCode}
-                            onChangeText={setSyncCode}
-                            placeholder={language === 'en' ? 'Enter code from 1st device here' : '1. cihazdaki kodu buraya girin'}
-                            placeholderTextColor="#667"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            secureTextEntry
+                      {/* Status Badge */}
+                      {syncStatusMsg ? (
+                        <View style={[
+                          styles.syncStatusBadge,
+                          syncStatus === 'connected' ? styles.syncStatusSuccess :
+                          syncStatus === 'error' ? styles.syncStatusError : styles.syncStatusNeutral
+                        ]}>
+                          <Ionicons
+                            name={syncStatus === 'connected' ? 'checkmark-circle' : syncStatus === 'error' ? 'alert-circle' : 'information-circle'}
+                            size={16}
+                            color={syncStatus === 'connected' ? '#34d399' : syncStatus === 'error' ? '#f87171' : '#38bdf8'}
                           />
-                          <TouchableOpacity
-                            style={styles.syncPrimaryBtn}
-                            onPress={handleLogin}
-                            disabled={authBusy || !syncCode.trim()}
-                          >
-                            <Text style={styles.syncPrimaryBtnText}>
-                              {authBusy ? (language === 'en' ? 'Connecting…' : 'Bağlanıyor…') : t.syncConnectBtn}
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={{ paddingVertical: 6 }}
-                            onPress={() => setRecoveryMode(true)}
-                            disabled={authBusy}
-                          >
-                            <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '500' }}>🔑 {t.syncForgotCode}</Text>
-                          </TouchableOpacity>
+                          <Text style={[
+                            styles.syncStatusText,
+                            { color: syncStatus === 'connected' ? '#34d399' : syncStatus === 'error' ? '#f87171' : '#38bdf8' }
+                          ]}>
+                            {syncStatusMsg}
+                          </Text>
                         </View>
-                      </View>
-                    )}
+                      ) : null}
 
-                    {recoveredCredentials && (
-                      <View style={{
-                        backgroundColor: '#0c2238',
-                        borderColor: '#38bdf8',
-                        borderWidth: 1,
-                        borderRadius: 8,
-                        padding: 12,
-                        marginTop: 12
-                      }}>
-                        <Text style={{ color: '#38bdf8', fontSize: 15, fontWeight: '700', marginBottom: 4 }}>
-                          {t.syncNewCredentialsTitle}
-                        </Text>
-                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
-                          {t.syncNewCredentialsWarning}
-                        </Text>
-                        <View style={{ marginBottom: 8 }}>
-                          <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
-                            {t.syncNewSyncCode}
-                          </Text>
-                          <View style={{
-                            backgroundColor: '#071626',
-                            padding: 8,
-                            borderRadius: 6,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                          }}>
-                            <Text selectable style={{ color: '#f1f5f9', fontSize: 11, flex: 1, marginRight: 8 }}>
-                              {recoveredCredentials.syncCode}
-                            </Text>
-                            <TouchableOpacity
-                              style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
-                              onPress={() => {
-                                Share.share({
-                                  message: language === 'en'
-                                    ? `Sync Code: ${recoveredCredentials.syncCode}`
-                                    : `Eşitleme Kodu: ${recoveredCredentials.syncCode}`
-                                });
-                              }}
-                            >
-                              <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <View style={{ marginBottom: 12 }}>
-                          <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
-                            {t.syncNewRecoveryKey}
-                          </Text>
-                          <View style={{
-                            backgroundColor: '#071626',
-                            padding: 8,
-                            borderRadius: 6,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                          }}>
-                            <Text selectable style={{ color: '#f1f5f9', fontSize: 11, letterSpacing: 1, flex: 1, marginRight: 8 }}>
-                              {recoveredCredentials.recoveryKey}
-                            </Text>
-                            <TouchableOpacity
-                              style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
-                              onPress={() => {
-                                Share.share({
-                                  message: language === 'en'
-                                    ? `Recovery Key: ${recoveredCredentials.recoveryKey}`
-                                    : `Kurtarma Anahtarı: ${recoveredCredentials.recoveryKey}`
-                                });
-                              }}
-                            >
-                              <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
+                      {/* Buttons: Test & Sync */}
+                      <View style={styles.syncActionsRow}>
                         <TouchableOpacity
-                          style={[styles.syncPrimaryBtn, { marginTop: 0 }]}
-                          onPress={() => setRecoveredCredentials(null)}
+                          style={styles.syncSecondaryBtn}
+                          onPress={handleTestConnection}
+                          disabled={authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                         >
-                          <Text style={styles.syncPrimaryBtnText}>{language === 'en' ? 'Done' : 'Tamam'}</Text>
+                          <Ionicons name="wifi-outline" size={16} color="#a9dfca" />
+                          <Text style={styles.syncSecondaryBtnText}>
+                            {syncStatus === 'testing'
+                              ? (language === 'en' ? 'Connecting...' : 'Bağlanıyor...')
+                              : (language === 'en' ? 'Test Connection' : 'Bağlantıyı Test Et')}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.syncPrimaryBtn}
+                          onPress={handleSyncNow}
+                          disabled={!session || authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
+                        >
+                          <Ionicons name="sync-outline" size={16} color="#081624" />
+                          <Text style={styles.syncPrimaryBtnText}>
+                            {syncStatus === 'syncing'
+                              ? (language === 'en' ? 'Syncing...' : 'Eşitleniyor...')
+                              : (language === 'en' ? 'Sync Now' : 'Şimdi Eşitle')}
+                          </Text>
                         </TouchableOpacity>
                       </View>
-                    )}
-
-                    {/* Status Badge */}
-                    {syncStatusMsg ? (
-                      <View style={[
-                        styles.syncStatusBadge,
-                        syncStatus === 'connected' ? styles.syncStatusSuccess :
-                        syncStatus === 'error' ? styles.syncStatusError : styles.syncStatusNeutral
-                      ]}>
-                        <Ionicons
-                          name={syncStatus === 'connected' ? 'checkmark-circle' : syncStatus === 'error' ? 'alert-circle' : 'information-circle'}
-                          size={16}
-                          color={syncStatus === 'connected' ? '#34d399' : syncStatus === 'error' ? '#f87171' : '#38bdf8'}
-                        />
-                        <Text style={[
-                          styles.syncStatusText,
-                          { color: syncStatus === 'connected' ? '#34d399' : syncStatus === 'error' ? '#f87171' : '#38bdf8' }
-                        ]}>
-                          {syncStatusMsg}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    {/* Buttons: Test & Sync */}
-                    <View style={styles.syncActionsRow}>
-                      <TouchableOpacity
-                        style={styles.syncSecondaryBtn}
-                        onPress={handleTestConnection}
-                        disabled={authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
-                      >
-                        <Ionicons name="wifi-outline" size={16} color="#a9dfca" />
-                        <Text style={styles.syncSecondaryBtnText}>
-                          {syncStatus === 'testing'
-                            ? (language === 'en' ? 'Connecting...' : 'Bağlanıyor...')
-                            : (language === 'en' ? 'Test Connection' : 'Bağlantıyı Test Et')}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.syncPrimaryBtn}
-                        onPress={handleSyncNow}
-                        disabled={!session || authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
-                      >
-                        <Ionicons name="sync-outline" size={16} color="#081624" />
-                        <Text style={styles.syncPrimaryBtnText}>
-                          {syncStatus === 'syncing'
-                            ? (language === 'en' ? 'Syncing...' : 'Eşitleniyor...')
-                            : (language === 'en' ? 'Sync Now' : 'Şimdi Eşitle')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.settingGroupHeader}>
-                    <Ionicons name="options-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>
-                      {language === 'en' ? 'AUTO SYNC' : 'OTOMATİK EŞİTLEME'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.settingCard}>
-                    <View style={styles.settingRow}>
-                      <View style={{ flex: 1, paddingRight: 10 }}>
-                        <Text style={styles.settingTitle}>
-                          {language === 'en' ? 'Automatic Synchronization' : 'Otomatik Senkronizasyon'}
-                        </Text>
-                        <Text style={styles.settingSub}>
-                          {autoSync
-                            ? (language === 'en'
-                                ? 'Syncs automatically on dose changes, app open, and set intervals'
-                                : 'İlaç durumu değiştiğinde, uygulama açıldığında ve seçilen aralıklarla otomatik eşitlenir')
-                            : (language === 'en'
-                                ? 'Enable to keep your devices in sync automatically'
-                                : 'Cihazlarınızı otomatik olarak güncel tutmak için açın')}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={autoSync}
-                        onValueChange={val => {
-                          triggerHaptic();
-                          setAutoSync(val);
-                          if (!val && syncDebounceTimerRef.current) {
-                            clearTimeout(syncDebounceTimerRef.current);
-                          }
-                          showToast(val
-                            ? (language === 'en' ? 'Automatic sync enabled' : 'Otomatik eşitleme açıldı')
-                            : (language === 'en' ? 'Automatic sync disabled' : 'Otomatik eşitleme kapatıldı'));
-                          if (val && session) {
-                            syncWithServer(session, false).catch(() => {});
-                          }
-                        }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                      />
                     </View>
 
-                    {autoSync && (
-                      <>
-                        <View style={styles.settingDivider} />
+                    <View style={styles.settingGroupHeader}>
+                      <Ionicons name="options-outline" size={16} color="#a9dfca" />
+                      <Text style={styles.settingGroupTitle}>
+                        {language === 'en' ? 'AUTO SYNC' : 'OTOMATİK EŞİTLEME'}
+                      </Text>
+                    </View>
 
-                        <View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text style={styles.settingTitle}>
-                              {language === 'en' ? 'Sync Interval' : 'Eşitleme Aralığı'}
-                            </Text>
-                            <View style={styles.selectedPillBadge}>
-                              <Text style={styles.selectedPillBadgeText}>
-                                {syncIntervalMin} {language === 'en' ? 'min' : 'dk'}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={styles.settingSub}>
-                            {language === 'en'
-                              ? 'How often to sync with server in the background'
-                              : 'Arka planda sunucu ile ne sıklıkla eşitlensin?'}
+                    <View style={styles.settingCard}>
+                      <View style={styles.settingRow}>
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text style={styles.settingTitle}>
+                            {language === 'en' ? 'Automatic Synchronization' : 'Otomatik Senkronizasyon'}
                           </Text>
+                          <Text style={styles.settingSub}>
+                            {autoSync
+                              ? (language === 'en'
+                                  ? 'Syncs automatically on dose changes, app open, and set intervals'
+                                  : 'İlaç durumu değiştiğinde, uygulama açıldığında ve seçilen aralıklarla otomatik eşitlenir')
+                              : (language === 'en'
+                                  ? 'Enable to keep your devices in sync automatically'
+                                  : 'Cihazlarınızı otomatik olarak güncel tutmak için açın')}
+                          </Text>
+                        </View>
+                        <Switch
+                          value={autoSync}
+                          onValueChange={val => {
+                            triggerHaptic();
+                            setAutoSync(val);
+                            if (!val && syncDebounceTimerRef.current) {
+                              clearTimeout(syncDebounceTimerRef.current);
+                            }
+                            showToast(val
+                              ? (language === 'en' ? 'Automatic sync enabled' : 'Otomatik eşitleme açıldı')
+                              : (language === 'en' ? 'Automatic sync disabled' : 'Otomatik eşitleme kapatıldı'));
+                            if (val && session) {
+                              syncWithServer(session, false).catch(() => {});
+                            }
+                          }}
+                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        />
+                      </View>
 
-                          {/* Quick Chips */}
-                          <View style={styles.chipSelector}>
-                            {SYNC_INTERVAL_OPTIONS.map(mins => (
+                      {autoSync && (
+                        <>
+                          <View style={styles.settingDivider} />
+
+                          <View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={styles.settingTitle}>
+                                {language === 'en' ? 'Sync Interval' : 'Eşitleme Aralığı'}
+                              </Text>
+                              <View style={styles.selectedPillBadge}>
+                                <Text style={styles.selectedPillBadgeText}>
+                                  {syncIntervalMin} {language === 'en' ? 'min' : 'dk'}
+                                </Text>
+                              </View>
+                            </View>
+                            <Text style={styles.settingSub}>
+                              {language === 'en'
+                                ? 'How often to sync with server in the background'
+                                : 'Arka planda sunucu ile ne sıklıkla eşitlensin?'}
+                            </Text>
+
+                            {/* Quick Chips */}
+                            <View style={styles.chipSelector}>
+                              {SYNC_INTERVAL_OPTIONS.map(mins => (
+                                <TouchableOpacity
+                                  key={mins}
+                                  style={[styles.choiceChip, syncIntervalMin === mins && styles.choiceChipActive]}
+                                  onPress={() => {
+                                    triggerHaptic();
+                                    setSyncIntervalMin(mins);
+                                    setCustomIntervalText(String(mins));
+                                    showToast(language === 'en' ? `Sync interval set to ${mins} minutes` : `Eşitleme aralığı ${mins} dakika yapıldı`);
+                                  }}
+                                >
+                                  <Text style={[styles.choiceChipText, syncIntervalMin === mins && styles.choiceChipTextActive]}>
+                                    {mins} {language === 'en' ? 'min' : 'dk'}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+
+                            {/* Custom Interval Stepper & Numeric Input */}
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 10,
+                              backgroundColor: '#101d29',
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: '#203244',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                            }}>
+                              <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={{ fontSize: 12.5, color: '#f5f3f0', fontWeight: '500' }}>
+                                  {language === 'en' ? 'Custom Interval' : 'Özel Aralık'}
+                                </Text>
+                                <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
+                                  {language === 'en' ? '1 - 1440 minutes' : '1 - 1440 dakika arası'}
+                                </Text>
+                              </View>
+
                               <TouchableOpacity
-                                key={mins}
-                                style={[styles.choiceChip, syncIntervalMin === mins && styles.choiceChipActive]}
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  backgroundColor: '#162838',
+                                  borderRadius: 6,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderWidth: 1,
+                                  borderColor: '#2c3e50',
+                                }}
                                 onPress={() => {
                                   triggerHaptic();
-                                  setSyncIntervalMin(mins);
-                                  setCustomIntervalText(String(mins));
-                                  showToast(language === 'en' ? `Sync interval set to ${mins} minutes` : `Eşitleme aralığı ${mins} dakika yapıldı`);
+                                  const next = Math.max(1, syncIntervalMin - 1);
+                                  setSyncIntervalMin(next);
+                                  setCustomIntervalText(String(next));
                                 }}
+                                accessibilityLabel={language === 'en' ? 'Decrease interval' : 'Aralığı azalt'}
                               >
-                                <Text style={[styles.choiceChipText, syncIntervalMin === mins && styles.choiceChipTextActive]}>
-                                  {mins} {language === 'en' ? 'min' : 'dk'}
-                                </Text>
+                                <Ionicons name="remove" size={16} color="#a9dfca" />
                               </TouchableOpacity>
-                            ))}
-                          </View>
 
-                          {/* Custom Interval Stepper & Numeric Input */}
-                          <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginTop: 10,
-                            backgroundColor: '#101d29',
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: '#203244',
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                          }}>
-                            <View style={{ flex: 1, marginRight: 8 }}>
-                              <Text style={{ fontSize: 12.5, color: '#f5f3f0', fontWeight: '500' }}>
-                                {language === 'en' ? 'Custom Interval' : 'Özel Aralık'}
-                              </Text>
-                              <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
-                                {language === 'en' ? '1 - 1440 minutes' : '1 - 1440 dakika arası'}
+                              <TextInput
+                                style={{
+                                  // Android adds default vertical padding that clipped the number in a 32dp box
+                                  minWidth: 60,
+                                  minHeight: 36,
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 6,
+                                  includeFontPadding: false,
+                                  textAlignVertical: 'center',
+                                  backgroundColor: '#0d1822',
+                                  borderRadius: 6,
+                                  borderWidth: 1,
+                                  borderColor: '#2c3e50',
+                                  color: '#f5f3f0',
+                                  textAlign: 'center',
+                                  fontSize: 14,
+                                  fontWeight: '700',
+                                  marginHorizontal: 6,
+                                }}
+                                keyboardType="number-pad"
+                                value={customIntervalText}
+                                onChangeText={text => {
+                                  const numeric = text.replace(/[^0-9]/g, '');
+                                  setCustomIntervalText(numeric);
+                                  const val = parseInt(numeric, 10);
+                                  if (!isNaN(val) && val >= 1 && val <= 1440) {
+                                    setSyncIntervalMin(val);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const val = parseInt(customIntervalText, 10);
+                                  if (isNaN(val) || val < 1) {
+                                    setCustomIntervalText(String(syncIntervalMin));
+                                  } else {
+                                    const clamped = Math.min(1440, Math.max(1, val));
+                                    setSyncIntervalMin(clamped);
+                                    setCustomIntervalText(String(clamped));
+                                  }
+                                }}
+                                selectTextOnFocus
+                              />
+
+                              <TouchableOpacity
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  backgroundColor: '#162838',
+                                  borderRadius: 6,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderWidth: 1,
+                                  borderColor: '#2c3e50',
+                                }}
+                                onPress={() => {
+                                  triggerHaptic();
+                                  const next = Math.min(1440, syncIntervalMin + 1);
+                                  setSyncIntervalMin(next);
+                                  setCustomIntervalText(String(next));
+                                }}
+                                accessibilityLabel={language === 'en' ? 'Increase interval' : 'Aralığı artır'}
+                              >
+                                <Ionicons name="add" size={16} color="#a9dfca" />
+                              </TouchableOpacity>
+
+                              <Text style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8, fontWeight: '600' }}>
+                                {language === 'en' ? 'min' : 'dk'}
                               </Text>
                             </View>
-
-                            <TouchableOpacity
-                              style={{
-                                width: 36,
-                                height: 36,
-                                backgroundColor: '#162838',
-                                borderRadius: 6,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderWidth: 1,
-                                borderColor: '#2c3e50',
-                              }}
-                              onPress={() => {
-                                triggerHaptic();
-                                const next = Math.max(1, syncIntervalMin - 1);
-                                setSyncIntervalMin(next);
-                                setCustomIntervalText(String(next));
-                              }}
-                              accessibilityLabel={language === 'en' ? 'Decrease interval' : 'Aralığı azalt'}
-                            >
-                              <Ionicons name="remove" size={16} color="#a9dfca" />
-                            </TouchableOpacity>
-
-                            <TextInput
-                              style={{
-                                // Android adds default vertical padding that clipped the number in a 32dp box
-                                minWidth: 60,
-                                minHeight: 36,
-                                paddingVertical: 0,
-                                paddingHorizontal: 6,
-                                includeFontPadding: false,
-                                textAlignVertical: 'center',
-                                backgroundColor: '#0d1822',
-                                borderRadius: 6,
-                                borderWidth: 1,
-                                borderColor: '#2c3e50',
-                                color: '#f5f3f0',
-                                textAlign: 'center',
-                                fontSize: 14,
-                                fontWeight: '700',
-                                marginHorizontal: 6,
-                              }}
-                              keyboardType="number-pad"
-                              value={customIntervalText}
-                              onChangeText={text => {
-                                const numeric = text.replace(/[^0-9]/g, '');
-                                setCustomIntervalText(numeric);
-                                const val = parseInt(numeric, 10);
-                                if (!isNaN(val) && val >= 1 && val <= 1440) {
-                                  setSyncIntervalMin(val);
-                                }
-                              }}
-                              onBlur={() => {
-                                const val = parseInt(customIntervalText, 10);
-                                if (isNaN(val) || val < 1) {
-                                  setCustomIntervalText(String(syncIntervalMin));
-                                } else {
-                                  const clamped = Math.min(1440, Math.max(1, val));
-                                  setSyncIntervalMin(clamped);
-                                  setCustomIntervalText(String(clamped));
-                                }
-                              }}
-                              selectTextOnFocus
-                            />
-
-                            <TouchableOpacity
-                              style={{
-                                width: 36,
-                                height: 36,
-                                backgroundColor: '#162838',
-                                borderRadius: 6,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderWidth: 1,
-                                borderColor: '#2c3e50',
-                              }}
-                              onPress={() => {
-                                triggerHaptic();
-                                const next = Math.min(1440, syncIntervalMin + 1);
-                                setSyncIntervalMin(next);
-                                setCustomIntervalText(String(next));
-                              }}
-                              accessibilityLabel={language === 'en' ? 'Increase interval' : 'Aralığı artır'}
-                            >
-                              <Ionicons name="add" size={16} color="#a9dfca" />
-                            </TouchableOpacity>
-
-                            <Text style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8, fontWeight: '600' }}>
-                              {language === 'en' ? 'min' : 'dk'}
-                            </Text>
                           </View>
-                        </View>
-                      </>
-                    )}
+                        </>
+                      )}
 
-                    {lastSyncAt && (
-                      <View style={styles.settingDivider}>
-                        <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 8 }}>
-                          {language === 'en' ? '🕒 Last successful sync: ' : '🕒 Son başarılı eşitleme: '}{lastSyncAt}
-                        </Text>
+                      {lastSyncAt && (
+                        <View style={styles.settingDivider}>
+                          <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 8 }}>
+                            {language === 'en' ? '🕒 Last successful sync: ' : '🕒 Son başarılı eşitleme: '}{lastSyncAt}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    </>
+                  ) : (
+                    <View style={styles.syncCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                        <Ionicons name="phone-portrait-outline" size={16} color="#f0b484" style={{ marginTop: 2 }} />
+                        <Text style={[styles.syncCardDesc, { flex: 1, marginBottom: 0 }]}>{t.localModeBackupHint}</Text>
                       </View>
-                    )}
-                  </View>
+                    </View>
+                  )}
 
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="save-outline" size={16} color="#a9dfca" />
@@ -6138,37 +5952,6 @@ const styles = StyleSheet.create({
   toastUndo: { color: '#a9dfca', fontSize: 13, fontWeight: '700' },
 
   // Floating Push Banner
-  pushNotificationBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    left: 14,
-    right: 14,
-    maxWidth: 600,
-    alignSelf: 'center',
-    zIndex: 9999,
-    backgroundColor: '#152535',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#a9dfca',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 12,
-  },
-  pushBannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  pushBannerAppRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pushBannerAppName: { color: '#a9dfca', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  pushBannerTitle: { color: '#f5f3f0', fontSize: 16, fontWeight: '700' },
-  pushBannerBody: { color: '#adb3bf', fontSize: 13, marginTop: 4, marginBottom: 12 },
-  pushBannerActions: { flexDirection: 'row', gap: 10 },
-  pushBannerActionTake: { flex: 1.2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#a9dfca', height: 38, borderRadius: 8 },
-  pushBannerActionTakeText: { color: '#081624', fontSize: 13, fontWeight: '700' },
-  pushBannerActionSnooze: { flex: 1.1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#213244', height: 38, borderRadius: 8, borderWidth: 1, borderColor: '#33485c' },
-  pushBannerActionSnoozeText: { color: '#f5f3f0', fontSize: 13, fontWeight: '600' },
-  pushBannerActionSkip: { paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#2b161f', height: 38, borderRadius: 8, borderWidth: 1, borderColor: '#5c2234' },
-  pushBannerActionSkipText: { color: '#f87171', fontSize: 13, fontWeight: '600' },
   notifRepeatNagBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#112926', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#1d4d42' },
   notifRepeatNagBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '600' },
 
@@ -6352,44 +6135,6 @@ const styles = StyleSheet.create({
     color: '#a9dfca',
     fontSize: 11,
     fontWeight: '700',
-  },
-  reliabilityHeaderRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1d2f42',
-  },
-  reliabilityBadgeActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#12332e',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#246156',
-  },
-  reliabilityBadgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34d399',
-  },
-  reliabilityBadgeActiveText: {
-    color: '#34d399',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  reliabilityVersionText: {
-    color: '#64748b',
-    fontSize: 11,
-    flexShrink: 1,
   },
   reliabilityItem: {
     flexDirection: 'row',

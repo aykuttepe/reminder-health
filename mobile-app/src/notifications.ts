@@ -26,17 +26,6 @@ export function registerDoseStatusChecker(checker: DoseStatusChecker | null): vo
   isDoseConfirmedTaken = checker;
 }
 
-export type ActiveNotificationPayload = {
-  title: string;
-  body: string;
-  doseId?: string | number;
-  time?: string;
-  date?: string;
-  isRepeat?: boolean;
-  repeatIndex?: number;
-  isAppointment?: boolean;
-};
-
 export type NotificationSoundType = 'default' | 'alarm' | 'gentle' | 'chime' | 'system_custom' | 'silent';
 
 export interface SoundProfileOption {
@@ -620,31 +609,6 @@ export function createNotificationResponseGate(handle: (response: NotificationAc
   };
 }
 
-export function addNotificationReceivedListener(
-  listener: (notification: { isRepeat?: boolean; doseId?: string | number; time?: string; date?: string; isAppointment?: boolean; title: string; body: string }) => void
-): () => void {
-  const sub = Notifications.addNotificationReceivedListener(notif => {
-    try {
-      const data = notif.request.content.data as any;
-      listener({
-        isRepeat: data?.isRepeat,
-        doseId: data?.doseId !== undefined ? notificationId(data.doseId) : undefined,
-        time: data?.time,
-        date: data?.date,
-        isAppointment: data?.isAppointment,
-        title: notif.request.content.title ?? 'İlaç Vakti',
-        body: notif.request.content.body ?? '',
-      });
-    } catch (err) {
-      console.log('addNotificationReceivedListener error:', err);
-    }
-  });
-
-  return () => {
-    sub.remove();
-  };
-}
-
 export async function playTestSound(
   soundType: NotificationSoundType,
   soundEnabled: boolean = true
@@ -845,7 +809,6 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
       for (const item of existing.filter(item => item.identifier.startsWith('test-med'))) {
         await Notifications.cancelScheduledNotificationAsync(item.identifier);
       }
-      if (testTimer) { clearTimeout(testTimer); testTimer = null; }
     }
     const owned = existing.filter(item => item.identifier.startsWith('dose-'));
     const snoozes = owned.filter(item => {
@@ -953,12 +916,9 @@ export function snoozeNotification(
   });
 }
 
-let testTimer: any = null;
-
 export async function scheduleTestNotification(
   privateMode: boolean,
   firstDose: NotificationDose | undefined,
-  onDeliver: (payload: ActiveNotificationPayload) => void,
   soundOptions?: {
     soundEnabled?: boolean;
     soundType?: NotificationSoundType;
@@ -967,10 +927,6 @@ export async function scheduleTestNotification(
     lang?: 'tr' | 'en';
   }
 ): Promise<void> {
-  if (testTimer) {
-    clearTimeout(testTimer);
-  }
-
   const soundEnabled = soundOptions?.soundEnabled ?? true;
   const soundType = soundOptions?.soundType ?? 'default';
   const hideDoseAmount = soundOptions?.hideDoseAmount ?? false;
@@ -1061,20 +1017,6 @@ export async function scheduleTestNotification(
   } catch (err) {
     console.log('Native test notification schedule fallback:', err);
   }
-
-  // 3. In-app banner & vibration trigger
-  testTimer = setTimeout(() => {
-    try {
-      Vibration.vibrate([0, 400, 200, 400]);
-    } catch {}
-    onDeliver({
-      title: primaryContent.title,
-      body: primaryContent.body,
-      doseId: mockDose.id,
-      time: mockDose.time,
-      isRepeat: false,
-    });
-  }, 3000);
 }
 
 export interface DoctorAppointmentScheduleParams {

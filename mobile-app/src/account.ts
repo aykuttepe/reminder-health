@@ -36,6 +36,12 @@ export async function switchAccount(store:Store,url:string,account:Account,curre
   await store.setItem('reminder_bound_account_v2',next);
   return result;
 }
+/** The account whose data the local store currently holds, readable without the network. */
+export async function boundAccountId(store:Store):Promise<string|undefined>{
+  const bound=await store.getItem('reminder_bound_account_v2');
+  const id=bound?.split('|')[1];
+  return id||undefined;
+}
 export async function assertAccount(store:Store,url:string,account:Account){
   const bound = await store.getItem('reminder_bound_account_v2');
   const target = accountKey(url,account.id);

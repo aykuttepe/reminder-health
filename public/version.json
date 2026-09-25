@@ -1,7 +1,7 @@
 {
-  "version": "1.2.6",
+  "version": "1.2.7",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.6: Yedekten geri yükleme. Ayarlar > Senkronizasyon & Yedekleme bölümünden alınan .json yedek artık randevuları ve tüm ayarları da içerir ve \"Yedekten Geri Yükle\" ile telefona geri yüklenebilir. Bozuk dosyalar hiçbir veriyi değiştirmez.",
-  "publishedAt": "2026-09-26T00:15:00Z"
+  "releaseNotes": "v1.2.7: Sade ve yerel. Veriler yalnızca telefonda tutulur (sunucu eşitlemesi bir sonraki güncellemeye kadar kapalı); Ayarlar > Yedekleme ile yedek alıp geri yükleyebilirsiniz. Uygulama açıkken üstte sabit kalan bildirim şeridi kaldırıldı. Ayarlar menüsü sadeleşti: Hatırlatmalar, Alarm Güvenilirliği, Görünüm. Hata & Tanılama ekranı kaldırıldı.",
+  "publishedAt": "2026-09-26T01:10:00Z"
 }

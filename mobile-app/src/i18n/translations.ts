@@ -191,6 +191,7 @@ export interface Translations {
   settingsExperienceDesc: string;
   settingsSync: string;
   settingsSyncDesc: string;
+  settingsBackup: string;
   syncServerUrl: string;
   syncConnectedAccount: string;
   syncDisconnect: string;
@@ -294,6 +295,28 @@ export interface Translations {
   restoreAction: string;
   restoreSuccess: string;
   restoreBusy: string;
+
+  // Cloud master switch
+  cloudSyncTitle: string;
+  cloudSyncOnDesc: string;
+  cloudSyncOffDesc: string;
+  localModeBackupHint: string;
+  toastCloudOn: string;
+  toastCloudOff: string;
+  settingsSyncLocalDesc: string;
+
+  // Alarm reliability page
+  reliabilityIntro: string;
+  reliabilityBatteryTitle: string;
+  reliabilityBatteryDesc: string;
+  reliabilityExactTitle: string;
+  reliabilityExactDesc: string;
+  reliabilityVendorTitle: string;
+  reliabilityVendorDesc: string;
+  reliabilityOpenSettings: string;
+  reliabilityOpened: string;
+  reliabilityTestButton: string;
+  reliabilityTestToast: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -474,20 +497,21 @@ export const translations: Record<Language, Translations> = {
     doctorShareActiveMeds: 'Kullanılan İlaçlar',
     doctorShareNoMeds: 'Kayıtlı aktif ilaç bulunmuyor.',
     profileSavedToast: 'Profil ve hekim bilgileri güncellendi',
-    settingsNotifications: 'Bildirim ve Ses Ayarları',
+    settingsNotifications: 'Hatırlatmalar',
     settingsNotificationsDesc: 'Zil sesleri, kilit ekranı ve tekrar alarmları',
-    settingsReminders: 'Hatırlatıcı & Erteleme',
+    settingsReminders: 'Erteleme ve Tekrar',
     settingsRemindersDesc: 'Erteleme süresi ve erken bildirim',
-    settingsReliability: 'Cihaz Güvenilirliği & Alarm',
-    settingsReliabilityDesc: 'Pil kısıtlamaları, arka plan alarm koruması',
+    settingsReliability: 'Alarm Güvenilirliği',
+    settingsReliabilityDesc: 'Hatırlatmaların zamanında çalması için izinler',
     settingsStock: 'Stok ve Envanter',
     settingsStockDesc: 'Kritik eşik seviyeleri ve kutu takibi',
-    settingsPrivacy: 'Gizlilik & Kilit Ekranı',
+    settingsPrivacy: 'Gizlilik ve Kilit Ekranı',
     settingsPrivacyDesc: 'İlaç adını gizleme ve gizli mod',
-    settingsExperience: 'Uygulama Deneyimi',
-    settingsExperienceDesc: 'Dozları daraltma, titreşim (haptics)',
+    settingsExperience: 'Görünüm',
+    settingsExperienceDesc: 'İlaç adını gizleme, dozları daraltma, titreşim',
     settingsSync: 'Senkronizasyon & Yedekleme',
-    settingsSyncDesc: 'Bulut eşitleme & JSON yedek',
+    settingsSyncDesc: 'Bulut eşitleme ve yedek',
+    settingsBackup: 'Yedekleme',
     syncServerUrl: 'Sunucu Adresi (URL)',
     syncConnectedAccount: 'Bağlı hesap',
     syncDisconnect: 'Hesaptan ayrıl',
@@ -569,8 +593,8 @@ export const translations: Record<Language, Translations> = {
     confirmResetDesc: 'Tüm ilaç kayıtlarınız ve ayarlarınız silinecektir. Devam edilsin mi?',
 
     backupTitle: 'Cihaz Dışı Yedek',
-    backupDesc: 'İlaçlarınızı, geçmişinizi, randevularınızı ve ayarlarınızı tek bir .json dosyasına kaydedin; telefon değişirse veya uygulama silinirse bu dosyadan geri yükleyin. Dosyayı telefonun dışında (e-posta, bulut sürücü, bilgisayar) saklayın. Dosya şifreli değildir ve sağlık bilgisi içerir.',
-    backupExport: 'Yedeği Dışa Aktar (.json)',
+    backupDesc: 'İlaçlarınızı, geçmişinizi, randevularınızı ve ayarlarınızı tek bir dosyaya kaydedin; telefon değişirse veya uygulama silinirse bu dosyadan geri yükleyin. Dosyayı telefonun dışında (e-posta, bulut sürücü, bilgisayar) saklayın. Dosya şifreli değildir ve sağlık bilgisi içerir.',
+    backupExport: 'Yedek Dosyası Oluştur',
     backupImport: 'Yedekten Geri Yükle',
     backupExportFailed: 'Yedek dosyası oluşturulamadı.',
     backupShareUnavailable: 'Bu cihazda dosya paylaşımı kullanılamıyor.',
@@ -582,7 +606,7 @@ export const translations: Record<Language, Translations> = {
     backupErrorNoDoses: 'Dosyada ilaç listesi bulunamadı.',
     backupErrorInvalidDose: 'Yedekteki {n}. ilaç kaydı hatalı. Hiçbir veri değiştirilmedi.',
     backupErrorInvalidAppointments: 'Yedekteki randevu listesi hatalı. Hiçbir veri değiştirilmedi.',
-    backupForeignAccount: 'Bu yedek başka bir eşitleme hesabına ait; hesaplar karışmasın diye geri yüklenmedi. O hesaba bağlanın ya da bu hesaptan çıkış yapıp tekrar deneyin.',
+    backupForeignAccount: 'Bu yedek, bu telefonun bağlı olduğu hesaptan farklı bir eşitleme hesabına ait; hesaplar karışmasın diye geri yüklenmedi. Önce o hesaba bağlanıp tekrar deneyin.',
     restoreConfirmTitle: 'Yedeği Geri Yükle',
     restoreConfirmDesc: '{date} tarihli yedek: {meds} ilaç, {appts} randevu.\n\nBu telefondaki ilaçlar, geçmiş ve ayarlar yedektekilerle değiştirilecek.',
     restoreConfirmNoAppointments: 'Bu yedekte randevu yok; mevcut randevularınız korunacak.',
@@ -590,6 +614,25 @@ export const translations: Record<Language, Translations> = {
     restoreAction: 'Geri Yükle',
     restoreSuccess: 'Yedek geri yüklendi',
     restoreBusy: 'Eşitleme veya hesap işlemi sürüyor. Bitince tekrar deneyin.',
+
+    cloudSyncTitle: 'Bulut Eşitleme',
+    cloudSyncOnDesc: 'Verileriniz hesabınıza gönderilir ve cihazlarınız arasında eşitlenir.',
+    cloudSyncOffDesc: 'Yerel mod: veriler yalnızca bu telefonda kalır, sunucuya hiçbir şey gönderilmez. Hesabınız ve kayıtlarınız silinmez; yeniden açtığınızda aynı hesapla birleştirilir.',
+    localModeBackupHint: 'Telefon kaybolur veya uygulama silinirse verileri yalnızca cihaz dışı yedekten geri alabilirsiniz. Düzenli yedek alın.',
+    toastCloudOn: 'Bulut eşitleme açıldı',
+    toastCloudOff: 'Yerel mod: veriler bu telefonda',
+    settingsSyncLocalDesc: 'Verileriniz yalnızca bu telefonda · Yedek al',
+    reliabilityIntro: 'Bazı telefonlar pil tasarrufu için arka plandaki uygulamaları durdurur. Hatırlatmaların gecikmemesi için aşağıdaki ayarları bir kez kontrol edin.',
+    reliabilityBatteryTitle: 'Pil kısıtlaması',
+    reliabilityBatteryDesc: 'Açılan ekranda bu uygulama için "Kısıtlama yok" seçin.',
+    reliabilityExactTitle: 'Tam saatinde çalma',
+    reliabilityExactDesc: '"Alarmlar ve hatırlatıcılar" iznini açık tutun.',
+    reliabilityVendorTitle: 'Telefon üreticisi ayarları',
+    reliabilityVendorDesc: 'Samsung, Xiaomi, Huawei gibi telefonlarda "Otomatik başlatma" ve arka planda çalışma iznini açın.',
+    reliabilityOpenSettings: 'Ayarları Aç',
+    reliabilityOpened: 'Telefon ayarları açıldı',
+    reliabilityTestButton: 'Deneme Alarmı Çal (5 sn sonra)',
+    reliabilityTestToast: '5 saniye sonra deneme alarmı çalacak. Telefonu kilitleyip deneyebilirsiniz.',
   },
 
   en: {
@@ -769,20 +812,21 @@ export const translations: Record<Language, Translations> = {
     doctorShareActiveMeds: 'Active Medications',
     doctorShareNoMeds: 'No active medications recorded.',
     profileSavedToast: 'Profile and doctor details updated',
-    settingsNotifications: 'Notification & Sound Settings',
+    settingsNotifications: 'Reminders',
     settingsNotificationsDesc: 'Ringtones, lock screen, and repeat alarms',
-    settingsReminders: 'Reminders & Snooze',
+    settingsReminders: 'Snooze and Repeat',
     settingsRemindersDesc: 'Snooze duration and early reminder heads-up',
-    settingsReliability: 'Device Reliability & Alarms',
-    settingsReliabilityDesc: 'Battery optimization and background alarms',
+    settingsReliability: 'Alarm Reliability',
+    settingsReliabilityDesc: 'Permissions that keep reminders on time',
     settingsStock: 'Stock & Inventory',
     settingsStockDesc: 'Critical stock thresholds and box tracking',
-    settingsPrivacy: 'Privacy & Lock Screen',
+    settingsPrivacy: 'Privacy and Lock Screen',
     settingsPrivacyDesc: 'Hide medication names and private mode',
-    settingsExperience: 'App Experience',
-    settingsExperienceDesc: 'Compact dose views and haptic feedback',
+    settingsExperience: 'Display',
+    settingsExperienceDesc: 'Hide medicine names, compact doses, vibration',
     settingsSync: 'Synchronization & Backup',
-    settingsSyncDesc: 'Cloud sync and JSON backups',
+    settingsSyncDesc: 'Cloud sync and backup',
+    settingsBackup: 'Backup',
     syncServerUrl: 'Server Address (URL)',
     syncConnectedAccount: 'Connected account',
     syncDisconnect: 'Disconnect account',
@@ -864,8 +908,8 @@ export const translations: Record<Language, Translations> = {
     confirmResetDesc: 'All medications and settings will be permanently erased. Continue?',
 
     backupTitle: 'Off-Device Backup',
-    backupDesc: 'Save your medications, history, appointments and settings to a single .json file, and restore from it if you change phones or remove the app. Keep the file off this phone (email, cloud drive, computer). The file is not encrypted and contains health information.',
-    backupExport: 'Export Backup (.json)',
+    backupDesc: 'Save your medications, history, appointments and settings to a single file, and restore from it if you change phones or remove the app. Keep the file off this phone (email, cloud drive, computer). The file is not encrypted and contains health information.',
+    backupExport: 'Create Backup File',
     backupImport: 'Restore from Backup',
     backupExportFailed: 'The backup file could not be created.',
     backupShareUnavailable: 'File sharing is not available on this device.',
@@ -877,7 +921,7 @@ export const translations: Record<Language, Translations> = {
     backupErrorNoDoses: 'No medication list was found in the file.',
     backupErrorInvalidDose: 'Medication record {n} in the backup is invalid. Nothing was changed.',
     backupErrorInvalidAppointments: 'The appointment list in the backup is invalid. Nothing was changed.',
-    backupForeignAccount: 'This backup belongs to another sync account, so it was not restored to keep accounts separate. Connect to that account, or disconnect from this one and try again.',
+    backupForeignAccount: 'This backup belongs to a different sync account than the one this phone is bound to, so it was not restored to keep accounts separate. Connect to that account first and try again.',
     restoreConfirmTitle: 'Restore Backup',
     restoreConfirmDesc: 'Backup from {date}: {meds} medications, {appts} appointments.\n\nMedications, history and settings on this phone will be replaced with those in the backup.',
     restoreConfirmNoAppointments: 'This backup has no appointments; your current appointments will be kept.',
@@ -885,6 +929,25 @@ export const translations: Record<Language, Translations> = {
     restoreAction: 'Restore',
     restoreSuccess: 'Backup restored',
     restoreBusy: 'A sync or account operation is in progress. Try again when it finishes.',
+
+    cloudSyncTitle: 'Cloud Sync',
+    cloudSyncOnDesc: 'Your data is sent to your account and kept in sync across your devices.',
+    cloudSyncOffDesc: 'Local mode: data stays on this phone only and nothing is sent to the server. Your account and records are not deleted; turning it back on merges with the same account.',
+    localModeBackupHint: 'If this phone is lost or the app is removed, only an off-device backup can bring your data back. Back up regularly.',
+    toastCloudOn: 'Cloud sync turned on',
+    toastCloudOff: 'Local mode: data stays on this phone',
+    settingsSyncLocalDesc: 'Data stays on this phone · Back up',
+    reliabilityIntro: 'Some phones stop background apps to save battery. Check the settings below once so reminders are not delayed.',
+    reliabilityBatteryTitle: 'Battery restriction',
+    reliabilityBatteryDesc: 'On the screen that opens, choose "Unrestricted" for this app.',
+    reliabilityExactTitle: 'Ring on time',
+    reliabilityExactDesc: 'Keep the "Alarms & reminders" permission on.',
+    reliabilityVendorTitle: 'Phone maker settings',
+    reliabilityVendorDesc: 'On Samsung, Xiaomi, Huawei and similar phones, allow auto-start and background activity.',
+    reliabilityOpenSettings: 'Open Settings',
+    reliabilityOpened: 'Phone settings opened',
+    reliabilityTestButton: 'Play Test Alarm (in 5 s)',
+    reliabilityTestToast: 'A test alarm will ring in 5 seconds. You can lock the phone to try it.',
   },
 };
 
