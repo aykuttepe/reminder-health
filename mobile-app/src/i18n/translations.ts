@@ -294,6 +294,15 @@ export interface Translations {
   restoreAction: string;
   restoreSuccess: string;
   restoreBusy: string;
+
+  // Cloud master switch
+  cloudSyncTitle: string;
+  cloudSyncOnDesc: string;
+  cloudSyncOffDesc: string;
+  localModeBackupHint: string;
+  toastCloudOn: string;
+  toastCloudOff: string;
+  settingsSyncLocalDesc: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -582,7 +591,7 @@ export const translations: Record<Language, Translations> = {
     backupErrorNoDoses: 'Dosyada ilaç listesi bulunamadı.',
     backupErrorInvalidDose: 'Yedekteki {n}. ilaç kaydı hatalı. Hiçbir veri değiştirilmedi.',
     backupErrorInvalidAppointments: 'Yedekteki randevu listesi hatalı. Hiçbir veri değiştirilmedi.',
-    backupForeignAccount: 'Bu yedek başka bir eşitleme hesabına ait; hesaplar karışmasın diye geri yüklenmedi. O hesaba bağlanın ya da bu hesaptan çıkış yapıp tekrar deneyin.',
+    backupForeignAccount: 'Bu yedek, bu telefonun bağlı olduğu hesaptan farklı bir eşitleme hesabına ait; hesaplar karışmasın diye geri yüklenmedi. Önce o hesaba bağlanıp tekrar deneyin.',
     restoreConfirmTitle: 'Yedeği Geri Yükle',
     restoreConfirmDesc: '{date} tarihli yedek: {meds} ilaç, {appts} randevu.\n\nBu telefondaki ilaçlar, geçmiş ve ayarlar yedektekilerle değiştirilecek.',
     restoreConfirmNoAppointments: 'Bu yedekte randevu yok; mevcut randevularınız korunacak.',
@@ -590,6 +599,14 @@ export const translations: Record<Language, Translations> = {
     restoreAction: 'Geri Yükle',
     restoreSuccess: 'Yedek geri yüklendi',
     restoreBusy: 'Eşitleme veya hesap işlemi sürüyor. Bitince tekrar deneyin.',
+
+    cloudSyncTitle: 'Bulut Eşitleme',
+    cloudSyncOnDesc: 'Verileriniz hesabınıza gönderilir ve cihazlarınız arasında eşitlenir.',
+    cloudSyncOffDesc: 'Yerel mod: veriler yalnızca bu telefonda kalır, sunucuya hiçbir şey gönderilmez. Hesabınız ve kayıtlarınız silinmez; yeniden açtığınızda aynı hesapla birleştirilir.',
+    localModeBackupHint: 'Telefon kaybolur veya uygulama silinirse verileri yalnızca cihaz dışı yedekten geri alabilirsiniz. Düzenli yedek alın.',
+    toastCloudOn: 'Bulut eşitleme açıldı',
+    toastCloudOff: 'Yerel mod: veriler bu telefonda',
+    settingsSyncLocalDesc: 'Yerel mod · JSON yedek',
   },
 
   en: {
@@ -877,7 +894,7 @@ export const translations: Record<Language, Translations> = {
     backupErrorNoDoses: 'No medication list was found in the file.',
     backupErrorInvalidDose: 'Medication record {n} in the backup is invalid. Nothing was changed.',
     backupErrorInvalidAppointments: 'The appointment list in the backup is invalid. Nothing was changed.',
-    backupForeignAccount: 'This backup belongs to another sync account, so it was not restored to keep accounts separate. Connect to that account, or disconnect from this one and try again.',
+    backupForeignAccount: 'This backup belongs to a different sync account than the one this phone is bound to, so it was not restored to keep accounts separate. Connect to that account first and try again.',
     restoreConfirmTitle: 'Restore Backup',
     restoreConfirmDesc: 'Backup from {date}: {meds} medications, {appts} appointments.\n\nMedications, history and settings on this phone will be replaced with those in the backup.',
     restoreConfirmNoAppointments: 'This backup has no appointments; your current appointments will be kept.',
@@ -885,6 +902,14 @@ export const translations: Record<Language, Translations> = {
     restoreAction: 'Restore',
     restoreSuccess: 'Backup restored',
     restoreBusy: 'A sync or account operation is in progress. Try again when it finishes.',
+
+    cloudSyncTitle: 'Cloud Sync',
+    cloudSyncOnDesc: 'Your data is sent to your account and kept in sync across your devices.',
+    cloudSyncOffDesc: 'Local mode: data stays on this phone only and nothing is sent to the server. Your account and records are not deleted; turning it back on merges with the same account.',
+    localModeBackupHint: 'If this phone is lost or the app is removed, only an off-device backup can bring your data back. Back up regularly.',
+    toastCloudOn: 'Cloud sync turned on',
+    toastCloudOff: 'Local mode: data stays on this phone',
+    settingsSyncLocalDesc: 'Local mode · JSON backup',
   },
 };
 

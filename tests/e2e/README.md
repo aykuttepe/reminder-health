@@ -3,6 +3,15 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Bulut eşitleme anahtarı — 26 Eylül 2026 (v1.2.7)
+
+- Emulator'da elle doğrulandı (release APK, hesap yok): anahtar varsayılan açık; kapatınca hesap/eşitleme
+  bölümleri gizlenip yerel mod uyarısı çıkar, Ayarlar menüsünde "Yerel mod · JSON yedek" görünür ve tercih
+  uygulama kapatılıp açılınca korunur. Uçak modunda soğuk açılışta ilaçlar hatasız yüklendi. Yeniden açınca
+  hesap arayüzü geri geldi.
+- Hesaplı yollar (yerel moddayken yoldaki eşitleme yanıtının atılması, yeniden açınca aynı hesapla birleştirme)
+  emulator'da hesap olmadığı için yalnızca telefonda elle doğrulanabilir.
+
 ## Yedekten geri yükleme — 26 Eylül 2026 (v1.2.6)
 
 - Emulator'da elle doğrulandı (release APK): "Yedeği Dışa Aktar" `reminder-health-yedek-<tarih>.json` dosyasıyla
