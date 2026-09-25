@@ -43,6 +43,21 @@ const SETTING_KINDS: Record<string, SettingKind> = {
   repeatNagCount: 'number',
 };
 
+// Single-doctor profile fields from before appointments existed. The app no longer reads them, but
+// keeps whatever is stored so a user's typed contact and notes are never silently dropped.
+export const LEGACY_DOCTOR_SETTING_KEYS = [
+  'doctorName', 'doctorSpecialty', 'doctorHospital', 'doctorPhone', 'doctorNextAppointment',
+  'doctorAppointmentTime', 'doctorApptLeadOptions', 'doctorBloodTestDate', 'doctorNotes',
+];
+
+export function pickLegacyDoctorSettings(settings: Record<string, unknown>): Record<string, unknown> {
+  const kept: Record<string, unknown> = {};
+  for (const key of LEGACY_DOCTOR_SETTING_KEYS) {
+    if (settings[key] !== undefined) kept[key] = settings[key];
+  }
+  return kept;
+}
+
 const SOUND_TYPES = ['default', 'alarm', 'gentle', 'chime', 'system_custom', 'silent'];
 
 export type BackupLanguage = 'tr' | 'en';

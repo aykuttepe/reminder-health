@@ -15,6 +15,7 @@ ${UDID}          emulator-5554
 ${MEDICATION}    E2E Sessiz İlaç
 ${TAB_MEDS}      android=new UiSelector().descriptionContains(", İlaçlarım").clickable(true)
 ${MUTE_SWITCH}   accessibility_id=Bildirimleri sessize al
+${MORE_OPTIONS}  accessibility_id=Diğer seçenekler
 
 *** Test Cases ***
 Muting A Medicine Removes Its Reminders Until Unmuted
@@ -42,9 +43,20 @@ Set Mute
     [Arguments]    ${state}
     Click Element    android=new UiSelector().text("${MEDICATION}")
     Wait Until Page Contains Element    accessibility_id=Kaydet    15s
+    # Mute sits under "Diğer seçenekler", which is folded unless the medicine is already muted.
+    ${expanded}=    Set Variable    ${FALSE}
     FOR    ${index}    IN RANGE    0    10
         ${visible}=    Run Keyword And Return Status    Element Should Be Visible    ${MUTE_SWITCH}
         IF    ${visible}    BREAK
+        # Tap the fold only once: after it opens the switch sits lower and a second tap would close it.
+        IF    not ${expanded}
+            ${folded}=    Run Keyword And Return Status    Element Should Be Visible    ${MORE_OPTIONS}
+            IF    ${folded}
+                Click Element    ${MORE_OPTIONS}
+                ${expanded}=    Set Variable    ${TRUE}
+                CONTINUE
+            END
+        END
         Swipe Screen Up
     END
     ${checked}=    Get Element Attribute    ${MUTE_SWITCH}    checked

@@ -17,7 +17,7 @@ function load(file) {
 }
 const {
   buildBackupFile, parseBackup, summarizeBackup, settingsForRestore, prepareRestoredDoses,
-  isBackupForeignToAccount, backupFileName, MAX_BACKUP_CHARS,
+  isBackupForeignToAccount, backupFileName, MAX_BACKUP_CHARS, pickLegacyDoctorSettings,
 } = load('backup');
 // Objects created inside the vm context carry its prototypes; compare plain copies.
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -125,4 +125,14 @@ test('restored medicines win the next sync while deletions keep their timestamps
 
 test('backup file names carry the local date and time to the minute', () => {
   assert.equal(backupFileName(new Date(2026, 8, 6, 7, 5)), 'reminder-health-yedek-2026-09-06-0705.json');
+});
+
+test('old single-doctor profile fields are kept in backups even though the app no longer shows them', () => {
+  const legacy = { doctorName: 'Dr. Eski', doctorPhone: '0212 000 00 00', doctorNotes: 'Tansiyonu sor' };
+  const { backup } = parseBackup(JSON.stringify(buildBackupFile({ doses: [], settings: { ...legacy, userName: 'A' }, learnedMeds: {} })));
+  assert.deepEqual(plain(pickLegacyDoctorSettings(backup.settings)), legacy);
+});
+
+test('picking legacy doctor fields ignores current settings and missing keys', () => {
+  assert.deepEqual(plain(pickLegacyDoctorSettings({ userName: 'A', appointments: '[]', snoozeMinutes: 10 })), {});
 });

@@ -134,25 +134,15 @@ export interface Translations {
   userNameLabel: string;
   userNameDesc: string;
   userNamePlaceholder: string;
-  profileDoctorSection: string;
   doctorNameLabel: string;
-  doctorNamePlaceholder: string;
   doctorSpecialtyLabel: string;
-  doctorSpecialtyPlaceholder: string;
   doctorHospitalLabel: string;
-  doctorHospitalPlaceholder: string;
-  doctorPhoneLabel: string;
-  doctorPhonePlaceholder: string;
   doctorCallButton: string;
   doctorAppointmentSection: string;
   doctorAppointmentLabel: string;
   doctorAppointmentTimeLabel: string;
   doctorSelectAppointment: string;
   doctorClearAppointment: string;
-  doctorAppointmentToday: string;
-  doctorAppointmentTomorrow: string;
-  doctorAppointmentDaysLeft: string;
-  doctorAppointmentDaysAgo: string;
   doctorLeadReminderLabel: string;
   doctorLeadReminderSub: string;
   leadOpt3d: string;
@@ -165,18 +155,12 @@ export interface Translations {
   doctorBloodTestLabel: string;
   doctorSelectBloodTest: string;
   doctorClearBloodTest: string;
-  doctorBloodTestToday: string;
-  doctorBloodTestTomorrow: string;
-  doctorBloodTestDaysLeft: string;
-  doctorBloodTestDaysAgo: string;
   doctorSnoozedToast: string;
   doctorNotesSection: string;
-  doctorNotesPlaceholder: string;
   doctorShareMedList: string;
   doctorShareSubject: string;
   doctorShareActiveMeds: string;
   doctorShareNoMeds: string;
-  profileSavedToast: string;
   settingsNotifications: string;
   settingsNotificationsDesc: string;
   settingsReminders: string;
@@ -454,25 +438,15 @@ export const translations: Record<Language, Translations> = {
     userNameLabel: 'Kullanıcı İsmi / Hitap',
     userNameDesc: 'Ana ekranda ve bildirimlerde size nasıl hitap edileceğini belirleyin',
     userNamePlaceholder: 'Adınızı giriniz...',
-    profileDoctorSection: 'TAKİP EDEN HEKİM & KLİNİK',
     doctorNameLabel: 'Doktor Adı / Ünvanı',
-    doctorNamePlaceholder: 'Örn. Prof. Dr. Ahmet Yılmaz',
     doctorSpecialtyLabel: 'Uzmanlık / Branş',
-    doctorSpecialtyPlaceholder: 'Örn. Nefroloji / Organ Nakli',
     doctorHospitalLabel: 'Hastane / Klinik',
-    doctorHospitalPlaceholder: 'Örn. Şehir Hastanesi, Acıbadem',
-    doctorPhoneLabel: 'İletişim / Telefon',
-    doctorPhonePlaceholder: 'Örn. 0532 123 45 67',
     doctorCallButton: 'Doktoru Ara',
     doctorAppointmentSection: 'RANDEVU & KONTROL',
     doctorAppointmentLabel: 'Sonraki Randevu Tarihi',
     doctorAppointmentTimeLabel: 'Randevu Saati',
     doctorSelectAppointment: 'Randevu Tarihi Seçin',
     doctorClearAppointment: 'Randevuyu Temizle',
-    doctorAppointmentToday: 'Bugün randevunuz var!',
-    doctorAppointmentTomorrow: 'Yarın',
-    doctorAppointmentDaysLeft: 'gün kaldı',
-    doctorAppointmentDaysAgo: 'gün önceydi',
     doctorLeadReminderLabel: 'Önceden Hatırlatıcılar (Çoklu Seçim)',
     doctorLeadReminderSub: 'Randevu öncesinde istediğiniz zaman dilimlerini seçebilirsiniz',
     leadOpt3d: '3 Gün Önce',
@@ -485,18 +459,12 @@ export const translations: Record<Language, Translations> = {
     doctorBloodTestLabel: 'Kan Verme / Tahlil Tarihi',
     doctorSelectBloodTest: 'Kan Tahlili Tarihi Seçin',
     doctorClearBloodTest: 'Tahlil Tarihini Temizle',
-    doctorBloodTestToday: 'Bugün tahlil gününüz! Aç karnına kan veriniz.',
-    doctorBloodTestTomorrow: 'Yarın tahlil gününüz (Aç karnına)',
-    doctorBloodTestDaysLeft: 'gün sonra kan tahlili',
-    doctorBloodTestDaysAgo: 'gün önceydi',
     doctorSnoozedToast: 'Randevu hatırlatıcısı ertelendi',
     doctorNotesSection: 'DOKTOR NOTU & TALİMATLAR',
-    doctorNotesPlaceholder: 'Örn. Tansiyon 14\'ü geçerse haber ver, tuzsuz diyet, kan tahlili aç karnına...',
     doctorShareMedList: 'İlaç Listesini Hekimle Paylaş',
     doctorShareSubject: 'İlaç ve Tedavi Listesi',
     doctorShareActiveMeds: 'Kullanılan İlaçlar',
     doctorShareNoMeds: 'Kayıtlı aktif ilaç bulunmuyor.',
-    profileSavedToast: 'Profil ve hekim bilgileri güncellendi',
     settingsNotifications: 'Hatırlatmalar',
     settingsNotificationsDesc: 'Zil sesleri, kilit ekranı ve tekrar alarmları',
     settingsReminders: 'Erteleme ve Tekrar',
@@ -769,25 +737,15 @@ export const translations: Record<Language, Translations> = {
     userNameLabel: 'User Name / Greeting',
     userNameDesc: 'Set how you are greeted on the home screen and in notifications',
     userNamePlaceholder: 'Enter your name...',
-    profileDoctorSection: 'PRIMARY DOCTOR & CLINIC',
     doctorNameLabel: 'Doctor Name & Title',
-    doctorNamePlaceholder: 'e.g. Prof. Dr. John Smith',
     doctorSpecialtyLabel: 'Specialty / Department',
-    doctorSpecialtyPlaceholder: 'e.g. Nephrology / Transplant',
     doctorHospitalLabel: 'Hospital / Clinic',
-    doctorHospitalPlaceholder: 'e.g. City Hospital, Mayo Clinic',
-    doctorPhoneLabel: 'Contact Phone',
-    doctorPhonePlaceholder: 'e.g. +1 555 123 4567',
     doctorCallButton: 'Call Doctor',
     doctorAppointmentSection: 'APPOINTMENT & CHECKUP',
     doctorAppointmentLabel: 'Next Appointment Date',
     doctorAppointmentTimeLabel: 'Appointment Time',
     doctorSelectAppointment: 'Select Appointment Date',
     doctorClearAppointment: 'Clear Appointment',
-    doctorAppointmentToday: 'You have an appointment today!',
-    doctorAppointmentTomorrow: 'Tomorrow',
-    doctorAppointmentDaysLeft: 'days left',
-    doctorAppointmentDaysAgo: 'days ago',
     doctorLeadReminderLabel: 'Advance Reminders (Multi-Select)',
     doctorLeadReminderSub: 'Select whichever reminder windows you need before the visit',
     leadOpt3d: '3 Days Before',
@@ -800,18 +758,12 @@ export const translations: Record<Language, Translations> = {
     doctorBloodTestLabel: 'Blood Test / Lab Date',
     doctorSelectBloodTest: 'Select Blood Test Date',
     doctorClearBloodTest: 'Clear Lab Date',
-    doctorBloodTestToday: 'Today is your lab test day! Remember to go fasting.',
-    doctorBloodTestTomorrow: 'Tomorrow is lab test day (Fasting)',
-    doctorBloodTestDaysLeft: 'days until blood test',
-    doctorBloodTestDaysAgo: 'days ago',
     doctorSnoozedToast: 'Appointment reminder snoozed',
     doctorNotesSection: 'DOCTOR NOTES & INSTRUCTIONS',
-    doctorNotesPlaceholder: 'e.g. Report if BP > 140, low salt diet, fasting blood test...',
     doctorShareMedList: 'Share Medication List with Doctor',
     doctorShareSubject: 'Medication & Treatment List',
     doctorShareActiveMeds: 'Active Medications',
     doctorShareNoMeds: 'No active medications recorded.',
-    profileSavedToast: 'Profile and doctor details updated',
     settingsNotifications: 'Reminders',
     settingsNotificationsDesc: 'Ringtones, lock screen, and repeat alarms',
     settingsReminders: 'Snooze and Repeat',

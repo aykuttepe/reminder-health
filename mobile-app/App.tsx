@@ -86,6 +86,8 @@ import {
   buildBackupFile,
   backupFileName,
   isBackupForeignToAccount,
+  parseAppointmentList,
+  pickLegacyDoctorSettings,
   parseBackup,
   prepareRestoredDoses,
   settingsForRestore,
@@ -151,6 +153,26 @@ const BACKUP_CACHE_DIR = 'backup-export';
 const CLOUD_SYNC_AVAILABLE = false;
 // The diagnostics log screen is hidden from the settings menu for now; the logger keeps recording.
 const DIAGNOSTICS_AVAILABLE = false;
+const PRIMARY_SOUND_TYPES: NotificationSoundType[] = ['default', 'alarm', 'silent'];
+// Factory values for "Veri & Sıfırlama"; they match the useState defaults in MainApp.
+const DEFAULT_STORED_SETTINGS = {
+  privateMode: true,
+  notifications: true,
+  soundEnabled: true,
+  soundType: 'default',
+  userName: '',
+  appointments: '[]',
+  snoozeMinutes: 15,
+  leadTimeMinutes: 0,
+  defaultStockThreshold: 5,
+  stockAlertsEnabled: true,
+  hideDoseAmount: false,
+  autoCollapseTaken: false,
+  showAppointmentCard: true,
+  hapticsEnabled: true,
+  repeatNagEnabled: true,
+  repeatNagCount: 5,
+};
 
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 
@@ -378,6 +400,7 @@ function MainApp() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [muted, setMuted] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [heroCarouselIndex, setHeroCarouselIndex] = useState(0);
 
   // Diagnostics & Logger State
@@ -460,11 +483,11 @@ function MainApp() {
 
   // Modern Calendar Modal State
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate' | 'doctorNextAppointment' | 'doctorBloodTestDate' | 'appointmentDate' | 'appointmentBloodTestDate'>('startDate');
+  const [calendarTarget, setCalendarTarget] = useState<'startDate' | 'cycleStartDate' | 'appointmentDate' | 'appointmentBloodTestDate'>('startDate');
   const [calendarTitle, setCalendarTitle] = useState('Tarih Seçin');
   const [calendarAppointmentTarget, setCalendarAppointmentTarget] = useState<{ target: 'appointmentDate' | 'appointmentBloodTestDate'; date: string } | null>(null);
 
-  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate' | 'doctorNextAppointment' | 'doctorBloodTestDate' | 'appointmentDate' | 'appointmentBloodTestDate', title: string) => {
+  const openCalendarPicker = (target: 'startDate' | 'cycleStartDate' | 'appointmentDate' | 'appointmentBloodTestDate', title: string) => {
     setCalendarTarget(target);
     setCalendarTitle(title);
     setCalendarOpen(true);
@@ -475,12 +498,6 @@ function MainApp() {
       setStartDate(selectedDateStr);
     } else if (calendarTarget === 'cycleStartDate') {
       setCycleStartDate(selectedDateStr);
-    } else if (calendarTarget === 'doctorNextAppointment') {
-      setDoctorNextAppointment(selectedDateStr);
-      syncProfileSettings({ doctorNextAppointment: selectedDateStr });
-    } else if (calendarTarget === 'doctorBloodTestDate') {
-      setDoctorBloodTestDate(selectedDateStr);
-      syncProfileSettings({ doctorBloodTestDate: selectedDateStr });
     } else if (calendarTarget === 'appointmentDate') {
       setCalendarAppointmentTarget({ target: 'appointmentDate', date: selectedDateStr });
     } else if (calendarTarget === 'appointmentBloodTestDate') {
@@ -688,15 +705,9 @@ function MainApp() {
 
   // Customizable Feature States
   const [userName, setUserName] = useState('');
-  const [doctorName, setDoctorName] = useState('');
-  const [doctorSpecialty, setDoctorSpecialty] = useState('');
-  const [doctorHospital, setDoctorHospital] = useState('');
-  const [doctorPhone, setDoctorPhone] = useState('');
-  const [doctorNextAppointment, setDoctorNextAppointment] = useState('');
-  const [doctorAppointmentTime, setDoctorAppointmentTime] = useState('13:00');
-  const [doctorApptLeadOptions, setDoctorApptLeadOptions] = useState<string[]>(['1d', '0d']);
-  const [doctorBloodTestDate, setDoctorBloodTestDate] = useState('');
-  const [doctorNotes, setDoctorNotes] = useState('');
+  // Pre-appointment profile fields (single doctor, date, notes). Appointments replaced them; the values
+  // are only carried along in storage and backups so nothing a user typed is silently deleted.
+  const legacyDoctorSettingsRef = useRef<Record<string, unknown>>({});
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [appointmentEditorOpen, setAppointmentEditorOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentItem | null>(null);
@@ -894,17 +905,7 @@ function MainApp() {
     if (parsed.soundEnabled !== undefined) setSoundEnabled(parsed.soundEnabled);
     if (parsed.soundType !== undefined) setSoundType(parsed.soundType);
     if (parsed.userName !== undefined) setUserName(parsed.userName);
-    if (parsed.doctorName !== undefined) setDoctorName(parsed.doctorName);
-    if (parsed.doctorSpecialty !== undefined) setDoctorSpecialty(parsed.doctorSpecialty);
-    if (parsed.doctorHospital !== undefined) setDoctorHospital(parsed.doctorHospital);
-    if (parsed.doctorPhone !== undefined) setDoctorPhone(parsed.doctorPhone);
-    if (parsed.doctorNextAppointment !== undefined) setDoctorNextAppointment(parsed.doctorNextAppointment);
-    if (parsed.doctorAppointmentTime !== undefined) {
-      setDoctorAppointmentTime(parsed.doctorAppointmentTime === '09:00' ? '13:00' : parsed.doctorAppointmentTime);
-    }
-    if (parsed.doctorApptLeadOptions !== undefined && Array.isArray(parsed.doctorApptLeadOptions)) setDoctorApptLeadOptions(parsed.doctorApptLeadOptions);
-    if (parsed.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(parsed.doctorBloodTestDate);
-    if (parsed.doctorNotes !== undefined) setDoctorNotes(parsed.doctorNotes);
+    legacyDoctorSettingsRef.current = pickLegacyDoctorSettings(parsed);
 
     let initialAppointments: AppointmentItem[] = [];
     const hasStoredAppointments = parsed.appointments !== undefined;
@@ -939,15 +940,6 @@ function MainApp() {
       }];
     }
     setAppointments(initialAppointments);
-    if (hasStoredAppointments && initialAppointments.length === 0) {
-      setDoctorNextAppointment('');
-      setDoctorBloodTestDate('');
-      setDoctorName('');
-      setDoctorSpecialty('');
-      setDoctorHospital('');
-      setDoctorPhone('');
-      setDoctorNotes('');
-    }
     if (parsed.snoozeMinutes !== undefined) setSnoozeMinutes(parsed.snoozeMinutes);
     if (parsed.leadTimeMinutes !== undefined) setLeadTimeMinutes(parsed.leadTimeMinutes);
     if (parsed.defaultStockThreshold !== undefined) setDefaultStockThreshold(parsed.defaultStockThreshold);
@@ -1077,21 +1069,13 @@ function MainApp() {
 
   // The persisted settings object doubles as the settings section of a backup file.
   const storedSettings = useMemo(() => ({
+    ...legacyDoctorSettingsRef.current,
     privateMode,
     notifications,
     soundEnabled,
     soundType,
     userName,
-    doctorName,
-    doctorSpecialty,
-    doctorHospital,
-    doctorPhone,
-    doctorNextAppointment,
-    doctorAppointmentTime,
-    doctorApptLeadOptions,
     appointments: JSON.stringify(appointments),
-    doctorBloodTestDate,
-    doctorNotes,
     snoozeMinutes,
     leadTimeMinutes,
     defaultStockThreshold,
@@ -1109,15 +1093,6 @@ function MainApp() {
     soundEnabled,
     soundType,
     userName,
-    doctorName,
-    doctorSpecialty,
-    doctorHospital,
-    doctorPhone,
-    doctorNextAppointment,
-    doctorAppointmentTime,
-    doctorApptLeadOptions,
-    doctorBloodTestDate,
-    doctorNotes,
     snoozeMinutes,
     leadTimeMinutes,
     defaultStockThreshold,
@@ -1139,28 +1114,8 @@ function MainApp() {
   // Sync doctor appointment and lab test notifications
   useEffect(() => {
     if (!hydrated || hasNotificationPermission === null) return;
-    void syncDoctorAppointmentNotifications({
-      appointments,
-      appointmentDate: doctorNextAppointment,
-      appointmentTime: doctorAppointmentTime,
-      leadOptions: doctorApptLeadOptions,
-      bloodTestDate: doctorBloodTestDate,
-      doctorName,
-      hospital: doctorHospital,
-      lang: language,
-    });
-  }, [
-    hydrated,
-    hasNotificationPermission,
-    appointments,
-    doctorNextAppointment,
-    doctorAppointmentTime,
-    doctorApptLeadOptions,
-    doctorBloodTestDate,
-    doctorName,
-    doctorHospital,
-    language,
-  ]);
+    void syncDoctorAppointmentNotifications({ appointments, lang: language });
+  }, [hydrated, hasNotificationPermission, appointments, language]);
 
 
   // Sync device scheduled alarms whenever doses or settings change
@@ -1428,6 +1383,7 @@ function MainApp() {
   };
 
   const openEditor = (dose?: Dose) => {
+    setShowAdvancedOptions(false);
     if (dose) {
       setEditingId(dose.id);
       setName(dose.name);
@@ -1616,29 +1572,7 @@ function MainApp() {
     // Launch-time callers run from an older render; the ref keeps actions applied meanwhile.
     doses: dosesRef.current,
     learnedMeds,
-    settings: {
-      userName,
-      doctorName,
-      doctorSpecialty,
-      doctorHospital,
-      doctorPhone,
-      doctorNextAppointment,
-      doctorAppointmentTime,
-      doctorApptLeadOptions,
-      doctorBloodTestDate,
-      doctorNotes,
-      notifications,
-      soundEnabled,
-      soundType,
-      snoozeMinutes,
-      leadTimeMinutes,
-      defaultStockThreshold,
-      stockAlertsEnabled,
-      hideDoseAmount,
-      autoCollapseTaken,
-      showAppointmentCard,
-      hapticsEnabled,
-    }
+    settings: storedSettings,
   });
 
   const bindAccount = async (next: Session) => {
@@ -1661,22 +1595,8 @@ function MainApp() {
       setLearnedMeds(snapshot.learnedMeds);
       const effectiveUserName = snapshot.settings.userName || (next.user?.name && next.user.name !== 'Kullanıcı' ? next.user.name : '');
       setUserName(effectiveUserName);
-      setDoctorName(snapshot.settings.doctorName || '');
-      setDoctorSpecialty(snapshot.settings.doctorSpecialty || '');
-      setDoctorHospital(snapshot.settings.doctorHospital || '');
-      setDoctorPhone(snapshot.settings.doctorPhone || '');
-      setDoctorNextAppointment(snapshot.settings.doctorNextAppointment || '');
-      setDoctorAppointmentTime(snapshot.settings.doctorAppointmentTime || '13:00');
-      if (snapshot.settings.doctorApptLeadOptions) {
-        try {
-          const opts = typeof snapshot.settings.doctorApptLeadOptions === 'string'
-            ? JSON.parse(snapshot.settings.doctorApptLeadOptions)
-            : snapshot.settings.doctorApptLeadOptions;
-          if (Array.isArray(opts)) setDoctorApptLeadOptions(opts);
-        } catch {}
-      }
-      setDoctorBloodTestDate(snapshot.settings.doctorBloodTestDate || '');
-      setDoctorNotes(snapshot.settings.doctorNotes || '');
+      setAppointments((parseAppointmentList(snapshot.settings.appointments) ?? []) as AppointmentItem[]);
+      legacyDoctorSettingsRef.current = pickLegacyDoctorSettings(snapshot.settings);
       if (snapshot.settings.notifications !== undefined) setNotifications(snapshot.settings.notifications);
       if (snapshot.settings.soundEnabled !== undefined) setSoundEnabled(snapshot.settings.soundEnabled);
       if (snapshot.settings.soundType !== undefined) setSoundType(snapshot.settings.soundType);
@@ -1732,15 +1652,6 @@ function MainApp() {
         hapticsEnabled,
       };
       payloadSettings.userName = (userName || '').trim();
-      payloadSettings.doctorName = (doctorName || '').trim();
-      payloadSettings.doctorSpecialty = (doctorSpecialty || '').trim();
-      payloadSettings.doctorHospital = (doctorHospital || '').trim();
-      payloadSettings.doctorPhone = (doctorPhone || '').trim();
-      payloadSettings.doctorNextAppointment = (doctorNextAppointment || '').trim();
-      payloadSettings.doctorAppointmentTime = doctorAppointmentTime || '13:00';
-      payloadSettings.doctorApptLeadOptions = JSON.stringify(doctorApptLeadOptions || ['1d', '0d']);
-      payloadSettings.doctorBloodTestDate = (doctorBloodTestDate || '').trim();
-      payloadSettings.doctorNotes = (doctorNotes || '').trim();
       payloadSettings.appointments = JSON.stringify(appointments || []);
 
       const activeDoses = (dosesRef.current && dosesRef.current.length > 0 ? dosesRef.current : doses);
@@ -1772,54 +1683,8 @@ function MainApp() {
             setUserName(currentSession.user.name);
           }
           if (response.settings.appointments !== undefined) {
-            try {
-              const appts = typeof response.settings.appointments === 'string'
-                ? JSON.parse(response.settings.appointments)
-                : response.settings.appointments;
-              if (Array.isArray(appts)) {
-                setAppointments(appts);
-                const active = appts.filter(a => !a.completed);
-                const primary = active[0] || appts[0];
-                if (primary) {
-                  setDoctorName(primary.doctorName || '');
-                  setDoctorSpecialty(primary.specialty || '');
-                  setDoctorHospital(primary.hospital || '');
-                  setDoctorPhone(primary.phone || '');
-                  setDoctorNextAppointment(primary.date || '');
-                  setDoctorAppointmentTime(primary.time || '13:00');
-                  setDoctorApptLeadOptions(primary.leadOptions || ['1d', '0d']);
-                  setDoctorBloodTestDate(primary.bloodTestDate || '');
-                  setDoctorNotes(primary.notes || primary.bloodTestNotes || '');
-                } else {
-                  setDoctorName('');
-                  setDoctorSpecialty('');
-                  setDoctorHospital('');
-                  setDoctorPhone('');
-                  setDoctorNextAppointment('');
-                  setDoctorAppointmentTime('13:00');
-                  setDoctorApptLeadOptions(['1d', '0d']);
-                  setDoctorBloodTestDate('');
-                  setDoctorNotes('');
-                }
-              }
-            } catch {}
-          } else {
-            if (response.settings.doctorName !== undefined) setDoctorName(response.settings.doctorName);
-            if (response.settings.doctorSpecialty !== undefined) setDoctorSpecialty(response.settings.doctorSpecialty);
-            if (response.settings.doctorHospital !== undefined) setDoctorHospital(response.settings.doctorHospital);
-            if (response.settings.doctorPhone !== undefined) setDoctorPhone(response.settings.doctorPhone);
-            if (response.settings.doctorNextAppointment !== undefined) setDoctorNextAppointment(response.settings.doctorNextAppointment);
-            if (response.settings.doctorAppointmentTime !== undefined) setDoctorAppointmentTime(response.settings.doctorAppointmentTime);
-            if (response.settings.doctorApptLeadOptions !== undefined) {
-              try {
-                const opts = typeof response.settings.doctorApptLeadOptions === 'string'
-                  ? JSON.parse(response.settings.doctorApptLeadOptions)
-                  : response.settings.doctorApptLeadOptions;
-                if (Array.isArray(opts) && opts.length > 0) setDoctorApptLeadOptions(opts);
-              } catch {}
-            }
-            if (response.settings.doctorBloodTestDate !== undefined) setDoctorBloodTestDate(response.settings.doctorBloodTestDate);
-            if (response.settings.doctorNotes !== undefined) setDoctorNotes(response.settings.doctorNotes);
+            const appts = parseAppointmentList(response.settings.appointments);
+            if (appts) setAppointments(appts as AppointmentItem[]);
           }
           if (response.settings.notifications !== undefined) setNotifications(response.settings.notifications);
           if (response.settings.soundEnabled !== undefined) setSoundEnabled(response.settings.soundEnabled);
@@ -2065,44 +1930,11 @@ function MainApp() {
     await syncWithServer(session, true);
   };
 
-  const syncProfileSettings = (overrides?: Partial<{
-    userName: string;
-    doctorName: string;
-    doctorSpecialty: string;
-    doctorHospital: string;
-    doctorPhone: string;
-    doctorNextAppointment: string;
-    doctorAppointmentTime: string;
-    doctorApptLeadOptions: string[];
-    doctorBloodTestDate: string;
-    doctorNotes: string;
-    appointments: AppointmentItem[];
-  }>) => {
+  const syncProfileSettings = (overrides?: Partial<{ userName: string; appointments: AppointmentItem[] }>) => {
     if (session && cloudActive) {
-      const activeUserName = (overrides?.userName !== undefined ? overrides.userName : userName).trim();
-      const activeDocName = (overrides?.doctorName !== undefined ? overrides.doctorName : doctorName).trim();
-      const activeDocSpecialty = (overrides?.doctorSpecialty !== undefined ? overrides.doctorSpecialty : doctorSpecialty).trim();
-      const activeDocHospital = (overrides?.doctorHospital !== undefined ? overrides.doctorHospital : doctorHospital).trim();
-      const activeDocPhone = (overrides?.doctorPhone !== undefined ? overrides.doctorPhone : doctorPhone).trim();
-      const activeNextAppt = overrides?.doctorNextAppointment !== undefined ? overrides.doctorNextAppointment : doctorNextAppointment;
-      const activeApptTime = overrides?.doctorAppointmentTime !== undefined ? overrides.doctorAppointmentTime : doctorAppointmentTime;
-      const activeLeadOpts = overrides?.doctorApptLeadOptions !== undefined ? overrides.doctorApptLeadOptions : doctorApptLeadOptions;
-      const activeBloodDate = overrides?.doctorBloodTestDate !== undefined ? overrides.doctorBloodTestDate : doctorBloodTestDate;
-      const activeNotes = (overrides?.doctorNotes !== undefined ? overrides.doctorNotes : doctorNotes).trim();
-      const activeAppts = overrides?.appointments !== undefined ? overrides.appointments : appointments;
-
       const payload: Record<string, any> = {
-        userName: activeUserName,
-        doctorName: activeDocName,
-        doctorSpecialty: activeDocSpecialty,
-        doctorHospital: activeDocHospital,
-        doctorPhone: activeDocPhone,
-        doctorNextAppointment: activeNextAppt,
-        doctorAppointmentTime: activeApptTime,
-        doctorApptLeadOptions: JSON.stringify(activeLeadOpts),
-        doctorBloodTestDate: activeBloodDate,
-        doctorNotes: activeNotes,
-        appointments: JSON.stringify(activeAppts),
+        userName: (overrides?.userName !== undefined ? overrides.userName : userName).trim(),
+        appointments: JSON.stringify(overrides?.appointments !== undefined ? overrides.appointments : appointments),
       };
 
       authRequest(serverUrl, '/api/sync', {
@@ -2132,32 +1964,7 @@ function MainApp() {
     updated.sort((a, b) => (a.date + ' ' + (a.time || '13:00')).localeCompare(b.date + ' ' + (b.time || '13:00')));
     setAppointments(updated);
 
-    const activeAppts = updated.filter(a => !a.completed);
-    const primary = activeAppts[0] || updated[0];
-    if (primary) {
-      setDoctorName(primary.doctorName || '');
-      setDoctorSpecialty(primary.specialty || '');
-      setDoctorHospital(primary.hospital || '');
-      setDoctorPhone(primary.phone || '');
-      setDoctorNextAppointment(primary.date || '');
-      setDoctorAppointmentTime(primary.time || '13:00');
-      setDoctorApptLeadOptions(primary.leadOptions || ['1d', '0d']);
-      setDoctorBloodTestDate(primary.bloodTestDate || '');
-      setDoctorNotes(primary.notes || primary.bloodTestNotes || '');
-    }
-
-    syncProfileSettings({
-      appointments: updated,
-      doctorName: primary?.doctorName,
-      doctorSpecialty: primary?.specialty,
-      doctorHospital: primary?.hospital,
-      doctorPhone: primary?.phone,
-      doctorNextAppointment: primary?.date,
-      doctorAppointmentTime: primary?.time,
-      doctorApptLeadOptions: primary?.leadOptions,
-      doctorBloodTestDate: primary?.bloodTestDate,
-      doctorNotes: primary?.notes || primary?.bloodTestNotes,
-    });
+    syncProfileSettings({ appointments: updated });
 
     setAppointmentEditorOpen(false);
     showToast(language === 'en' ? '✅ Appointment saved' : '✅ Randevu kaydedildi');
@@ -2176,52 +1983,7 @@ function MainApp() {
           onPress: () => {
             const updated = appointments.filter(a => a.id !== id);
             setAppointments(updated);
-            const activeAppts = updated.filter(a => !a.completed);
-            const primary = activeAppts[0] || updated[0];
-
-            const newDocName = primary?.doctorName || '';
-            const newDocSpecialty = primary?.specialty || '';
-            const newDocHospital = primary?.hospital || '';
-            const newDocPhone = primary?.phone || '';
-            const newNextAppt = primary?.date || '';
-            const newApptTime = primary?.time || '13:00';
-            const newLeadOptions = primary?.leadOptions || ['1d', '0d'];
-            const newBloodDate = primary?.bloodTestDate || '';
-            const newNotes = primary?.notes || primary?.bloodTestNotes || '';
-
-            setDoctorName(newDocName);
-            setDoctorSpecialty(newDocSpecialty);
-            setDoctorHospital(newDocHospital);
-            setDoctorPhone(newDocPhone);
-            setDoctorNextAppointment(newNextAppt);
-            setDoctorAppointmentTime(newApptTime);
-            setDoctorApptLeadOptions(newLeadOptions);
-            setDoctorBloodTestDate(newBloodDate);
-            setDoctorNotes(newNotes);
-
-            syncProfileSettings({
-              appointments: updated,
-              doctorName: newDocName,
-              doctorSpecialty: newDocSpecialty,
-              doctorHospital: newDocHospital,
-              doctorPhone: newDocPhone,
-              doctorNextAppointment: newNextAppt,
-              doctorAppointmentTime: newApptTime,
-              doctorApptLeadOptions: newLeadOptions,
-              doctorBloodTestDate: newBloodDate,
-              doctorNotes: newNotes,
-            });
-
-            void syncDoctorAppointmentNotifications({
-              appointments: updated,
-              appointmentDate: newNextAppt,
-              appointmentTime: newApptTime,
-              leadOptions: newLeadOptions,
-              bloodTestDate: newBloodDate,
-              doctorName: newDocName,
-              hospital: newDocHospital,
-              lang: language,
-            });
+            syncProfileSettings({ appointments: updated });
 
             showToast(language === 'en' ? '🗑️ Appointment deleted' : '🗑️ Randevu silindi');
           },
@@ -2234,76 +1996,12 @@ function MainApp() {
     triggerHaptic();
     const updated = appointments.map(a => a.id === id ? { ...a, completed: !a.completed, updatedAt: Date.now() } : a);
     setAppointments(updated);
-    const activeAppts = updated.filter(a => !a.completed);
-    const primary = activeAppts[0];
-
-    const newDocName = primary?.doctorName || '';
-    const newDocSpecialty = primary?.specialty || '';
-    const newDocHospital = primary?.hospital || '';
-    const newDocPhone = primary?.phone || '';
-    const newNextAppt = primary?.date || '';
-    const newApptTime = primary?.time || '13:00';
-    const newLeadOptions = primary?.leadOptions || ['1d', '0d'];
-    const newBloodDate = primary?.bloodTestDate || '';
-    const newNotes = primary?.notes || primary?.bloodTestNotes || '';
-
-    setDoctorName(newDocName);
-    setDoctorSpecialty(newDocSpecialty);
-    setDoctorHospital(newDocHospital);
-    setDoctorPhone(newDocPhone);
-    setDoctorNextAppointment(newNextAppt);
-    setDoctorAppointmentTime(newApptTime);
-    setDoctorApptLeadOptions(newLeadOptions);
-    setDoctorBloodTestDate(newBloodDate);
-    setDoctorNotes(newNotes);
-
-    syncProfileSettings({
-      appointments: updated,
-      doctorName: newDocName,
-      doctorSpecialty: newDocSpecialty,
-      doctorHospital: newDocHospital,
-      doctorPhone: newDocPhone,
-      doctorNextAppointment: newNextAppt,
-      doctorAppointmentTime: newApptTime,
-      doctorApptLeadOptions: newLeadOptions,
-      doctorBloodTestDate: newBloodDate,
-      doctorNotes: newNotes,
-    });
-
-    void syncDoctorAppointmentNotifications({
-      appointments: updated,
-      appointmentDate: newNextAppt,
-      appointmentTime: newApptTime,
-      leadOptions: newLeadOptions,
-      bloodTestDate: newBloodDate,
-      doctorName: newDocName,
-      hospital: newDocHospital,
-      lang: language,
-    });
+    syncProfileSettings({ appointments: updated });
 
     const target = updated.find(a => a.id === id);
     showToast(target?.completed
       ? (language === 'en' ? '✓ Appointment marked as completed' : '✓ Randevu tamamlandı olarak işaretlendi')
       : (language === 'en' ? 'Appointment reopened' : 'Randevu tekrar açıldı'));
-  };
-
-  const handleCallDoctor = () => {
-    triggerHaptic();
-    if (!doctorPhone.trim()) return;
-    const cleanPhone = doctorPhone.replace(/[^0-9+]/g, '');
-    if (!cleanPhone) {
-      Alert.alert(
-        language === 'en' ? 'Invalid Phone' : 'Geçersiz Numara',
-        language === 'en' ? 'Please enter a valid phone number.' : 'Lütfen geçerli bir telefon numarası girin.'
-      );
-      return;
-    }
-    Linking.openURL(`tel:${cleanPhone}`).catch(() => {
-      Alert.alert(
-        language === 'en' ? 'Error' : 'Hata',
-        language === 'en' ? 'Could not launch phone dialer.' : 'Arama başlatılamadı.'
-      );
-    });
   };
 
   const handleShareMedList = async () => {
@@ -2314,9 +2012,13 @@ function MainApp() {
     let text = `📋 ${t.doctorShareSubject}\n`;
     text += `━━━━━━━━━━━━━━━━━━━━\n`;
     if (userName.trim()) text += `👤 ${language === 'en' ? 'Patient' : 'Hasta'}: ${userName.trim()}\n`;
-    if (doctorName.trim()) text += `👨‍⚕️ ${t.doctorNameLabel}: ${doctorName.trim()}\n`;
-    if (doctorSpecialty.trim()) text += `🩺 ${t.doctorSpecialtyLabel}: ${doctorSpecialty.trim()}\n`;
-    if (doctorHospital.trim()) text += `🏥 ${t.doctorHospitalLabel}: ${doctorHospital.trim()}\n`;
+    // The next open appointment stands in for "my doctor" in the shared summary.
+    const nextAppt = appointments
+      .filter(a => !a.completed && a.date >= today)
+      .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))[0];
+    if (nextAppt?.doctorName?.trim()) text += `👨‍⚕️ ${t.doctorNameLabel}: ${nextAppt.doctorName.trim()}\n`;
+    if (nextAppt?.specialty?.trim()) text += `🩺 ${t.doctorSpecialtyLabel}: ${nextAppt.specialty.trim()}\n`;
+    if (nextAppt?.hospital?.trim()) text += `🏥 ${t.doctorHospitalLabel}: ${nextAppt.hospital.trim()}\n`;
     text += `📅 ${language === 'en' ? 'Date' : 'Tarih'}: ${dateStr}\n\n`;
 
     text += `💊 ${t.doctorShareActiveMeds} (${activeMeds.length}):\n`;
@@ -2334,15 +2036,13 @@ function MainApp() {
       });
     }
 
-    if (doctorNextAppointment) {
-      const timePart = doctorAppointmentTime ? ` (${doctorAppointmentTime})` : '';
-      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${formatLocalizedDate(doctorNextAppointment, language)}${timePart}\n`;
-    }
-    if (doctorBloodTestDate) {
-      text += `🧪 ${t.doctorBloodTestLabel}: ${formatLocalizedDate(doctorBloodTestDate, language)}\n`;
-    }
-    if (doctorNotes.trim()) {
-      text += `\n📝 ${t.doctorNotesSection}:\n${doctorNotes.trim()}\n`;
+    if (nextAppt) {
+      const timePart = nextAppt.time ? ` (${nextAppt.time})` : '';
+      text += `\n🗓️ ${t.doctorAppointmentLabel}: ${formatLocalizedDate(nextAppt.date, language)}${timePart}\n`;
+      if (nextAppt.hasBloodTest && nextAppt.bloodTestDate) {
+        text += `🧪 ${t.doctorBloodTestLabel}: ${formatLocalizedDate(nextAppt.bloodTestDate, language)}\n`;
+      }
+      if (nextAppt.notes?.trim()) text += `\n📝 ${t.doctorNotesSection}:\n${nextAppt.notes.trim()}\n`;
     }
 
     try {
@@ -2475,28 +2175,17 @@ function MainApp() {
         {
           text: language === 'en' ? 'Reset' : 'Sıfırla',
           style: 'destructive',
-          onPress: () => {
-            AsyncStorage.clear().catch(() => {});
+          onPress: async () => {
+            // Clear first so the persistence effects write the defaults into an empty store.
+            try {
+              await AsyncStorage.clear();
+            } catch (error) {
+              logger.error('Settings', 'Veriler sıfırlanırken depolama temizlenemedi', error);
+            }
             setDoses([]);
-            setPrivateMode(true);
-            setNotifications(true);
-            setSoundEnabled(true);
-            setSoundType('default');
-            setUserName('');
-            setDoctorName('');
-            setDoctorSpecialty('');
-            setDoctorHospital('');
-            setDoctorPhone('');
-            setDoctorNextAppointment('');
-            setDoctorNotes('');
-            setSnoozeMinutes(15);
-            setLeadTimeMinutes(0);
-            setDefaultStockThreshold(5);
-            setStockAlertsEnabled(true);
-            setHideDoseAmount(false);
-            setAutoCollapseTaken(false);
-            setShowAppointmentCard(true);
-            setHapticsEnabled(true);
+            setLearnedMeds({});
+            // Appointments are part of the settings object, so their reminders stop as well.
+            applyStoredSettings(DEFAULT_STORED_SETTINGS);
             showToast(t.toastResetSuccess);
           },
         },
@@ -2572,11 +2261,6 @@ function MainApp() {
                 setTab('Ayarlar');
                 setSettingsSubPage('profile');
               }}
-              doctorNextAppointment={doctorNextAppointment}
-              doctorAppointmentTime={doctorAppointmentTime}
-              doctorName={doctorName}
-              doctorHospital={doctorHospital}
-              doctorSpecialty={doctorSpecialty}
               appointments={appointments}
               onOpenAppointmentEditor={handleOpenAppointmentEditor}
               showAppointmentCard={showAppointmentCard}
@@ -2704,8 +2388,8 @@ function MainApp() {
                         <Text style={styles.menuItemTitle}>{t.settingsProfile}</Text>
                         <Text style={styles.menuItemSub}>
                           {userName
-                            ? (doctorName ? `${userName} • ${doctorName}` : (language === 'en' ? `Name: ${userName}` : `Hitap: ${userName}`))
-                            : (doctorName ? doctorName : t.settingsProfileDesc)}
+                            ? (language === 'en' ? `Name: ${userName}` : `Hitap: ${userName}`)
+                            : t.settingsProfileDesc}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="#4e6173" />
@@ -2942,57 +2626,6 @@ function MainApp() {
 
               {/* SUB PAGE 1: KULLANICI & HEKİM PROFİLİ */}
               {settingsSubPage === 'profile' && (() => {
-                const appointmentDiff = doctorNextAppointment ? getCalendarDayDiff(today, doctorNextAppointment) : null;
-                let badgeText = '';
-                let badgeTextColor = '#34d399';
-                let badgeBg = 'rgba(52, 211, 153, 0.15)';
-                const timeSuffix = doctorAppointmentTime ? ` • ⏰ ${doctorAppointmentTime}` : '';
-
-                if (appointmentDiff !== null) {
-                  if (appointmentDiff === 0) {
-                    badgeText = `${t.doctorAppointmentToday}${timeSuffix}`;
-                    badgeTextColor = '#fbbf24';
-                    badgeBg = 'rgba(251, 191, 36, 0.2)';
-                  } else if (appointmentDiff === 1) {
-                    badgeText = `${t.doctorAppointmentTomorrow} (${formatLocalizedDate(doctorNextAppointment, language)})${timeSuffix}`;
-                    badgeTextColor = '#34d399';
-                    badgeBg = 'rgba(52, 211, 153, 0.18)';
-                  } else if (appointmentDiff > 1) {
-                    badgeText = `${appointmentDiff} ${t.doctorAppointmentDaysLeft} (${formatLocalizedDate(doctorNextAppointment, language)})${timeSuffix}`;
-                    badgeTextColor = '#38bdf8';
-                    badgeBg = 'rgba(56, 189, 248, 0.18)';
-                  } else {
-                    badgeText = `${Math.abs(appointmentDiff)} ${t.doctorAppointmentDaysAgo} (${formatLocalizedDate(doctorNextAppointment, language)})${timeSuffix}`;
-                    badgeTextColor = '#94a3b8';
-                    badgeBg = 'rgba(148, 163, 184, 0.15)';
-                  }
-                }
-
-                const bloodTestDiff = doctorBloodTestDate ? getCalendarDayDiff(today, doctorBloodTestDate) : null;
-                let bloodBadgeText = '';
-                let bloodBadgeTextColor = '#a78bfa';
-                let bloodBadgeBg = 'rgba(167, 139, 250, 0.18)';
-
-                if (bloodTestDiff !== null) {
-                  if (bloodTestDiff === 0) {
-                    bloodBadgeText = t.doctorBloodTestToday;
-                    bloodBadgeTextColor = '#fbbf24';
-                    bloodBadgeBg = 'rgba(251, 191, 36, 0.2)';
-                  } else if (bloodTestDiff === 1) {
-                    bloodBadgeText = `${t.doctorBloodTestTomorrow} (${formatLocalizedDate(doctorBloodTestDate, language)})`;
-                    bloodBadgeTextColor = '#a78bfa';
-                    bloodBadgeBg = 'rgba(167, 139, 250, 0.2)';
-                  } else if (bloodTestDiff > 1) {
-                    bloodBadgeText = `${bloodTestDiff} ${t.doctorBloodTestDaysLeft} (${formatLocalizedDate(doctorBloodTestDate, language)})`;
-                    bloodBadgeTextColor = '#38bdf8';
-                    bloodBadgeBg = 'rgba(56, 189, 248, 0.18)';
-                  } else {
-                    bloodBadgeText = `${Math.abs(bloodTestDiff)} ${t.doctorBloodTestDaysAgo} (${formatLocalizedDate(doctorBloodTestDate, language)})`;
-                    bloodBadgeTextColor = '#94a3b8';
-                    bloodBadgeBg = 'rgba(148, 163, 184, 0.15)';
-                  }
-                }
-
                 return (
                   <>
                     {/* KULLANICI BİLGİSİ */}
@@ -3023,87 +2656,6 @@ function MainApp() {
                           </TouchableOpacity>
                         )}
                       </View>
-                    </View>
-
-                    {/* TAKİP EDEN HEKİM & KLİNİK */}
-                    <View style={styles.settingGroupHeader}>
-                      <Ionicons name="medkit-outline" size={16} color="#a9dfca" />
-                      <Text style={styles.settingGroupTitle}>{t.profileDoctorSection}</Text>
-                    </View>
-                    <View style={styles.settingCard}>
-                      {/* Doktor Adı */}
-                      <Text style={styles.profileFieldLabel}>{t.doctorNameLabel}</Text>
-                      <View style={styles.profileInputRow}>
-                        <Ionicons name="person-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={styles.profileInput}
-                          value={doctorName}
-                          onChangeText={setDoctorName}
-                          placeholder={t.doctorNamePlaceholder}
-                          placeholderTextColor="#5c6e80"
-                          maxLength={60}
-                          onBlur={() => syncProfileSettings()}
-                        />
-                      </View>
-
-                      {/* Branş / Uzmanlık */}
-                      <Text style={styles.profileFieldLabel}>{t.doctorSpecialtyLabel}</Text>
-                      <View style={styles.profileInputRow}>
-                        <Ionicons name="fitness-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={styles.profileInput}
-                          value={doctorSpecialty}
-                          onChangeText={setDoctorSpecialty}
-                          placeholder={t.doctorSpecialtyPlaceholder}
-                          placeholderTextColor="#5c6e80"
-                          maxLength={60}
-                          onBlur={() => syncProfileSettings()}
-                        />
-                      </View>
-
-                      {/* Hastane / Klinik */}
-                      <Text style={styles.profileFieldLabel}>{t.doctorHospitalLabel}</Text>
-                      <View style={styles.profileInputRow}>
-                        <Ionicons name="business-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={styles.profileInput}
-                          value={doctorHospital}
-                          onChangeText={setDoctorHospital}
-                          placeholder={t.doctorHospitalPlaceholder}
-                          placeholderTextColor="#5c6e80"
-                          maxLength={80}
-                          onBlur={() => syncProfileSettings()}
-                        />
-                      </View>
-
-                      {/* Telefon & Ara Butonu */}
-                      <Text style={styles.profileFieldLabel}>{t.doctorPhoneLabel}</Text>
-                      <View style={styles.profileInputRow}>
-                        <Ionicons name="call-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={styles.profileInput}
-                          value={doctorPhone}
-                          onChangeText={setDoctorPhone}
-                          placeholder={t.doctorPhonePlaceholder}
-                          placeholderTextColor="#5c6e80"
-                          keyboardType="phone-pad"
-                          maxLength={25}
-                          onBlur={() => syncProfileSettings()}
-                        />
-                      </View>
-
-                      {doctorPhone.trim().length > 0 && (
-                        <TouchableOpacity
-                          style={styles.doctorCallBtn}
-                          onPress={handleCallDoctor}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="call" size={16} color="#081624" />
-                          <Text style={styles.doctorCallBtnText}>
-                            {language === 'en' ? `Call ${doctorName ? doctorName : 'Doctor'}` : `${doctorName ? doctorName : 'Doktor'}'u Ara`}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
 
                     {/* RANDEVULAR VE DOKTOR TAKİBİ */}
@@ -3349,28 +2901,7 @@ function MainApp() {
                       })
                     )}
 
-                    {/* DOKTOR NOTLARI & TALİMATLAR */}
-                    <View style={styles.settingGroupHeader}>
-                      <Ionicons name="document-text-outline" size={16} color="#a9dfca" />
-                      <Text style={styles.settingGroupTitle}>{t.doctorNotesSection}</Text>
-                    </View>
-                    <View style={styles.settingCard}>
-                      <View style={[styles.profileInputRow, { height: 'auto', minHeight: 90, alignItems: 'flex-start', paddingVertical: 10 }]}>
-                        <Ionicons name="reader-outline" size={16} color="#a9dfca" style={{ marginRight: 8, marginTop: 4 }} />
-                        <TextInput
-                          style={[styles.profileInput, { textAlignVertical: 'top', minHeight: 80 }]}
-                          value={doctorNotes}
-                          onChangeText={setDoctorNotes}
-                          placeholder={t.doctorNotesPlaceholder}
-                          placeholderTextColor="#5c6e80"
-                          multiline
-                          numberOfLines={4}
-                          onBlur={() => syncProfileSettings()}
-                        />
-                      </View>
-                    </View>
-
-                    {/* EYLEMLER: PAYLAŞ & KAYDET */}
+                    {/* İLAÇ LİSTESİNİ PAYLAŞ */}
                     <View style={{ marginBottom: 30, gap: 10 }}>
                       <TouchableOpacity
                         style={[styles.profileActionBtn, styles.profileShareBtn]}
@@ -3381,20 +2912,6 @@ function MainApp() {
                         <Text style={styles.profileShareBtnText}>{t.doctorShareMedList}</Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={[styles.profileActionBtn, styles.profileSaveBtn]}
-                        onPress={() => {
-                          triggerHaptic();
-                          showToast(t.profileSavedToast);
-                          syncProfileSettings();
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="checkmark-circle-outline" size={18} color="#34d399" />
-                        <Text style={styles.profileSaveBtnText}>
-                          {language === 'en' ? 'Save Profile Details' : 'Bilgileri Kaydet'}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </>
                 );
@@ -3530,7 +3047,8 @@ function MainApp() {
                         </View>
 
                         <View style={styles.soundOptionsList}>
-                          {SOUND_PROFILE_OPTIONS.map(opt => {
+                          {/* Three everyday choices; an older pick (gentle, chime, device) stays listed while selected. */}
+                          {SOUND_PROFILE_OPTIONS.filter(opt => PRIMARY_SOUND_TYPES.includes(opt.id) || opt.id === soundType).map(opt => {
                             const isSelected = soundType === opt.id;
                             const soundInfo = getSoundProfileInfo(opt.id);
                             return (
@@ -5235,276 +4753,309 @@ function MainApp() {
                 })}
               </View>
 
-              {/* Schedule & Cycle */}
-              <Text style={styles.inputLabel}>
-                {language === 'en' ? 'Schedule & Regimen' : 'Kullanım Düzeni & Döngü'}
-              </Text>
-              <View style={styles.selectorGrid}>
-                {[
-                  { id: 'everyday' as const, label: t.freqEveryday },
-                  { id: 'alternate' as const, label: t.freqAlternate },
-                  { id: 'cycle' as const, label: t.freqCycle },
-                  { id: 'variable' as const, label: t.freqVariable },
-                ].map(opt => (
-                  <TouchableOpacity key={opt.id} style={[styles.selectorBtn, frequencyType === opt.id && styles.selectorBtnActive]} onPress={() => setFrequencyType(opt.id)}>
-                    <Text style={[styles.selectorBtnText, frequencyType === opt.id && styles.selectorBtnTextActive]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Cycle config */}
-              {frequencyType === 'cycle' && (
-                <View style={styles.cycleBox}>
-                  <Text style={styles.cycleBoxTitle}>
-                    {language === 'en' ? 'Take & Break Cycle' : 'Alım & Ara Verme Döngüsü'}
-                  </Text>
-                  <View style={styles.presetRow}>
-                    <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(3, amount, 4, language === 'en' ? '0 (Break)' : '0 (Ara)', 'cycle')}>
-                      <Text style={styles.presetBtnText}>
-                        {language === 'en' ? '3 days on / 4 days off' : '3 gün al / 4 gün ara'}
+              {/* Most medicines are daily and ongoing; the rest of the plan stays folded unless it is in use. */}
+              {(() => {
+                const advancedInUse = frequencyType !== 'everyday' || durationMode !== 'continuous' || muted;
+                const advancedOpen = showAdvancedOptions || advancedInUse;
+                return (
+                  <>
+                    <TouchableOpacity
+                      style={styles.advancedToggle}
+                      onPress={() => { triggerHaptic(); setShowAdvancedOptions(open => !open); }}
+                      disabled={advancedInUse}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: advancedOpen }}
+                      accessibilityLabel={language === 'en' ? 'More options' : 'Diğer seçenekler'}
+                    >
+                      <Text style={styles.advancedToggleText}>
+                        {language === 'en' ? 'More options' : 'Diğer seçenekler'}
                       </Text>
+                      <Text style={styles.advancedToggleHint} numberOfLines={2}>
+                        {language === 'en'
+                          ? 'Every other day, cycles, treatment length, start date, mute'
+                          : 'Gün aşırı, döngü, tedavi süresi, başlangıç tarihi, sessize alma'}
+                      </Text>
+                      {!advancedInUse && (
+                        <Ionicons name={advancedOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#a9dfca" style={styles.advancedToggleIcon} />
+                      )}
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(5, amount, 2, language === 'en' ? '0 (Break)' : '0 (Ara)', 'cycle')}>
-                      <Text style={styles.presetBtnText}>
-                        {language === 'en' ? '5 days on / 2 days off' : '5 gün al / 2 gün ara'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.twoColRow}>
-                    <View style={styles.col}>
-                      <Text style={styles.timeInputLabel}>
-                        {language === 'en' ? 'Dose Days' : 'Alım Gün Sayısı'}
-                      </Text>
-                      <TextInput
-                        style={styles.textInput}
-                        value={cyclePhase1Days}
-                        onChangeText={v => setCyclePhase1Days(v.replace(/[^0-9]/g, ''))}
-                        placeholder="1"
-                        placeholderTextColor="#667"
-                        keyboardType="numeric"
-                      />
-                    </View>
-                    <View style={styles.col}>
-                      <Text style={styles.timeInputLabel}>
-                        {language === 'en' ? 'Break Days' : 'Ara Gün Sayısı'}
-                      </Text>
-                      <TextInput
-                        style={styles.textInput}
-                        value={cyclePhase2Days}
-                        onChangeText={v => setCyclePhase2Days(v.replace(/[^0-9]/g, ''))}
-                        placeholder="1"
-                        placeholderTextColor="#667"
-                        keyboardType="numeric"
-                      />
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Variable cycle config */}
-              {frequencyType === 'variable' && (
-                <View style={styles.cycleBox}>
-                  <Text style={styles.cycleBoxTitle}>
-                    {language === 'en' ? 'Variable / Stepped Dose Cycle' : 'Değişken / Kademeli Doz Döngüsü'}
-                  </Text>
-                  <View style={styles.presetRow}>
-                    <TouchableOpacity style={[styles.presetBtn, styles.presetBtnHighlight]} onPress={() => applyCyclePreset(4, '1.5 tablet', 3, '1 tablet', 'variable')}>
-                      <Text style={styles.presetBtnHighlightText}>
-                        {language === 'en' ? '⭐ 4 days 1.5 dose / 3 days 1 dose' : '⭐ 4 gün 1.5 doz / 3 gün 1 doz'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.phaseCard}>
-                    <Text style={styles.phaseCardBadge}>
-                      {language === 'en' ? 'PHASE 1' : '1. AŞAMA'}
+                    {advancedOpen && (
+                      <>
+                    {/* Schedule & Cycle */}
+                    <Text style={styles.inputLabel}>
+                      {language === 'en' ? 'Schedule & Regimen' : 'Kullanım Düzeni & Döngü'}
                     </Text>
-                    <View style={styles.twoColRow}>
-                      <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>
-                          {language === 'en' ? 'Days' : 'Gün Sayısı'}
+                    <View style={styles.selectorGrid}>
+                      {[
+                        { id: 'everyday' as const, label: t.freqEveryday },
+                        { id: 'alternate' as const, label: t.freqAlternate },
+                        { id: 'cycle' as const, label: t.freqCycle },
+                        { id: 'variable' as const, label: t.freqVariable },
+                      ].map(opt => (
+                        <TouchableOpacity key={opt.id} style={[styles.selectorBtn, frequencyType === opt.id && styles.selectorBtnActive]} onPress={() => setFrequencyType(opt.id)}>
+                          <Text style={[styles.selectorBtnText, frequencyType === opt.id && styles.selectorBtnTextActive]}>{opt.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {/* Cycle config */}
+                    {frequencyType === 'cycle' && (
+                      <View style={styles.cycleBox}>
+                        <Text style={styles.cycleBoxTitle}>
+                          {language === 'en' ? 'Take & Break Cycle' : 'Alım & Ara Verme Döngüsü'}
                         </Text>
-                        <TextInput
-                          style={styles.textInput}
-                          value={cyclePhase1Days}
-                          onChangeText={v => setCyclePhase1Days(v.replace(/[^0-9]/g, ''))}
-                          placeholder="1"
-                          placeholderTextColor="#667"
-                          keyboardType="numeric"
-                        />
+                        <View style={styles.presetRow}>
+                          <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(3, amount, 4, language === 'en' ? '0 (Break)' : '0 (Ara)', 'cycle')}>
+                            <Text style={styles.presetBtnText}>
+                              {language === 'en' ? '3 days on / 4 days off' : '3 gün al / 4 gün ara'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.presetBtn} onPress={() => applyCyclePreset(5, amount, 2, language === 'en' ? '0 (Break)' : '0 (Ara)', 'cycle')}>
+                            <Text style={styles.presetBtnText}>
+                              {language === 'en' ? '5 days on / 2 days off' : '5 gün al / 2 gün ara'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.twoColRow}>
+                          <View style={styles.col}>
+                            <Text style={styles.timeInputLabel}>
+                              {language === 'en' ? 'Dose Days' : 'Alım Gün Sayısı'}
+                            </Text>
+                            <TextInput
+                              style={styles.textInput}
+                              value={cyclePhase1Days}
+                              onChangeText={v => setCyclePhase1Days(v.replace(/[^0-9]/g, ''))}
+                              placeholder="1"
+                              placeholderTextColor="#667"
+                              keyboardType="numeric"
+                            />
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={styles.timeInputLabel}>
+                              {language === 'en' ? 'Break Days' : 'Ara Gün Sayısı'}
+                            </Text>
+                            <TextInput
+                              style={styles.textInput}
+                              value={cyclePhase2Days}
+                              onChangeText={v => setCyclePhase2Days(v.replace(/[^0-9]/g, ''))}
+                              placeholder="1"
+                              placeholderTextColor="#667"
+                              keyboardType="numeric"
+                            />
+                          </View>
+                        </View>
                       </View>
-                      <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>{t.doseAmount}</Text>
-                        <TextInput style={styles.textInput} value={cyclePhase1Amount} onChangeText={setCyclePhase1Amount} />
-                      </View>
-                    </View>
-                  </View>
-                  <View style={styles.phaseCard}>
-                    <Text style={styles.phaseCardBadge}>
-                      {language === 'en' ? 'PHASE 2' : '2. AŞAMA'}
-                    </Text>
-                    <View style={styles.twoColRow}>
-                      <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>
-                          {language === 'en' ? 'Days' : 'Gün Sayısı'}
+                    )}
+
+                    {/* Variable cycle config */}
+                    {frequencyType === 'variable' && (
+                      <View style={styles.cycleBox}>
+                        <Text style={styles.cycleBoxTitle}>
+                          {language === 'en' ? 'Variable / Stepped Dose Cycle' : 'Değişken / Kademeli Doz Döngüsü'}
                         </Text>
-                        <TextInput
-                          style={styles.textInput}
-                          value={cyclePhase2Days}
-                          onChangeText={v => setCyclePhase2Days(v.replace(/[^0-9]/g, ''))}
-                          placeholder="1"
-                          placeholderTextColor="#667"
-                          keyboardType="numeric"
-                        />
+                        <View style={styles.presetRow}>
+                          <TouchableOpacity style={[styles.presetBtn, styles.presetBtnHighlight]} onPress={() => applyCyclePreset(4, '1.5 tablet', 3, '1 tablet', 'variable')}>
+                            <Text style={styles.presetBtnHighlightText}>
+                              {language === 'en' ? '⭐ 4 days 1.5 dose / 3 days 1 dose' : '⭐ 4 gün 1.5 doz / 3 gün 1 doz'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.phaseCard}>
+                          <Text style={styles.phaseCardBadge}>
+                            {language === 'en' ? 'PHASE 1' : '1. AŞAMA'}
+                          </Text>
+                          <View style={styles.twoColRow}>
+                            <View style={styles.col}>
+                              <Text style={styles.timeInputLabel}>
+                                {language === 'en' ? 'Days' : 'Gün Sayısı'}
+                              </Text>
+                              <TextInput
+                                style={styles.textInput}
+                                value={cyclePhase1Days}
+                                onChangeText={v => setCyclePhase1Days(v.replace(/[^0-9]/g, ''))}
+                                placeholder="1"
+                                placeholderTextColor="#667"
+                                keyboardType="numeric"
+                              />
+                            </View>
+                            <View style={styles.col}>
+                              <Text style={styles.timeInputLabel}>{t.doseAmount}</Text>
+                              <TextInput style={styles.textInput} value={cyclePhase1Amount} onChangeText={setCyclePhase1Amount} />
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.phaseCard}>
+                          <Text style={styles.phaseCardBadge}>
+                            {language === 'en' ? 'PHASE 2' : '2. AŞAMA'}
+                          </Text>
+                          <View style={styles.twoColRow}>
+                            <View style={styles.col}>
+                              <Text style={styles.timeInputLabel}>
+                                {language === 'en' ? 'Days' : 'Gün Sayısı'}
+                              </Text>
+                              <TextInput
+                                style={styles.textInput}
+                                value={cyclePhase2Days}
+                                onChangeText={v => setCyclePhase2Days(v.replace(/[^0-9]/g, ''))}
+                                placeholder="1"
+                                placeholderTextColor="#667"
+                                keyboardType="numeric"
+                              />
+                            </View>
+                            <View style={styles.col}>
+                              <Text style={styles.timeInputLabel}>{t.doseAmount}</Text>
+                              <TextInput style={styles.textInput} value={cyclePhase2Amount} onChangeText={setCyclePhase2Amount} />
+                            </View>
+                          </View>
+                        </View>
                       </View>
-                      <View style={styles.col}>
-                        <Text style={styles.timeInputLabel}>{t.doseAmount}</Text>
-                        <TextInput style={styles.textInput} value={cyclePhase2Amount} onChangeText={setCyclePhase2Amount} />
+                    )}
+
+                    {/* Cycle Start Date Picker */}
+                    {frequencyType !== 'everyday' && (
+                      <View style={styles.datePickerCard}>
+                        <View style={styles.datePickerInfo}>
+                          <Text style={styles.datePickerLabel}>
+                            {language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi'}
+                          </Text>
+                          <Text style={styles.datePickerHint}>
+                            {language === 'en' ? 'Reference start date for day 1 of the cycle' : 'Döngünün 1. gününün referans başlangıç tarihi'}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.datePickerBtn}
+                          onPress={() => openCalendarPicker('cycleStartDate', language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi')}
+                        >
+                          <Ionicons name="calendar-outline" size={18} color="#34d399" />
+                          <Text style={styles.datePickerBtnText}>{formatLocalizedDate(cycleStartDate, language)}</Text>
+                          <View style={styles.datePickerChangeBadge}>
+                            <Text style={styles.datePickerChangeBadgeText}>
+                              {language === 'en' ? 'Change' : 'Değiştir'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
                       </View>
-                    </View>
-                  </View>
-                </View>
-              )}
+                    )}
 
-              {/* Cycle Start Date Picker */}
-              {frequencyType !== 'everyday' && (
-                <View style={styles.datePickerCard}>
-                  <View style={styles.datePickerInfo}>
-                    <Text style={styles.datePickerLabel}>
-                      {language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi'}
+                    {/* Duration & Treatment Period */}
+                    <Text style={styles.inputLabel}>
+                      {language === 'en' ? 'Treatment / Usage Duration' : 'Tedavi / Kullanım Süresi'}
                     </Text>
-                    <Text style={styles.datePickerHint}>
-                      {language === 'en' ? 'Reference start date for day 1 of the cycle' : 'Döngünün 1. gününün referans başlangıç tarihi'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.datePickerBtn}
-                    onPress={() => openCalendarPicker('cycleStartDate', language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi')}
-                  >
-                    <Ionicons name="calendar-outline" size={18} color="#34d399" />
-                    <Text style={styles.datePickerBtnText}>{formatLocalizedDate(cycleStartDate, language)}</Text>
-                    <View style={styles.datePickerChangeBadge}>
-                      <Text style={styles.datePickerChangeBadgeText}>
-                        {language === 'en' ? 'Change' : 'Değiştir'}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Duration & Treatment Period */}
-              <Text style={styles.inputLabel}>
-                {language === 'en' ? 'Treatment / Usage Duration' : 'Tedavi / Kullanım Süresi'}
-              </Text>
-              <View style={styles.selectorGrid}>
-                <TouchableOpacity
-                  style={[styles.selectorBtn, durationMode === 'continuous' && styles.selectorBtnActive]}
-                  onPress={() => setDurationMode('continuous')}
-                >
-                  <Text style={[styles.selectorBtnText, durationMode === 'continuous' && styles.selectorBtnTextActive]}>
-                    {t.durationContinuous}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.selectorBtn, durationMode === 'days' && styles.selectorBtnActive]}
-                  onPress={() => setDurationMode('days')}
-                >
-                  <Text style={[styles.selectorBtnText, durationMode === 'days' && styles.selectorBtnTextActive]}>
-                    {t.durationDays}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Treatment Start Date Picker */}
-              <View style={styles.datePickerCard}>
-                <View style={styles.datePickerInfo}>
-                  <Text style={styles.datePickerLabel}>
-                    {language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi'}
-                  </Text>
-                  <Text style={styles.datePickerHint}>
-                    {language === 'en' ? 'First day medication starts' : 'İlacın kullanılmaya başlandığı ilk gün'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.datePickerBtn}
-                  onPress={() => openCalendarPicker('startDate', language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi')}
-                >
-                  <Ionicons name="calendar-outline" size={18} color="#34d399" />
-                  <Text style={styles.datePickerBtnText}>{formatLocalizedDate(startDate, language)}</Text>
-                  <View style={styles.datePickerChangeBadge}>
-                    <Text style={styles.datePickerChangeBadgeText}>
-                      {language === 'en' ? 'Change' : 'Değiştir'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {durationMode === 'days' && (
-                <View style={styles.cycleBox}>
-                  <Text style={styles.cycleBoxTitle}>
-                    {language === 'en' ? 'Treatment Duration & End Schedule' : 'Tedavi Süresi & Bitiş Takvimi'}
-                  </Text>
-                  <View style={styles.presetRow}>
-                    {[
-                      { days: '5', label: language === 'en' ? '5 Days' : '5 Gün' },
-                      { days: '7', label: language === 'en' ? '7 Days (Antibiotic)' : '7 Gün (Antibiyotik)' },
-                      { days: '10', label: language === 'en' ? '10 Days' : '10 Gün' },
-                      { days: '14', label: language === 'en' ? '14 Days (2 Weeks)' : '14 Gün (2 Hafta)' },
-                      { days: '30', label: language === 'en' ? '30 Days (1 Box)' : '30 Gün (1 Kutu)' },
-                    ].map(p => (
+                    <View style={styles.selectorGrid}>
                       <TouchableOpacity
-                        key={p.days}
-                        style={[styles.presetBtn, durationDays === p.days && styles.presetBtnHighlight]}
-                        onPress={() => setDurationDays(p.days)}
+                        style={[styles.selectorBtn, durationMode === 'continuous' && styles.selectorBtnActive]}
+                        onPress={() => setDurationMode('continuous')}
                       >
-                        <Text style={[styles.presetBtnText, durationDays === p.days && styles.presetBtnHighlightText]}>
-                          {p.label}
+                        <Text style={[styles.selectorBtnText, durationMode === 'continuous' && styles.selectorBtnTextActive]}>
+                          {t.durationContinuous}
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
+                      <TouchableOpacity
+                        style={[styles.selectorBtn, durationMode === 'days' && styles.selectorBtnActive]}
+                        onPress={() => setDurationMode('days')}
+                      >
+                        <Text style={[styles.selectorBtnText, durationMode === 'days' && styles.selectorBtnTextActive]}>
+                          {t.durationDays}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
 
-                  <View style={{ marginTop: 8 }}>
-                    <Text style={styles.timeInputLabel}>
-                      {language === 'en' ? 'Total Treatment Days' : 'Toplam Tedavi Günü'}
-                    </Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={durationDays}
-                      onChangeText={v => setDurationDays(v.replace(/[^0-9]/g, ''))}
-                      placeholder="7"
-                      placeholderTextColor="#667"
-                      keyboardType="numeric"
-                    />
-                  </View>
+                    {/* Treatment Start Date Picker */}
+                    <View style={styles.datePickerCard}>
+                      <View style={styles.datePickerInfo}>
+                        <Text style={styles.datePickerLabel}>
+                          {language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi'}
+                        </Text>
+                        <Text style={styles.datePickerHint}>
+                          {language === 'en' ? 'First day medication starts' : 'İlacın kullanılmaya başlandığı ilk gün'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.datePickerBtn}
+                        onPress={() => openCalendarPicker('startDate', language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi')}
+                      >
+                        <Ionicons name="calendar-outline" size={18} color="#34d399" />
+                        <Text style={styles.datePickerBtnText}>{formatLocalizedDate(startDate, language)}</Text>
+                        <View style={styles.datePickerChangeBadge}>
+                          <Text style={styles.datePickerChangeBadgeText}>
+                            {language === 'en' ? 'Change' : 'Değiştir'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
 
-                  <View style={styles.durationSummaryBanner}>
-                    <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.durationSummaryBannerText}>
-                      {language === 'en'
-                        ? `Starts on ${formatLocalizedDate(startDate, language)} · Last dose on ${formatLocalizedDate(calculateEndDate(startDate, Number(durationDays) || 7), language)} (${durationDays || 7} days).`
-                        : `${formatLocalizedDate(startDate, language)} tarihinde başlar · ${calculateEndDate(startDate, Number(durationDays) || 7)} tarihinde son doz (${durationDays || 7} gün).`}
-                    </Text>
-                  </View>
-                </View>
-              )}
+                    {durationMode === 'days' && (
+                      <View style={styles.cycleBox}>
+                        <Text style={styles.cycleBoxTitle}>
+                          {language === 'en' ? 'Treatment Duration & End Schedule' : 'Tedavi Süresi & Bitiş Takvimi'}
+                        </Text>
+                        <View style={styles.presetRow}>
+                          {[
+                            { days: '5', label: language === 'en' ? '5 Days' : '5 Gün' },
+                            { days: '7', label: language === 'en' ? '7 Days (Antibiotic)' : '7 Gün (Antibiyotik)' },
+                            { days: '10', label: language === 'en' ? '10 Days' : '10 Gün' },
+                            { days: '14', label: language === 'en' ? '14 Days (2 Weeks)' : '14 Gün (2 Hafta)' },
+                            { days: '30', label: language === 'en' ? '30 Days (1 Box)' : '30 Gün (1 Kutu)' },
+                          ].map(p => (
+                            <TouchableOpacity
+                              key={p.days}
+                              style={[styles.presetBtn, durationDays === p.days && styles.presetBtnHighlight]}
+                              onPress={() => setDurationDays(p.days)}
+                            >
+                              <Text style={[styles.presetBtnText, durationDays === p.days && styles.presetBtnHighlightText]}>
+                                {p.label}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
 
-              {/* Per-medicine mute: no reminders at all for this medicine */}
-              <View style={[styles.settingRow, styles.muteRow]}>
-                <View style={styles.settingRowText}>
-                  <Text style={styles.settingTitle}>{language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}</Text>
-                  <Text style={styles.settingSub}>
-                    {language === 'en'
-                      ? 'No notifications for this medicine. It stays on Today; mark doses yourself.'
-                      : 'Bu ilaç için hiç bildirim gelmez. Bugün ekranında kalır, dozları kendin işaretlersin.'}
-                  </Text>
-                </View>
-                <Switch
-                  value={muted}
-                  onValueChange={val => { triggerHaptic(); setMuted(val); }}
-                  trackColor={{ true: '#a9dfca', false: '#3a4655' }}
-                  accessibilityLabel={language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}
-                />
-              </View>
+                        <View style={{ marginTop: 8 }}>
+                          <Text style={styles.timeInputLabel}>
+                            {language === 'en' ? 'Total Treatment Days' : 'Toplam Tedavi Günü'}
+                          </Text>
+                          <TextInput
+                            style={styles.textInput}
+                            value={durationDays}
+                            onChangeText={v => setDurationDays(v.replace(/[^0-9]/g, ''))}
+                            placeholder="7"
+                            placeholderTextColor="#667"
+                            keyboardType="numeric"
+                          />
+                        </View>
+
+                        <View style={styles.durationSummaryBanner}>
+                          <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
+                          <Text style={styles.durationSummaryBannerText}>
+                            {language === 'en'
+                              ? `Starts on ${formatLocalizedDate(startDate, language)} · Last dose on ${formatLocalizedDate(calculateEndDate(startDate, Number(durationDays) || 7), language)} (${durationDays || 7} days).`
+                              : `${formatLocalizedDate(startDate, language)} tarihinde başlar · ${calculateEndDate(startDate, Number(durationDays) || 7)} tarihinde son doz (${durationDays || 7} gün).`}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Per-medicine mute: no reminders at all for this medicine */}
+                    <View style={[styles.settingRow, styles.muteRow]}>
+                      <View style={styles.settingRowText}>
+                        <Text style={styles.settingTitle}>{language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}</Text>
+                        <Text style={styles.settingSub}>
+                          {language === 'en'
+                            ? 'No notifications for this medicine. It stays on Today; mark doses yourself.'
+                            : 'Bu ilaç için hiç bildirim gelmez. Bugün ekranında kalır, dozları kendin işaretlersin.'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={muted}
+                        onValueChange={val => { triggerHaptic(); setMuted(val); }}
+                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        accessibilityLabel={language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}
+                      />
+                    </View>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Stock & Box */}
               <Text style={styles.inputLabel}>{t.stockTracking}</Text>
@@ -5571,7 +5122,7 @@ function MainApp() {
         {/* Modern Calendar Picker Modal */}
         <CalendarModal
           visible={calendarOpen}
-          selectedDate={calendarTarget === 'startDate' ? startDate : (calendarTarget === 'cycleStartDate' ? cycleStartDate : (doctorNextAppointment || today))}
+          selectedDate={calendarTarget === 'startDate' ? startDate : (calendarTarget === 'cycleStartDate' ? cycleStartDate : today)}
           title={calendarTitle}
           onSelect={handleDateSelected}
           onClose={() => setCalendarOpen(false)}
@@ -5792,6 +5343,19 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   // Long descriptions must wrap instead of sliding under the switch at the row's right edge.
   settingRowText: { flex: 1, paddingRight: 12 },
+  advancedToggle: {
+    marginTop: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingRight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#244763',
+    backgroundColor: '#132433',
+  },
+  advancedToggleText: { color: '#a9dfca', fontSize: 15, fontWeight: '700' },
+  advancedToggleHint: { color: '#8a99a8', fontSize: 12, marginTop: 2 },
+  advancedToggleIcon: { position: 'absolute', right: 14, top: 14 },
   muteRow: { marginTop: 16, backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
   settingTitle: { color: '#f5f3f0', fontSize: 15, fontWeight: '600' },
   settingSub: { color: '#adb3bf', fontSize: 12, marginTop: 2 },

@@ -3,6 +3,19 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Profil, form ve sıfırlama sadeleştirmesi — 26 Eylül 2026 (v1.2.8)
+
+- Profil yalnızca hitap adı, randevu listesi ve "İlaç Listesini Hekimle Paylaş"; eski tek-hekim alanları gizli
+  ama depoda ve yedekte korunuyor. İlaç formunda gelişmiş seçenekler "Diğer seçenekler" altında; bildirim sesi
+  listesi üç seçenek.
+- `medication_mute.robot` sessize alma anahtarına ulaşmak için "Diğer seçenekler"i bir kez açar (ikinci dokunuş
+  bölümü kapattığı için ilk koşuda failed, düzeltmeyle passed).
+- Emulator'da elle: randevulu yedek geri yüklenip "Tüm Verileri ve Ayarları Sıfırla" yapıldı; Bugün "Yaklaşan
+  Randevu Yok" gösterdi, `dumpsys alarm` uygulamaya ait alarm listelemedi, yeniden açılışta da temiz kaldı.
+  Önceden sıfırlama randevuları bırakıyordu.
+- Sonuçlar: settings-layout 9/9, notification-actions 6/6; mute, appointments, medication, persistence, stock,
+  validation, undo, notification 1/1 — **passed**.
+
 ## Sadeleştirme ve uygulama içi şeridin kaldırılması — 26 Eylül 2026 (v1.2.7)
 
 - Uygulama açıkken üstte sabit kalan bildirim şeridi kaldırıldı; Android'in kendi bildirimi gösteriliyor.
