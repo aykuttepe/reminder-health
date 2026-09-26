@@ -95,6 +95,7 @@ export interface Translations {
   medNamePlaceholder: string;
   doseAmount: string;
   doseAmountPlaceholder: string;
+  doseAmountDefault: string;
   medForm: string;
   mealCondition: string;
   timesPerDay: string;
@@ -410,7 +411,8 @@ export const translations: Record<Language, Translations> = {
     medName: 'İlaç Adı',
     medNamePlaceholder: 'Örn. Coraspin',
     doseAmount: 'Doz Miktarı',
-    doseAmountPlaceholder: 'Örn. 1 tablet',
+    doseAmountPlaceholder: 'Örn. 1 adet',
+    doseAmountDefault: '1 adet',
     medForm: 'İlaç Formu',
     mealCondition: 'Açlık / Tokluk Durumu',
     timesPerDay: 'Günlük Doz Saatleri',
@@ -721,7 +723,8 @@ export const translations: Record<Language, Translations> = {
     medName: 'Medication Name',
     medNamePlaceholder: 'E.g. Aspirin',
     doseAmount: 'Dose Amount',
-    doseAmountPlaceholder: 'E.g. 1 tablet',
+    doseAmountPlaceholder: 'E.g. 1 pill',
+    doseAmountDefault: '1 pill',
     medForm: 'Medication Form',
     mealCondition: 'Meal Timing',
     timesPerDay: 'Daily Dose Times',
