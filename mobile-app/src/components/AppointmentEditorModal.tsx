@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppointmentItem } from '../medicationPlan';
 import { formatLocalizedDate, toDateKey } from './CalendarModal';
 import { useResponsive } from '../useResponsive';
+import { TimePickerModal } from './TimePickerModal';
 
 const POPULAR_SPECIALTIES_TR = [
   'Dahiliye',
@@ -48,8 +49,6 @@ const POPULAR_SPECIALTIES_EN = [
   'Dental',
 ];
 
-const TIME_PRESETS = ['08:30', '09:00', '10:30', '11:00', '13:00', '14:30', '15:30', '16:00'];
-const BLOOD_TIME_PRESETS = ['07:30', '08:00', '08:30', '09:00', '09:30', '10:00'];
 
 interface AppointmentEditorModalProps {
   visible: boolean;
@@ -89,6 +88,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
   const [hasBloodTest, setHasBloodTest] = useState(false);
   const [bloodTestDate, setBloodTestDate] = useState('');
   const [bloodTestTime, setBloodTestTime] = useState('08:30');
+  const [timePickerFor, setTimePickerFor] = useState<null | 'appointment' | 'bloodTest'>(null);
   const [bloodTestFasting, setBloodTestFasting] = useState(true);
   const [bloodTestNotes, setBloodTestNotes] = useState('');
 
@@ -364,26 +364,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
 
           {/* Randevu Saati */}
           <View style={styles.fieldSection}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={styles.fieldLabel}>{isEn ? 'Appointment Time' : 'Randevu Saati'}</Text>
-              <View style={styles.timeDisplayBadge}>
-                <Ionicons name="time" size={14} color="#a9dfca" />
-                <Text style={styles.timeDisplayText}>{time || '13:00'}</Text>
-              </View>
-            </View>
-            <View style={styles.timePresetsRow}>
-              {TIME_PRESETS.map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.timePresetChip, time === t && styles.timePresetChipActive]}
-                  onPress={() => setTime(t)}
-                >
-                  <Text style={[styles.timePresetChipText, time === t && styles.timePresetChipTextActive]}>
-                    {t}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={styles.fieldLabel}>{isEn ? 'Appointment Time' : 'Randevu Saati'}</Text>
+            <TouchableOpacity style={styles.timeSelectField} onPress={() => setTimePickerFor('appointment')} activeOpacity={0.8}>
+              <Ionicons name="time-outline" size={20} color="#a9dfca" />
+              <Text style={styles.timeSelectValue}>{time || '13:00'}</Text>
+              <Text style={styles.timeSelectHint}>{isEn ? 'Tap to change' : 'Değiştirmek için dokunun'}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+            </TouchableOpacity>
           </View>
 
           {/* Önceden Hatırlatma Seçenekleri */}
@@ -494,23 +481,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
 
                 {/* Tahlil Saati */}
                 <View style={{ marginTop: 12 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.bloodFieldLabel}>{isEn ? 'Test Time (Morning)' : 'Kan Verme Saati (Sabah)'}</Text>
-                    <Text style={styles.bloodTimeBadgeText}>⏰ {bloodTestTime}</Text>
-                  </View>
-                  <View style={styles.timePresetsRow}>
-                    {BLOOD_TIME_PRESETS.map(bt => (
-                      <TouchableOpacity
-                        key={bt}
-                        style={[styles.bloodTimePresetChip, bloodTestTime === bt && styles.bloodTimePresetChipActive]}
-                        onPress={() => setBloodTestTime(bt)}
-                      >
-                        <Text style={[styles.bloodTimePresetChipText, bloodTestTime === bt && styles.bloodTimePresetChipTextActive]}>
-                          {bt}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  <Text style={styles.bloodFieldLabel}>{isEn ? 'Test Time (Morning)' : 'Kan Verme Saati (Sabah)'}</Text>
+                  <TouchableOpacity style={styles.timeSelectField} onPress={() => setTimePickerFor('bloodTest')} activeOpacity={0.8}>
+                    <Ionicons name="time-outline" size={20} color="#a9dfca" />
+                    <Text style={styles.timeSelectValue}>{bloodTestTime}</Text>
+                    <Text style={styles.timeSelectHint}>{isEn ? 'Tap to change' : 'Değiştirmek için dokunun'}</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                  </TouchableOpacity>
                 </View>
 
                 {/* Aç Karnına Uyarısı Toggle */}
@@ -590,6 +567,22 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <TimePickerModal
+        visible={timePickerFor !== null}
+        value={timePickerFor === 'bloodTest' ? bloodTestTime : time}
+        title={timePickerFor === 'bloodTest'
+          ? (isEn ? 'Test Time' : 'Kan Verme Saati')
+          : (isEn ? 'Appointment Time' : 'Randevu Saati')}
+        confirmLabel={isEn ? 'Done' : 'Tamam'}
+        cancelLabel={isEn ? 'Cancel' : 'Vazgeç'}
+        onConfirm={picked => {
+          if (timePickerFor === 'bloodTest') setBloodTestTime(picked);
+          else setTime(picked);
+          setTimePickerFor(null);
+        }}
+        onClose={() => setTimePickerFor(null)}
+      />
     </Modal>
   );
 };
@@ -751,47 +744,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
-  timeDisplayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(169, 223, 202, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  timeDisplayText: {
-    color: '#a9dfca',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  timePresetsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
-  },
-  timePresetChip: {
-    backgroundColor: '#101d29',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#203244',
-  },
-  timePresetChipActive: {
-    backgroundColor: '#163832',
-    borderColor: '#a9dfca',
-  },
-  timePresetChipText: {
-    color: '#adb3bf',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  timePresetChipTextActive: {
-    color: '#a9dfca',
-    fontWeight: '700',
-  },
   leadChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -923,32 +875,6 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
   },
-  bloodTimeBadgeText: {
-    color: '#c4b5fd',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  bloodTimePresetChip: {
-    backgroundColor: '#0c111e',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.2)',
-  },
-  bloodTimePresetChipActive: {
-    backgroundColor: 'rgba(167, 139, 250, 0.25)',
-    borderColor: '#a78bfa',
-  },
-  bloodTimePresetChipText: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  bloodTimePresetChipTextActive: {
-    color: '#c4b5fd',
-    fontWeight: '700',
-  },
   fastingToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1016,5 +942,29 @@ const styles = StyleSheet.create({
     color: '#081624',
     fontSize: 14,
     fontWeight: '700',
+  },
+  timeSelectField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#28394a',
+    backgroundColor: '#101d29',
+  },
+  timeSelectValue: {
+    color: '#f5f3f0',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  timeSelectHint: {
+    flex: 1,
+    textAlign: 'right',
+    color: '#5c6e80',
+    fontSize: 12,
   },
 });
