@@ -59,8 +59,8 @@ Paket adı: `com.itmarti.reminder` (Play'e ilk yüklemeden sonra değiştirileme
     Bugün, bildirim, İlaçlarım, Geçmiş, Stok, İlaç ekleme.
   - Ekranlar emulator'da örnek verilerle (uydurma ilaç ve hekim adları) alınıp
     `tools/compose.py` ile çerçevelendi; simge `tools/make_icon.py` ile çizildi (Pillow gerekir).
-  - Not: Uygulamanın içindeki başlatıcı ve bildirim simgesi hâlâ Expo'nun varsayılan simgesi; mağaza
-    simgesiyle aynı olması için ayrı bir sürümde değiştirilmeli.
+  - Başlatıcı ve bildirim simgesi de v1.2.10'da bu mağaza simgesiyle aynı Rutin tasarımına güncellendi
+    (`mobile-app/android/app/src/main/res` ve `mobile-app/assets`).
 
 ## 3. Uygulama içeriği (App content)
 
