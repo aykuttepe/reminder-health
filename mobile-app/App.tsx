@@ -1416,7 +1416,7 @@ function MainApp() {
     } else {
       setEditingId(null);
       setName('');
-      setAmount('1 tablet');
+      setAmount(getTranslations(language).doseAmountDefault);
       setTimes(['09:00']);
       setSlotAmounts({});
       setDoseCount(1);
@@ -4623,7 +4623,7 @@ function MainApp() {
                 placeholderTextColor="#667"
               />
 
-              {/* Amount & Quick Chips */}
+              {/* Amount */}
               <Text style={styles.inputLabel}>{t.doseAmount}</Text>
               <TextInput
                 style={styles.textInput}
@@ -4632,13 +4632,6 @@ function MainApp() {
                 placeholder={t.doseAmountPlaceholder}
                 placeholderTextColor="#667"
               />
-              <View style={styles.quickRow}>
-                {['0.5 tablet', '1 tablet', '1.5 tablet', '2 tablet'].map(amt => (
-                  <TouchableOpacity key={amt} style={[styles.quickChip, amount === amt && styles.quickChipActive]} onPress={() => setAmount(amt)}>
-                    <Text style={[styles.quickChipText, amount === amt && styles.quickChipTextActive]}>{amt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
               {/* Form & Meal */}
               <Text style={styles.inputLabel}>{t.medForm}</Text>
@@ -5570,11 +5563,6 @@ const styles = StyleSheet.create({
   modalContent: { padding: 16, paddingBottom: 60 },
   inputLabel: { color: '#adb3bf', fontSize: 13, fontWeight: '600', marginTop: 14, marginBottom: 6 },
   textInput: { backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', borderRadius: 8, padding: 12, color: '#f5f3f0', fontSize: 15 },
-  quickRow: { flexDirection: 'row', gap: 6, marginTop: 6 },
-  quickChip: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, backgroundColor: '#101d29', borderWidth: 1, borderColor: '#28394a' },
-  quickChipActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
-  quickChipText: { color: '#adb3bf', fontSize: 11 },
-  quickChipTextActive: { color: '#a9dfca', fontWeight: '600' },
   selectorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   selectorBtn: { flex: 1, minWidth: '45%', backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   selectorBtnActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
