@@ -3,7 +3,7 @@
     "name": "Rutin",
     "slug": "reminder-health",
     "scheme": "reminderhealth",
-    "version": "1.2.10",
+    "version": "1.2.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -27,7 +27,7 @@
         "WAKE_LOCK",
         "CAMERA"
       ],
-      "versionCode": 43
+      "versionCode": 44
     },
     "web": {
       "favicon": "./assets/favicon.png"
