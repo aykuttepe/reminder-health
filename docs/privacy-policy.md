@@ -47,7 +47,7 @@ Bu politika değişirse güncel hali bu sayfada yayınlanır ve üstteki tarih g
 
 ## İletişim
 
-Sorularınız için: [İLETİŞİM E-POSTASI]
+Sorularınız için: tepe.aykut05@gmail.com
 
 ---
 
@@ -66,4 +66,4 @@ Last updated: 26 September 2026
 - Notifications, exact alarms, boot completed and vibration are used only to deliver reminders on time.
 - Rutin is intended for adults and is not directed at children under 13.
 
-Contact: [İLETİŞİM E-POSTASI]
+Contact: tepe.aykut05@gmail.com
