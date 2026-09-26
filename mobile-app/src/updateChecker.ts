@@ -4,7 +4,7 @@
  * yeni sürüm kontrolü ve APK indirme bağlantısı sağlar.
  */
 
-export const CURRENT_APP_VERSION = '1.2.10';
+export const CURRENT_APP_VERSION = '1.2.11';
 export const DEFAULT_GITHUB_REPO = 'aykuttepe/reminder-health';
 
 export interface UpdateCheckResult {
