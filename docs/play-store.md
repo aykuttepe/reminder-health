@@ -52,8 +52,15 @@ Paket adı: `com.itmarti.reminder` (Play'e ilk yüklemeden sonra değiştirileme
 - **Gizlilik politikası URL'si:**
   `https://github.com/aykuttepe/reminder-health/blob/main/docs/privacy-policy.md`
   (Yayından önce dosyadaki `[İLETİŞİM E-POSTASI]` yer tutucusunu doldur.)
-- **Görseller (henüz hazırlanmadı):** 512×512 simge, 1024×500 öne çıkan görsel, en az 2 telefon ekran
-  görüntüsü (Bugün, İlaçlarım, Geçmiş, bildirim önerilir).
+- **Görseller:** `docs/store-assets/`
+  - Uygulama simgesi: `play-icon-512.png` (512×512, saydamlıksız). Kaynak: `icon-source-1024.png`.
+  - Öne çıkan görsel: `feature-graphic-1024x500.png`.
+  - Telefon ekran görüntüleri (1080×1920, sırasıyla yükle): `screenshot-1.png` … `screenshot-6.png` —
+    Bugün, bildirim, İlaçlarım, Geçmiş, Stok, İlaç ekleme.
+  - Ekranlar emulator'da örnek verilerle (uydurma ilaç ve hekim adları) alınıp
+    `tools/compose.py` ile çerçevelendi; simge `tools/make_icon.py` ile çizildi (Pillow gerekir).
+  - Başlatıcı ve bildirim simgesi de v1.2.10'da bu mağaza simgesiyle aynı Rutin tasarımına güncellendi
+    (`mobile-app/android/app/src/main/res` ve `mobile-app/assets`).
 
 ## 3. Uygulama içeriği (App content)
 
