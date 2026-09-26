@@ -1,5 +1,7 @@
 export type Language = 'tr' | 'en';
 
+export const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
+
 export interface Translations {
   // Tabs
   tabToday: string;
@@ -301,6 +303,18 @@ export interface Translations {
   reliabilityOpened: string;
   reliabilityTestButton: string;
   reliabilityTestToast: string;
+  exactAlarmBannerTitle: string;
+  exactAlarmBannerText: string;
+  storageReadFailed: string;
+  settingsExperienceSection: string;
+  autoCollapseTitle: string;
+  autoCollapseDesc: string;
+  errorBoundaryTitle: string;
+  errorBoundaryText: string;
+  errorBoundaryDetail: string;
+  errorBoundaryNoDetail: string;
+  errorBoundaryRetry: string;
+  errorBoundaryShare: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -601,6 +615,18 @@ export const translations: Record<Language, Translations> = {
     reliabilityOpened: 'Telefon ayarları açıldı',
     reliabilityTestButton: 'Deneme Alarmı Çal (5 sn sonra)',
     reliabilityTestToast: '5 saniye sonra deneme alarmı çalacak. Telefonu kilitleyip deneyebilirsiniz.',
+    exactAlarmBannerTitle: 'Hatırlatmalar gecikebilir',
+    exactAlarmBannerText: 'Tam saatinde gelmeleri için "Alarmlar ve hatırlatıcılar" iznini açın.',
+    storageReadFailed: 'Kayıtlar okunamadı. Uygulamayı yeniden açın.',
+    settingsExperienceSection: 'Uygulama Deneyimi',
+    autoCollapseTitle: 'Alınan Dozları Otomatik Daralt',
+    autoCollapseDesc: 'Bugün sekmesinde alınan ilaçlar katlanmış kalsın',
+    errorBoundaryTitle: 'Beklenmeyen Bir Hata Oluştu',
+    errorBoundaryText: 'Arayüzde geçici bir problem meydana geldi. İlaç kayıtlarınız ve verileriniz cihazınızda güvenle korundu.',
+    errorBoundaryDetail: 'Hata Tanımı:',
+    errorBoundaryNoDetail: 'Detay bulunamadı',
+    errorBoundaryRetry: 'Yeniden Dene',
+    errorBoundaryShare: 'Raporu Paylaş',
   },
 
   en: {
@@ -900,6 +926,18 @@ export const translations: Record<Language, Translations> = {
     reliabilityOpened: 'Phone settings opened',
     reliabilityTestButton: 'Play Test Alarm (in 5 s)',
     reliabilityTestToast: 'A test alarm will ring in 5 seconds. You can lock the phone to try it.',
+    exactAlarmBannerTitle: 'Reminders may be late',
+    exactAlarmBannerText: 'Turn on "Alarms & reminders" so they arrive on time.',
+    storageReadFailed: 'Your records could not be read. Please reopen the app.',
+    settingsExperienceSection: 'App Experience',
+    autoCollapseTitle: 'Collapse Taken Doses',
+    autoCollapseDesc: 'Keep taken medicines folded on the Today tab',
+    errorBoundaryTitle: 'Something Went Wrong',
+    errorBoundaryText: 'The screen hit a temporary problem. Your medicines and records are safe on this device.',
+    errorBoundaryDetail: 'Error details:',
+    errorBoundaryNoDetail: 'No details available',
+    errorBoundaryRetry: 'Try Again',
+    errorBoundaryShare: 'Share Report',
   },
 };
 

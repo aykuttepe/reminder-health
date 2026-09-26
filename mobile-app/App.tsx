@@ -80,6 +80,7 @@ import {
   type SyncDose,
 } from './src/syncManager';
 import { logger, type LogEntry, type LogLevel } from './src/logger';
+import { IS_STORE_BUILD, canScheduleExactAlarms } from './src/distribution';
 import {
   BACKUP_MIME_TYPE,
   MAX_BACKUP_CHARS,
@@ -116,7 +117,7 @@ export type SettingsSubPage =
   | 'sync'
   | 'reset'
   | 'diagnostics';
-import { getTranslations, type Language } from './src/i18n/translations';
+import { getTranslations, STORAGE_KEY_LANGUAGE, type Language } from './src/i18n/translations';
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
@@ -125,27 +126,12 @@ import {
 } from './src/medicationPlan';
 export * from './src/medicationPlan';
 
-const mealLabels: Record<MealCondition, string> = {
-  tok: 'Tok karnına',
-  ac: 'Aç karnına',
-  yemekle: 'Yemekle birlikte',
-  farketmez: 'Fark etmez',
-};
-
-const formLabels: Record<MedicineForm, string> = {
-  tablet: 'Tablet',
-  kapsul: 'Kapsül',
-  damla: 'Damla',
-  surup: 'Şurup',
-};
-
 const initialDoses: Dose[] = [];
 
 const STORAGE_KEY_DOSES = 'rutin_native_doses';
 const STORAGE_KEY_SETTINGS = 'rutin_native_settings';
 const STORAGE_KEY_LEARNED_MEDS = 'rutin_native_learned_meds';
 const STORAGE_KEY_SYNC_CONFIG = 'rutin_native_sync_config';
-const STORAGE_KEY_LANGUAGE = 'reminder_health_language_v1';
 const BACKUP_CACHE_DIR = 'backup-export';
 // Server sync (account, cloud switch, manual/auto sync) is parked until a later update: the app runs
 // in local mode and its sync UI is hidden. The user's stored cloud choice and account link are kept,
@@ -378,6 +364,8 @@ function MainApp() {
   // Set once the launch session check has bound an account or failed; see the notification gate.
   const [accountChecked, setAccountChecked] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  // null until checked; false means Android would deliver reminders late (Play builds need user consent).
+  const [exactAlarmAllowed, setExactAlarmAllowed] = useState<boolean | null>(null);
   const [scheduleInfo, setScheduleInfo] = useState<string | null>(null);
   const [doses, setDoses] = useState<Dose[]>(() => initialDoses.map(d => normalizeDoseDay(d)));
   const pastWeekHistory = Array.from({ length: 7 }, (_, index) => {
@@ -1012,7 +1000,7 @@ function MainApp() {
         setHydrated(true);
       }).catch(error => {
         console.error('Storage hydration failed', error);
-        if (mounted) setScheduleInfo('Kayıtlar okunamadı. Uygulamayı yeniden açın.');
+        if (mounted) setScheduleInfo(getTranslations(language).storageReadFailed);
       });
     return () => { mounted = false; };
   }, []);
@@ -1118,6 +1106,20 @@ function MainApp() {
   }, [hydrated, hasNotificationPermission, appointments, language]);
 
 
+  // Notification buttons and Android channel names follow the app language.
+  useEffect(() => {
+    if (!hydrated) return;
+    void initNotifications(language);
+  }, [hydrated, language]);
+
+  // Re-read exact-alarm access on launch and whenever the user returns from system settings.
+  useEffect(() => {
+    const check = () => { void canScheduleExactAlarms().then(setExactAlarmAllowed); };
+    check();
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') check(); });
+    return () => subscription.remove();
+  }, []);
+
   // Sync device scheduled alarms whenever doses or settings change
   useEffect(() => {
     if (!hydrated || hasNotificationPermission === null) return;
@@ -1132,6 +1134,7 @@ function MainApp() {
       repeatNagEnabled,
       repeatNagCount,
       lang: language,
+      exactAlarms: exactAlarmAllowed !== false,
     }).then(summary => {
       if (summary.incompleteCount > 0) {
         if (current) setScheduleInfo(language === 'en'
@@ -1152,7 +1155,7 @@ function MainApp() {
     });
     return () => { current = false; };
   }, [
-    hydrated, hasNotificationPermission, today, refreshVersion,
+    hydrated, hasNotificationPermission, today, refreshVersion, exactAlarmAllowed,
     doses,
     notifications,
     privateMode,
@@ -2239,6 +2242,22 @@ function MainApp() {
           style={styles.scrollArea}
           contentContainerStyle={[styles.scrollContent, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}
         >
+          {/* Play installs start without exact-alarm access on Android 14+; without it reminders run late. */}
+          {tab === 'Bugün' && exactAlarmAllowed === false && doses.some(d => !d.deletedAt && !d.muted) && (
+            <TouchableOpacity
+              style={styles.exactAlarmBanner}
+              onPress={async () => { triggerHaptic(); await openExactAlarmSettings(); }}
+              accessibilityRole="button"
+              accessibilityLabel={`${t.exactAlarmBannerTitle}. ${t.reliabilityOpenSettings}`}
+            >
+              <Ionicons name="alarm-outline" size={22} color="#f0b484" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.exactAlarmBannerTitle}>{t.exactAlarmBannerTitle}</Text>
+                <Text style={styles.exactAlarmBannerText}>{t.exactAlarmBannerText}</Text>
+              </View>
+              <Text style={styles.exactAlarmBannerAction}>{t.reliabilityOpenSettings}</Text>
+            </TouchableOpacity>
+          )}
           {tab === 'Bugün' && (
             <TodayView
               carouselSlots={carouselSlots}
@@ -2569,21 +2588,28 @@ function MainApp() {
                       </View>
                       <View style={styles.updateTextBox}>
                         <Text style={styles.updateTitle}>Rutin v{CURRENT_APP_VERSION}</Text>
-                        <Text style={styles.updateSub}>{language === 'en' ? 'App version' : 'Uygulama sürümü'}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={[styles.checkUpdateBtn, isCompactText && styles.checkUpdateBtnStacked, checkingUpdate && { opacity: 0.6 }]}
-                        onPress={() => handleCheckUpdate(true)}
-                        disabled={checkingUpdate}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name={checkingUpdate ? 'sync' : 'refresh-outline'} size={14} color="#081624" />
-                        <Text style={styles.checkUpdateBtnText}>
-                          {checkingUpdate
-                            ? (language === 'en' ? 'Checking...' : 'Denetleniyor...')
-                            : (language === 'en' ? 'Check Updates' : 'Güncellemeleri Denetle')}
+                        <Text style={styles.updateSub}>
+                          {IS_STORE_BUILD
+                            ? (language === 'en' ? 'Updates arrive from the store' : 'Güncellemeler mağazadan gelir')
+                            : (language === 'en' ? 'App version' : 'Uygulama sürümü')}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+                      {/* Store builds are updated by the store; checking GitHub there would break store policy. */}
+                      {!IS_STORE_BUILD && (
+                        <TouchableOpacity
+                          style={[styles.checkUpdateBtn, isCompactText && styles.checkUpdateBtnStacked, checkingUpdate && { opacity: 0.6 }]}
+                          onPress={() => handleCheckUpdate(true)}
+                          disabled={checkingUpdate}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name={checkingUpdate ? 'sync' : 'refresh-outline'} size={14} color="#081624" />
+                          <Text style={styles.checkUpdateBtnText}>
+                            {checkingUpdate
+                              ? (language === 'en' ? 'Checking...' : 'Denetleniyor...')
+                              : (language === 'en' ? 'Check Updates' : 'Güncellemeleri Denetle')}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                     {updateInfo?.updateAvailable && (
@@ -3037,7 +3063,7 @@ function MainApp() {
                             style={styles.testSoundHeaderBtn}
                             onPress={() => {
                               triggerHaptic();
-                              playTestSound(soundType, soundEnabled);
+                              playTestSound(soundType, soundEnabled, language);
                               showToast(language === 'en' ? '🔊 Playing sound preview...' : '🔊 Bildirim sesi önizlemesi çalınıyor...');
                             }}
                           >
@@ -3058,7 +3084,7 @@ function MainApp() {
                                 onPress={() => {
                                   triggerHaptic();
                                   setSoundType(opt.id);
-                                  playTestSound(opt.id, true);
+                                  playTestSound(opt.id, true, language);
                                   showToast(`🎵 ${soundInfo.title} ${language === 'en' ? 'selected' : 'seçildi'}`);
                                 }}
                               >
@@ -3268,7 +3294,7 @@ function MainApp() {
                       <>
                         <Text style={[styles.settingSub, { marginBottom: 12 }]}>{t.reliabilityIntro}</Text>
                         {[
-                          { icon: 'battery-charging' as const, title: t.reliabilityBatteryTitle, desc: t.reliabilityBatteryDesc, open: openBatteryOptimizationSettings },
+                          { icon: 'battery-charging' as const, title: t.reliabilityBatteryTitle, desc: t.reliabilityBatteryDesc, open: () => openBatteryOptimizationSettings(!IS_STORE_BUILD) },
                           { icon: 'alarm' as const, title: t.reliabilityExactTitle, desc: t.reliabilityExactDesc, open: openExactAlarmSettings },
                           { icon: 'hardware-chip-outline' as const, title: t.reliabilityVendorTitle, desc: t.reliabilityVendorDesc, open: () => openChannelNotificationSettings() },
                         ].map((item, index) => (
@@ -3305,7 +3331,7 @@ function MainApp() {
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
-                          { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled }
+                          { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled, lang: language }
                         );
                       }}
                     >
@@ -3455,6 +3481,7 @@ function MainApp() {
                           privateMode,
                           hideDoseAmount,
                           isRepeat: false,
+                          lang: language,
                         });
                         return (
                           <View style={styles.notifPreviewContent}>
@@ -3493,7 +3520,7 @@ function MainApp() {
                         scheduleTestNotification(
                           privateMode,
                           doses[0],
-                          { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled }
+                          { soundEnabled, soundType, hideDoseAmount, repeatNagEnabled, lang: language }
                         );
                       }}
                     >
@@ -3509,13 +3536,13 @@ function MainApp() {
                 <>
                   <View style={styles.settingGroupHeader}>
                     <Ionicons name="sparkles-outline" size={16} color="#a9dfca" />
-                    <Text style={styles.settingGroupTitle}>UYGULAMA DENEYİMİ</Text>
+                    <Text style={styles.settingGroupTitle}>{t.settingsExperienceSection.toLocaleUpperCase(language === 'en' ? 'en-US' : 'tr-TR')}</Text>
                   </View>
                   <View style={styles.settingCard}>
                     <View style={styles.settingRow}>
                       <View style={styles.settingRowText}>
-                        <Text style={styles.settingTitle}>Alınan Dozları Otomatik Daralt</Text>
-                        <Text style={styles.settingSub}>Bugün sekmesinde alınan ilaçlar katlanmış kalsın</Text>
+                        <Text style={styles.settingTitle}>{t.autoCollapseTitle}</Text>
+                        <Text style={styles.settingSub}>{t.autoCollapseDesc}</Text>
                       </View>
                       <Switch
                         value={autoCollapseTaken}
@@ -5115,7 +5142,8 @@ function MainApp() {
           onClose={() => setScannerOpen(false)}
           onScanResult={handleScanResult}
           learnedMeds={learnedMeds}
-          serverUrl={serverUrl}
+          // Store builds keep scanned barcodes on the phone (local catalog only).
+          serverUrl={IS_STORE_BUILD ? undefined : serverUrl}
           lang={language}
         />
 
@@ -5343,6 +5371,20 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   // Long descriptions must wrap instead of sliding under the switch at the row's right edge.
   settingRowText: { flex: 1, paddingRight: 12 },
+  exactAlarmBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#59441f',
+    backgroundColor: '#2d2516',
+  },
+  exactAlarmBannerTitle: { color: '#f5f3f0', fontSize: 15, fontWeight: '700' },
+  exactAlarmBannerText: { color: '#d6c7ad', fontSize: 13, marginTop: 2 },
+  exactAlarmBannerAction: { color: '#f0b484', fontSize: 13, fontWeight: '700' },
   advancedToggle: {
     marginTop: 18,
     paddingVertical: 12,

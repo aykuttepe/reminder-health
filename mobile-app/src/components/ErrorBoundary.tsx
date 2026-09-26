@@ -8,7 +8,9 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../logger';
+import { getTranslations, STORAGE_KEY_LANGUAGE, type Language } from '../i18n/translations';
 
 interface Props {
   children: ReactNode;
@@ -18,6 +20,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  language: Language;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -25,14 +28,19 @@ export class ErrorBoundary extends Component<Props, State> {
     hasError: false,
     error: null,
     errorInfo: null,
+    language: 'tr',
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error, errorInfo: null };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     this.setState({ errorInfo });
+    // This screen sits outside the app, so it reads the saved language itself.
+    AsyncStorage.getItem(STORAGE_KEY_LANGUAGE)
+      .then(saved => { if (saved === 'en') this.setState({ language: 'en' }); })
+      .catch(readError => logger.warn('ErrorBoundary', 'Dil ayarı okunamadı', { error: String(readError) }));
     logger.fatal('ErrorBoundary', `Arayüz Çökmesi: ${error.message}`, error, {
       componentStack: errorInfo.componentStack,
     });
@@ -64,32 +72,31 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render(): ReactNode {
     if (this.state.hasError) {
-      const { error } = this.state;
+      const { error, language } = this.state;
+      const t = getTranslations(language);
       return (
         <View style={styles.container}>
           <View style={styles.iconBox}>
             <Ionicons name="warning-outline" size={48} color="#f0b484" />
           </View>
 
-          <Text style={styles.title}>Beklenmeyen Bir Hata Oluştu</Text>
-          <Text style={styles.subtitle}>
-            Arayüzde geçici bir problem meydana geldi. İlaç kayıtlarınız ve verileriniz cihazınızda güvenle korundu.
-          </Text>
+          <Text style={styles.title}>{t.errorBoundaryTitle}</Text>
+          <Text style={styles.subtitle}>{t.errorBoundaryText}</Text>
 
           <ScrollView style={styles.errorBox} contentContainerStyle={styles.errorBoxContent}>
-            <Text style={styles.errorTitle}>Hata Tanımı:</Text>
-            <Text style={styles.errorText}>{error?.message || 'Detay bulunamadı'}</Text>
+            <Text style={styles.errorTitle}>{t.errorBoundaryDetail}</Text>
+            <Text style={styles.errorText}>{error?.message || t.errorBoundaryNoDetail}</Text>
           </ScrollView>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.primaryBtn} onPress={this.handleRestart} activeOpacity={0.8}>
               <Ionicons name="refresh-outline" size={20} color="#081624" />
-              <Text style={styles.primaryBtnText}>Yeniden Dene</Text>
+              <Text style={styles.primaryBtnText}>{t.errorBoundaryRetry}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.secondaryBtn} onPress={this.handleShareReport} activeOpacity={0.8}>
               <Ionicons name="share-outline" size={18} color="#a9dfca" />
-              <Text style={styles.secondaryBtnText}>Raporu Paylaş</Text>
+              <Text style={styles.secondaryBtnText}>{t.errorBoundaryShare}</Text>
             </TouchableOpacity>
           </View>
         </View>

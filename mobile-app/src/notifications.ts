@@ -181,6 +181,20 @@ export const SOUND_CHANNELS: Record<
 
 export const URGENT_REPEAT_CHANNEL_ID = 'medication-channel-urgent-v2';
 
+// Channel names show in Android's notification settings; they follow the app language.
+const CHANNEL_TEXT_EN: Record<NotificationSoundType, { name: string; description: string }> = {
+  default: { name: 'Medication Reminder (Default Sound)', description: 'Alert with the standard notification sound' },
+  alarm: { name: 'Medication Reminder (Alarm Tone)', description: 'Distinct, high-priority alarm tone' },
+  gentle: { name: 'Medication Reminder (Gentle Tone)', description: 'Soft, gentle notification tone' },
+  chime: { name: 'Medication Reminder (Crystal Chime)', description: 'Clear, bright chime' },
+  system_custom: { name: 'Medication Reminder (Device Sound)', description: 'Ringtone or notification sound chosen in Android settings' },
+  silent: { name: 'Medication Reminder (Silent)', description: 'Silent mode, vibration only' },
+};
+
+function channelText(type: NotificationSoundType, lang: 'tr' | 'en'): { name: string; description: string } {
+  return lang === 'en' ? CHANNEL_TEXT_EN[type] : SOUND_CHANNELS[type];
+}
+
 /**
  * Builds rich notification title and multiline body containing
  * medicine name, dosage, meal condition, instructions, and stock status.
@@ -288,7 +302,7 @@ export async function openChannelNotificationSettings(channelId?: string): Promi
  * Opens Android battery optimization exemption prompt/settings so the app
  * is not killed or throttled by Android Doze Mode during sleep.
  */
-export async function openBatteryOptimizationSettings(): Promise<boolean> {
+export async function openBatteryOptimizationSettings(allowDirectRequest = true): Promise<boolean> {
   if (Platform.OS !== 'android') {
     await Linking.openSettings();
     return true;
@@ -296,6 +310,8 @@ export async function openBatteryOptimizationSettings(): Promise<boolean> {
 
   const packageName = 'com.itmarti.reminder';
   try {
+    // The one-tap exemption dialog needs REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, which store builds omit.
+    if (!allowDirectRequest) throw new Error('direct battery exemption request unavailable');
     await Linking.sendIntent('android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS', [
       { key: 'android.provider.extra.APP_PACKAGE', value: packageName },
     ]);
@@ -396,24 +412,27 @@ export function updateNotificationHandler(
   }
 }
 
-export async function initNotifications(): Promise<void> {
+/** Registers action buttons and channels. Called again when the language changes: Android and iOS keep
+ * the ids, and only labels, channel names and descriptions are updated. */
+export async function initNotifications(lang: 'tr' | 'en' = 'tr'): Promise<void> {
+  const isEn = lang === 'en';
   try {
     // 1. Register interactive notification category with Action buttons
     try {
       await Notifications.setNotificationCategoryAsync(NOTIFICATION_CATEGORY_MED_ACTIONS, [
         {
           identifier: ACTION_TAKEN,
-          buttonTitle: '✅ İlaç İçildi',
+          buttonTitle: isEn ? '✅ Taken' : '✅ İlaç İçildi',
           options: { opensAppToForeground: true },
         },
         {
           identifier: ACTION_SNOOZE,
-          buttonTitle: '⏱️ 3 Dk Ertele',
+          buttonTitle: isEn ? '⏱️ Snooze 3 min' : '⏱️ 3 Dk Ertele',
           options: { opensAppToForeground: true },
         },
         {
           identifier: ACTION_SKIP,
-          buttonTitle: '❌ Atla',
+          buttonTitle: isEn ? '❌ Skip' : '❌ Atla',
           options: { opensAppToForeground: true, isDestructive: true },
         },
       ]);
@@ -422,17 +441,17 @@ export async function initNotifications(): Promise<void> {
         // Snoozing schedules a new reminder from JS, so the app has to be started for it.
         {
           identifier: ACTION_APPT_SNOOZE_1H,
-          buttonTitle: '⏱️ 1 Saat Ertele',
+          buttonTitle: isEn ? '⏱️ Snooze 1 hour' : '⏱️ 1 Saat Ertele',
           options: { opensAppToForeground: true },
         },
         {
           identifier: ACTION_APPT_SNOOZE_3H,
-          buttonTitle: '⏱️ 3 Saat Ertele',
+          buttonTitle: isEn ? '⏱️ Snooze 3 hours' : '⏱️ 3 Saat Ertele',
           options: { opensAppToForeground: true },
         },
         {
           identifier: ACTION_APPT_DONE,
-          buttonTitle: '✅ Anlaşıldı',
+          buttonTitle: isEn ? '✅ Got it' : '✅ Anlaşıldı',
           options: { opensAppToForeground: false },
         },
       ]);
@@ -457,8 +476,9 @@ export async function initNotifications(): Promise<void> {
       // 3. Register fresh v2 channels with distinctive sound assets & custom channel
       for (const key of Object.keys(SOUND_CHANNELS) as NotificationSoundType[]) {
         const cfg = SOUND_CHANNELS[key];
+        const text = channelText(key, lang);
         await Notifications.setNotificationChannelAsync(cfg.id, {
-          name: cfg.name,
+          name: text.name,
           importance: cfg.importance,
           vibrationPattern: [0, 500, 250, 500],
           lightColor: '#059669',
@@ -466,7 +486,7 @@ export async function initNotifications(): Promise<void> {
           enableVibrate: true,
           showBadge: true,
           lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-          description: cfg.description,
+          description: text.description,
           audioAttributes: cfg.audioUsage
             ? {
                 usage: cfg.audioUsage,
@@ -482,7 +502,7 @@ export async function initNotifications(): Promise<void> {
 
       // 4. Register dedicated urgent repeating channel (plays via ALARM stream, always loud & vibrating)
       await Notifications.setNotificationChannelAsync(URGENT_REPEAT_CHANNEL_ID, {
-        name: 'İlaç Israrcı Tekrar Uyarısı (Her 3 Dk Ses & Titreşim)',
+        name: isEn ? 'Medication Repeat Alert (Every 3 Min)' : 'İlaç Israrcı Tekrar Uyarısı (Her 3 Dk Ses & Titreşim)',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 800, 350, 800, 350, 800],
         lightColor: '#ef4444',
@@ -490,7 +510,9 @@ export async function initNotifications(): Promise<void> {
         enableVibrate: true,
         showBadge: true,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        description: 'İlaç onaylanana kadar her 3 dakikada bir çalan yüksek sesli ve güçlü titreşimli acil uyarı',
+        description: isEn
+          ? 'Loud alert with strong vibration every 3 minutes until the dose is confirmed'
+          : 'İlaç onaylanana kadar her 3 dakikada bir çalan yüksek sesli ve güçlü titreşimli acil uyarı',
         audioAttributes: {
           usage: Notifications.AndroidAudioUsage.ALARM,
           contentType: Notifications.AndroidAudioContentType.SONIFICATION,
@@ -611,22 +633,27 @@ export function createNotificationResponseGate(handle: (response: NotificationAc
 
 export async function playTestSound(
   soundType: NotificationSoundType,
-  soundEnabled: boolean = true
+  soundEnabled: boolean = true,
+  lang: 'tr' | 'en' = 'tr',
 ): Promise<void> {
   const isSilent = !soundEnabled || soundType === 'silent';
   const channel = SOUND_CHANNELS[isSilent ? 'silent' : soundType];
+  const channelName = channelText(isSilent ? 'silent' : soundType, lang).name;
+  const isEn = lang === 'en';
 
   try {
     Vibration.vibrate([0, 200, 100, 200]);
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: isSilent ? '🔕 Sessiz Hatırlatıcı Testi' : `🔔 Ses Testi: ${channel.name}`,
+        title: isSilent
+          ? (isEn ? '🔕 Silent Reminder Test' : '🔕 Sessiz Hatırlatıcı Testi')
+          : (isEn ? `🔔 Sound Test: ${channelName}` : `🔔 Ses Testi: ${channelName}`),
         body: isSilent
-          ? 'Bildirim sesi sessize ayarlandı, yalnızca titreşim verildi.'
+          ? (isEn ? 'Notification sound is off; vibration only.' : 'Bildirim sesi sessize ayarlandı, yalnızca titreşim verildi.')
           : soundType === 'system_custom'
-          ? 'Cihaz ayarlarından seçtiğiniz melodiyi çalar.'
-          : `${channel.name} sesi test edildi.`,
+          ? (isEn ? 'Plays the sound you chose in device settings.' : 'Cihaz ayarlarından seçtiğiniz melodiyi çalar.')
+          : (isEn ? `${channelName} sound tested.` : `${channelName} sesi test edildi.`),
         sound: isSilent ? undefined : (channel.sound ? channel.sound : 'default'),
         priority: Notifications.AndroidNotificationPriority.MAX,
         vibrate: [0, 200, 100, 200],
@@ -731,6 +758,8 @@ export interface SyncNotificationOptions {
   repeatNagEnabled?: boolean;
   repeatNagCount?: number;
   lang?: 'tr' | 'en';
+  /** False while Android denies exact alarms; alarms set then are late, so they are redone once allowed. */
+  exactAlarms?: boolean;
 }
 
 export type ScheduleSummary = { count: number; incompleteCount: number; refreshAfter: string | null };
@@ -856,14 +885,17 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
         } catch {}
       }
     }
+    // Compare our own signature: native APIs may normalize returned content/trigger values. Alarms set
+    // without exact-alarm access carry a marker, so granting access later re-registers them on time.
+    const planSignature = (content: unknown) =>
+      JSON.stringify(content) + (options.exactAlarms === false ? '|inexact' : '');
     // Count unchanged requests too, including those after a failed scheduling attempt.
     const confirmed = new Set(desired.filter(request =>
       owned.some(item => item.identifier === request.identifier &&
-        item.content.data?.planSignature === JSON.stringify(request.content))
+        item.content.data?.planSignature === planSignature(request.content))
     ).map(request => request.identifier));
     for (const request of desired) {
-      // Compare our own signature: native APIs may normalize returned content/trigger values.
-      const signature = JSON.stringify(request.content);
+      const signature = planSignature(request.content);
       if (confirmed.has(request.identifier)) continue;
       try {
         await Notifications.scheduleNotificationAsync({ ...request,
@@ -885,7 +917,7 @@ export function syncMedicationNotifications(doses: NotificationDose[], options: 
 
 function buildSnoozeRequest(
   dose: NotificationDose, fireAt: number,
-  options: { soundEnabled?: boolean; soundType?: NotificationSoundType; privateMode?: boolean; hideDoseAmount?: boolean } = {},
+  options: { soundEnabled?: boolean; soundType?: NotificationSoundType; privateMode?: boolean; hideDoseAmount?: boolean; lang?: 'tr' | 'en' } = {},
 ): Notifications.NotificationRequestInput {
   const isSilent = options.soundEnabled === false || options.soundType === 'silent';
   const channel = SOUND_CHANNELS[isSilent ? 'silent' : (options.soundType ?? 'default')];
@@ -893,7 +925,7 @@ function buildSnoozeRequest(
   return {
     identifier: `dose-${dose.id}-${dose.statusDate ?? localDateKey()}-${dose.time}-snooze`,
     content: {
-      title: `⏱️ Erteleme: ${content.title}`, body: content.body,
+      title: `${options.lang === 'en' ? '⏱️ Snoozed' : '⏱️ Erteleme'}: ${content.title}`, body: content.body,
       sound: isSilent ? undefined : (channel.sound ?? 'med_alarm.wav'),
       priority: Notifications.AndroidNotificationPriority.MAX,
       vibrate: [0, 800, 350, 800, 350, 800],
@@ -907,7 +939,7 @@ function buildSnoozeRequest(
 
 export function snoozeNotification(
   dose: NotificationDose, minutes = 3,
-  soundOptions?: { soundEnabled?: boolean; soundType?: NotificationSoundType; privateMode?: boolean; hideDoseAmount?: boolean },
+  soundOptions?: { soundEnabled?: boolean; soundType?: NotificationSoundType; privateMode?: boolean; hideDoseAmount?: boolean; lang?: 'tr' | 'en' },
 ): Promise<void> {
   return serializeNotifications(async () => {
     if (dose.muted) return;

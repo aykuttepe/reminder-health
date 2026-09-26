@@ -3,6 +3,18 @@
 Bu klasör Reminder Health için ayrı bir Python + Robot Framework + Appium ortamıdır.
 Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değiştirmez.
 
+## Play derlemesi ve İngilizce arayüz — 26 Eylül 2026 (v1.2.9)
+
+- Play derlemesi (`assemblePlayRelease`, yükleme anahtarıyla imzalı) emulator'a kuruldu. Kesin alarm izni
+  **kapalıyken** `notification-schedule` 3/3 ve `notification-actions` erteleme testi **failed** (hatırlatma
+  gecikti). `adb shell appops set com.itmarti.reminder SCHEDULE_EXACT_ALARM allow` sonrası
+  `notification-schedule` 3/3 **passed**. İzin kapalıyken Bugün'de uyarı gösterilir.
+- `notification_actions.robot` gövdeye dokunma testi doz saati geçmişken "Şimdi Al (Geç)" düğmesini
+  bulamıyordu (saat 17:22, doz 09:00); artık `Al` veya `Şimdi Al…` kabul ediliyor — **passed**.
+- İngilizce arayüz taraması (uiautomator dökümünde Türkçe harf arama): bildirim düğmeleri, kanal adları,
+  kilit ekranı önizlemesi, erteleme başlığı, Görünüm sayfası ve hata ekranı Türkçe kalıyordu; düzeltildi.
+  Bildirim panelinde "⏰ Medication Time", "✅ Taken", "⏱️ Snooze 3 min", "❌ Skip" görüldü.
+
 ## Profil, form ve sıfırlama sadeleştirmesi — 26 Eylül 2026 (v1.2.8)
 
 - Profil yalnızca hitap adı, randevu listesi ve "İlaç Listesini Hekimle Paylaş"; eski tek-hekim alanları gizli

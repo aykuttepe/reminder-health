@@ -293,6 +293,19 @@ test('concurrent reconciliations are serialized and unchanged alarms are not res
   assert.equal(api.operations.length, 0);
 });
 
+test('alarms set without exact-alarm access are re-registered once access is granted', async () => {
+  const api = setup();
+  await api.syncMedicationNotifications([dose()], { ...options, exactAlarms: false });
+  api.operations.length = 0;
+  await api.syncMedicationNotifications([dose()], { ...options, exactAlarms: false });
+  assert.equal(api.operations.length, 0, 'no churn while access stays off');
+  await api.syncMedicationNotifications([dose()], { ...options, exactAlarms: true });
+  assert.ok(api.operations.length > 0, 'granting access reschedules the late alarms');
+  api.operations.length = 0;
+  await api.syncMedicationNotifications([dose()], options);
+  assert.equal(api.operations.length, 0, 'an omitted flag matches alarms already set on time');
+});
+
 test('bounded queue reports when the plan must be refreshed and preserves unrelated requests', async () => {
   const api = setup('2026-09-07T12:00:00', 'ios');
   api.pending.set('unrelated', { identifier: 'unrelated', content: { data: {} } });

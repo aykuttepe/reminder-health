@@ -1,7 +1,7 @@
 {
-  "version": "1.2.8",
+  "version": "1.2.9",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.8: Daha sade profil ve ilaç formu. Hekim bilgileri artık yalnızca randevularda; profil sayfası adınız, randevularınız ve ilaç listesini paylaşma düğmesinden oluşur. İlaç eklerken gün aşırı, döngü, tedavi süresi gibi seçenekler \"Diğer seçenekler\" altında. Bildirim sesi seçenekleri üçe indi. \"Tüm Verileri Sıfırla\" artık randevuları ve hatırlatmalarını da siler.",
-  "publishedAt": "2026-09-26T01:35:00Z"
+  "releaseNotes": "v1.2.9: Google Play hazırlığı ve İngilizce düzeltmeleri. Uygulamanın adı artık \"Rutin\". Hatırlatmaların tam saatinde gelmesi için gereken izin kapalıysa Bugün ekranında uyarı çıkar. İngilizce kullanımda bildirim düğmeleri ve bazı ekranlarda kalan Türkçe yazılar düzeltildi.",
+  "publishedAt": "2026-09-26T18:00:00Z"
 }
