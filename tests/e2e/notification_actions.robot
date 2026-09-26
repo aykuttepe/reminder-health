@@ -135,9 +135,11 @@ Test Notification Should Be Gone
 
 Take Dose From Today Card
     Wait Until Page Contains Element    ${TAB_TODAY}    30s
-    # The body tap switches to Today even if the app was last left on another tab.
-    Wait Until Page Contains Element    android=new UiSelector().text("Al")    20s
-    Click Element    android=new UiSelector().text("Al")
+    # The body tap switches to Today even if the app was last left on another tab. The button reads
+    # "Al" before the dose time and "Şimdi Al (Geç)" after it, so the test must not depend on the clock.
+    ${take}=    Set Variable    android=new UiSelector().textMatches("^(Al|Şimdi Al.*)$")
+    Wait Until Page Contains Element    ${take}    20s
+    Click Element    ${take}
     Stock Should Be    29
     History Should Show Today Record    Alındı
 
