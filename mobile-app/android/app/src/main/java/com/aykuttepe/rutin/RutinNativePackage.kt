@@ -1,4 +1,4 @@
-package com.itmarti.reminder
+package com.aykuttepe.rutin
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

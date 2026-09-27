@@ -13,7 +13,7 @@ from robot.api.deco import keyword
 class EmulatorNotificationProbe:
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_AUTO_KEYWORDS = False
-    PACKAGE = "com.itmarti.reminder"
+    PACKAGE = "com.aykuttepe.rutin"
 
     def __init__(self, udid="emulator-5554"):
         self.udid = udid

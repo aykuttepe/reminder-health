@@ -1,7 +1,7 @@
 # Google Play yayın rehberi — Rutin: İlaç Hatırlatıcı
 
 Bu belge Play Console'da doldurulacak alanların hazır cevaplarını ve yayın adımlarını içerir.
-Paket adı: `com.itmarti.reminder` (Play'e ilk yüklemeden sonra değiştirilemez).
+Paket adı: `com.aykuttepe.rutin` (Play'e ilk yüklemeden sonra değiştirilemez).
 
 ## 1. Derleme ve imza
 
@@ -16,9 +16,12 @@ Paket adı: `com.itmarti.reminder` (Play'e ilk yüklemeden sonra değiştirileme
   - **Bu dosya ile o satırları birlikte yedekle** (ör. parola yöneticisi + harici disk). Kaybolursa
     Play Console > Uygulama bütünlüğü üzerinden yükleme anahtarı sıfırlama istenebilir.
 - İlk yüklemede **Play App Signing**'i kabul et; asıl imza anahtarını Google saklar.
-- `github` derleme türü (GitHub Releases APK) eski anahtarla imzalanmaya devam eder; mevcut kurulumlar
-  güncellenmeye devam eder. İki tür aynı paket adını taşır ama imzaları farklıdır: GitHub APK'sı olan bir
-  telefona Play sürümü üstüne kurulamaz (bkz. bölüm 8).
+- v1.2.13 ve sonraki `github` ile `play` derlemeleri `com.aykuttepe.rutin` paket adını taşır. Bu iki
+  dağıtımın imzaları farklı olduğu için GitHub APK'sı olan bir telefona Play sürümü üstüne kurulamaz
+  (bkz. bölüm 8).
+- v1.2.12 ve önceki `com.itmarti.reminder` kurulumları Android tarafından ayrı bir uygulama sayılır;
+  doğrudan güncellenemez. Yerel verileri taşımak için eski uygulamada yedek oluşturup yeni uygulamada
+  geri yüklemek gerekir. Geçiş tamamlanana kadar iki paket aynı telefonda yan yana kalabilir.
 
 ## 2. Mağaza girişi (Store listing)
 

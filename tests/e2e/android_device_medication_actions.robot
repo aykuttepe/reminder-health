@@ -71,8 +71,8 @@ Open Installed Reminder Without Test Medications
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=${UDID}
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${TRUE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${FALSE}
@@ -198,7 +198,7 @@ Reveal Reminder Actions
     Fail    "İlaç İçildi" action is not visible in the notification shade.
 
 Reminder Should Be Foreground On Phone
-    ${state}=    Execute Script    mobile: queryAppState    appId=com.itmarti.reminder
+    ${state}=    Execute Script    mobile: queryAppState    appId=com.aykuttepe.rutin
     Should Be Equal As Integers    ${state}    4
 
 Keep Phone Awake Until

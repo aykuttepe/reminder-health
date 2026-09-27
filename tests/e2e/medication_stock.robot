@@ -69,8 +69,8 @@ Open Clean Reminder Application
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=${UDID}
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${FALSE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${TRUE}

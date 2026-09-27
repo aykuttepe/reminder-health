@@ -20,8 +20,8 @@ Medication Persists And Can Be Edited
     Click Element    accessibility_id=Kaydet
     Wait Until Page Contains    ${MEDICATION}    15s
     Sleep    2s
-    Terminate Application    com.itmarti.reminder
-    Activate Application    com.itmarti.reminder
+    Terminate Application    com.aykuttepe.rutin
+    Activate Application    com.aykuttepe.rutin
     Click Element    android=new UiSelector().descriptionContains(", İlaçlarım").clickable(true)
     Wait Until Page Contains    Tedavi Planı    15s
     Wait Until Page Contains    ${MEDICATION}    20s
@@ -33,8 +33,8 @@ Medication Persists And Can Be Edited
     Wait Until Page Contains    ${RENAMED}    15s
     Page Should Not Contain Text    ${MEDICATION}
     Sleep    2s
-    Terminate Application    com.itmarti.reminder
-    Activate Application    com.itmarti.reminder
+    Terminate Application    com.aykuttepe.rutin
+    Activate Application    com.aykuttepe.rutin
     Click Element    android=new UiSelector().descriptionContains(", İlaçlarım").clickable(true)
     Wait Until Page Contains    Tedavi Planı    15s
     Wait Until Page Contains    ${RENAMED}    20s
@@ -53,8 +53,8 @@ Open Clean Reminder Application
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=emulator-5554
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${FALSE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${TRUE}

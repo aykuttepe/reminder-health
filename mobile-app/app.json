@@ -3,7 +3,7 @@
     "name": "Rutin",
     "slug": "reminder-health",
     "scheme": "reminderhealth",
-    "version": "1.2.12",
+    "version": "1.2.13",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,7 +11,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.itmarti.reminder",
+      "package": "com.aykuttepe.rutin",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -27,7 +27,7 @@
         "WAKE_LOCK",
         "CAMERA"
       ],
-      "versionCode": 45
+      "versionCode": 47
     },
     "web": {
       "favicon": "./assets/favicon.png"

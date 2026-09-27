@@ -1,4 +1,4 @@
-package com.itmarti.reminder
+package com.aykuttepe.rutin
 
 import android.os.Build
 import android.os.Bundle

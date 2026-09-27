@@ -7,7 +7,7 @@ Uygulamanın npm bağımlılıklarını veya global shell ayarlarını değişti
 
 - Play derlemesi (`assemblePlayRelease`, yükleme anahtarıyla imzalı) emulator'a kuruldu. Kesin alarm izni
   **kapalıyken** `notification-schedule` 3/3 ve `notification-actions` erteleme testi **failed** (hatırlatma
-  gecikti). `adb shell appops set com.itmarti.reminder SCHEDULE_EXACT_ALARM allow` sonrası
+  gecikti). `adb shell appops set com.aykuttepe.rutin SCHEDULE_EXACT_ALARM allow` sonrası
   `notification-schedule` 3/3 **passed**. İzin kapalıyken Bugün'de uyarı gösterilir.
 - `notification_actions.robot` gövdeye dokunma testi doz saati geçmişken "Şimdi Al (Geç)" düğmesini
   bulamıyordu (saat 17:22, doz 09:00); artık `Al` veya `Şimdi Al…` kabul ediliyor — **passed**.
@@ -282,8 +282,8 @@ ekran görüntüsü veya UI dökümü alınmadı.
 - Fiziksel Samsung **SM-A376B**, Android **16 / API 36** üzerinde güncellenen **0.2.21 / versionCode 22** sürümü ile `android_device_smoke.robot` **4 passed, 0 failed** verdi. İlaçlarım, Geçmiş, Ayarlar ve Bugün ekranları kontrol edildi; mevcut kullanıcı verileri korundu.
 - Aynı fiziksel smoke testi üç bağımsız Appium oturumunda art arda geçti: **12 test çalıştırması, 12 passed, 0 failed**. Bu ölçüm sekme gezintisi ve oturum kararlılığıyla sınırlıdır; başarılı adımlarda screenshot alınmadığından emulator'daki screenshot hatasının çözümünü kanıtlamaz. Toplu rapor: `results/device-stability/report.html`.
 - Mevcut `mobile-app/android/app/build/outputs/apk/release/app-release.apk` sürümü
-  **0.2.21 / versionCode 22**; package `com.itmarti.reminder`, activity
-  `com.itmarti.reminder.MainActivity`. Bu APK `./gradlew assembleRelease` ile yeniden
+  **0.2.21 / versionCode 22**; package `com.aykuttepe.rutin`, activity
+  `com.aykuttepe.rutin.MainActivity`. Bu APK `./gradlew assembleRelease` ile yeniden
   derlenmiş ve emulator testleri bu binary üzerinde tekrarlanmıştır.
 
 İlk sandbox denemesinde yerel HTTP bağlantısı engellendi. Ağ izniyle tekrar edilen

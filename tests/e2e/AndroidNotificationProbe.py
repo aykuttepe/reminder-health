@@ -16,7 +16,7 @@ from robot.libraries.BuiltIn import BuiltIn
 class AndroidNotificationProbe:
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_AUTO_KEYWORDS = False
-    PACKAGE = "com.itmarti.reminder"
+    PACKAGE = "com.aykuttepe.rutin"
 
     def __init__(self, udid):
         self.udid = udid

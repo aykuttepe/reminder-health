@@ -24,8 +24,8 @@ Open Installed Reminder Application
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=${UDID}
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${TRUE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${FALSE}
@@ -33,7 +33,7 @@ Open Installed Reminder Application
     ...    dontStopAppOnReset=${TRUE}
     ...    shouldTerminateApp=${FALSE}
     ...    newCommandTimeout=${120}
-    Activate Application    com.itmarti.reminder
+    Activate Application    com.aykuttepe.rutin
     Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", İlaçlarım").clickable(true)    30s
 
 Tab Opens On Phone

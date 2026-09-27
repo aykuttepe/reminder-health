@@ -276,7 +276,7 @@ export async function openChannelNotificationSettings(channelId?: string): Promi
     return true;
   }
 
-  const packageName = 'com.itmarti.reminder';
+  const packageName = 'com.aykuttepe.rutin';
   const targetChannelId = channelId ?? 'medication-channel-custom-v2';
 
   try {
@@ -308,7 +308,7 @@ export async function openBatteryOptimizationSettings(allowDirectRequest = true)
     return true;
   }
 
-  const packageName = 'com.itmarti.reminder';
+  const packageName = 'com.aykuttepe.rutin';
   try {
     // The one-tap exemption dialog needs REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, which store builds omit.
     if (!allowDirectRequest) throw new Error('direct battery exemption request unavailable');
@@ -337,7 +337,7 @@ export async function openExactAlarmSettings(): Promise<boolean> {
     return true;
   }
 
-  const packageName = 'com.itmarti.reminder';
+  const packageName = 'com.aykuttepe.rutin';
   try {
     await Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM', [
       { key: 'android.provider.extra.APP_PACKAGE', value: packageName },

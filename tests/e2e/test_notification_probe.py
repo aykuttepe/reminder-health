@@ -3,7 +3,7 @@ import unittest
 from AndroidNotificationProbe import AndroidNotificationProbe
 
 
-def record(package="com.itmarti.reminder", tag="test-med-main", timestamp=100):
+def record(package="com.aykuttepe.rutin", tag="test-med-main", timestamp=100):
     return (
         f"    NotificationRecord(0x1: pkg={package} user=UserHandle{{0}} "
         f"id=0 tag={tag} importance=4)\n"

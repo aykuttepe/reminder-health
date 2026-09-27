@@ -1,4 +1,4 @@
-package com.itmarti.reminder
+package com.aykuttepe.rutin
 
 import android.app.AlarmManager
 import android.os.Build

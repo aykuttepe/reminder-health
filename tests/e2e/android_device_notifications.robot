@@ -27,8 +27,8 @@ Open Installed Reminder For Notifications
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=${UDID}
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${TRUE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${FALSE}

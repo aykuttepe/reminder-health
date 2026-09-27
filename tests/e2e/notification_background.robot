@@ -28,12 +28,12 @@ Test Notification Reaches Android Notification Shade In Background
     Should Contain    ${notification_source}    ⏰ İlaç Vakti
     Should Contain    ${notification_source}    Planlı ilacınızı alma zamanı geldi.
     Press Keycode    4
-    Activate Application    com.itmarti.reminder
+    Activate Application    com.aykuttepe.rutin
     Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", Bugün").clickable(true)    10s
 
 *** Keywords ***
 Reminder Should Be In Background
-    ${state}=    Execute Script    mobile: queryAppState    appId=com.itmarti.reminder
+    ${state}=    Execute Script    mobile: queryAppState    appId=com.aykuttepe.rutin
     Should Be Equal As Integers    ${state}    3
 
 Open Clean Reminder Application
@@ -41,8 +41,8 @@ Open Clean Reminder Application
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=emulator-5554
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${FALSE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${TRUE}

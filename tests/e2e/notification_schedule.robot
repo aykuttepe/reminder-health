@@ -88,7 +88,7 @@ Deleted Medication Stops Reminding
 *** Keywords ***
 Stock Should Stay Untouched After Wake
     Wake And Dismiss Keyguard
-    Activate Application    com.itmarti.reminder
+    Activate Application    com.aykuttepe.rutin
     Wait Until Page Contains Element    ${TAB_TODAY}    15s
     Stock Should Be    30
 
@@ -137,14 +137,14 @@ Wait Until Device Time
     Sleep    ${remaining}s
 
 Reminder Should Be In Background
-    ${state}=    Execute Script    mobile: queryAppState    appId=com.itmarti.reminder
+    ${state}=    Execute Script    mobile: queryAppState    appId=com.aykuttepe.rutin
     Should Be Equal As Integers    ${state}    3
 
 Reminder Should Reach Foreground
     Wait Until Keyword Succeeds    15s    500ms    Reminder State Should Be Foreground
 
 Reminder State Should Be Foreground
-    ${state}=    Execute Script    mobile: queryAppState    appId=com.itmarti.reminder
+    ${state}=    Execute Script    mobile: queryAppState    appId=com.aykuttepe.rutin
     Should Be Equal As Integers    ${state}    4
 
 Open Clean Reminder Application
@@ -153,8 +153,8 @@ Open Clean Reminder Application
     ...    platformName=Android
     ...    automationName=UiAutomator2
     ...    udid=${UDID}
-    ...    appPackage=com.itmarti.reminder
-    ...    appActivity=com.itmarti.reminder.MainActivity
+    ...    appPackage=com.aykuttepe.rutin
+    ...    appActivity=com.aykuttepe.rutin.MainActivity
     ...    noReset=${FALSE}
     ...    fullReset=${FALSE}
     ...    autoGrantPermissions=${TRUE}
