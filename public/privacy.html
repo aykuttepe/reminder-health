@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rutin: İlaç Hatırlatıcı — Gizlilik Politikası</title>
+  <style>
+    :root {
+      --bg: #081624;
+      --card-bg: #111e2b;
+      --border: #203244;
+      --text: #f5f3f0;
+      --text-muted: #8e9aa8;
+      --mint: #a9dfca;
+      --accent: #2e8b57;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 26px;
+      color: var(--mint);
+      margin-bottom: 8px;
+    }
+    .date-badge {
+      display: inline-block;
+      font-size: 13px;
+      color: var(--text-muted);
+      background: rgba(169, 223, 202, 0.1);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(169, 223, 202, 0.2);
+    }
+    h2 {
+      font-size: 19px;
+      color: var(--mint);
+      margin-top: 28px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--mint);
+      padding-left: 10px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: var(--text);
+    }
+    ul {
+      margin-left: 20px;
+      margin-bottom: 16px;
+    }
+    li {
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    strong {
+      color: #ffffff;
+    }
+    .card-highlight {
+      background: rgba(169, 223, 202, 0.05);
+      border: 1px solid rgba(169, 223, 202, 0.2);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+    .disclaimer-box {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
+      color: #fca5a5;
+    }
+    .lang-divider {
+      margin: 40px 0;
+      border: 0;
+      border-top: 2px dashed var(--border);
+    }
+    footer {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    a {
+      color: var(--mint);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Rutin: İlaç Hatırlatıcı</h1>
+      <p style="color: var(--text-muted); font-size: 15px;">Gizlilik Politikası (Privacy Policy)</p>
+      <span class="date-badge">Son Güncelleme: 27 Eylül 2026</span>
+    </header>
+
+    <div class="card-highlight">
+      <strong>Özet:</strong> Rutin, hiçbir kişisel veri veya sağlık verisi toplamaz. Tüm verileriniz yalnızca telefonunuzun kendi yerel depolama alanında saklanır. Uygulamada reklam, kullanıcı analitiği ve üyelik hesabı bulunmaz.
+    </div>
+
+    <h2>1. Veri Toplamama ve Gizlilik Taahhüdü</h2>
+    <p>Rutin, kullanıcıların gizliliğini temel alan bir mimari ile tasarlanmıştır. Uygulamayı kullanırken girdiğiniz ilaç adları, alım saatleri, stok adetleri, doktor randevuları ve geçmiş kayıtları yalnızca telefonunuzda (cihaz içi yerel hafızada) işlenir ve hiçbir koşulda geliştiriciye veya üçüncü taraf sunuculara aktarılmaz.</p>
+
+    <h2>2. İzinler ve Kullanım Amaçları</h2>
+    <ul>
+      <li><strong>Bildirimler (POST_NOTIFICATIONS):</strong> İlaç saatleriniz geldiğinde zamanında bildirim gönderebilmek için.</li>
+      <li><strong>Tam Saatinde Alarmlar (SCHEDULE_EXACT_ALARM):</strong> Doz saatlerinin sistem pil tasarrufu modlarına takılmadan tam vaktinde çalması için.</li>
+      <li><strong>Kamera (CAMERA):</strong> İlaç kutusunun üzerindeki karekod/barkodu okutarak ilacı saniyeler içinde ekleyebilmeniz için. Kamera görüntüsü kaydedilmez veya gönderilmez; yalnızca yerel ilaç kataloğunda arama yapılır.</li>
+      <li><strong>Cihaz Başlatıldığında Çalışma (RECEIVE_BOOT_COMPLETED):</strong> Telefon kapanıp açıldığında hatırlatma alarmlarının kaybolmaması ve yeniden kurulması için.</li>
+      <li><strong>Titreşim (VIBRATE):</strong> Hatırlatma uyarıları ve dokunma geri bildirimi için.</li>
+    </ul>
+
+    <h2>3. Veri Saklama ve Silme Hakları</h2>
+    <p>Tüm verileriniz üzerindeki tam kontrol size aittir:</p>
+    <ul>
+      <li>Uygulama içindeki <strong>"Ayarlar &gt; Veri &amp; Sıfırlama"</strong> menüsünden tüm kayıtlarınızı tek dokunuşla kalıcı olarak silebilirsiniz.</li>
+      <li>Uygulamayı telefonunuzdan sildiğinizde cihazda tutulan tüm veriler işletim sistemi tarafından tamamen temizlenir.</li>
+      <li>Kendi isteğinizle oluşturduğunuz yedek dosyaları yalnızca sizin belirleyeceğiniz hedefe (kendi e-postanız, bulut alanınız vb.) aktarılır.</li>
+    </ul>
+
+    <div class="disclaimer-box">
+      <strong style="color: #ef4444;">Tıbbi Sorumluluk Reddi (Medical Disclaimer):</strong><br>
+      Rutin bir kişisel ilaç takip ve hatırlatma aracıdır. Tıbbi bir cihaz değildir; tıbbi tavsiye, klinik teşhis veya tedavi sunmaz. Sağlık kararlarınız ve ilaç kullanımınızla ilgili daima hekiminize veya eczacınıza danışınız.
+    </div>
+
+    <h2>4. Çocukların Gizliliği</h2>
+    <p>Rutin yetişkin kullanıcılar için tasarlanmış olup 13 yaşından küçük çocuklara yönelik değildir.</p>
+
+    <h2>5. İletişim</h2>
+    <p>Gizlilik politikamız ile ilgili her türlü soru ve talebiniz için:<br>
+    <strong>E-posta:</strong> <a href="mailto:tepe.aykut05@gmail.com">tepe.aykut05@gmail.com</a><br>
+    <strong>Geliştirici:</strong> Aykut Tepe<br>
+    <strong>Açık Kaynak Deposu:</strong> <a href="https://github.com/aykuttepe/reminder-health" target="_blank" rel="noopener">github.com/aykuttepe/reminder-health</a></p>
+
+    <hr class="lang-divider">
+
+    <header>
+      <h1>Rutin: Medication Reminder</h1>
+      <p style="color: var(--text-muted); font-size: 15px;">Privacy Policy</p>
+      <span class="date-badge">Last Updated: September 27, 2026</span>
+    </header>
+
+    <div class="card-highlight">
+      <strong>Summary:</strong> Rutin collects zero personal or health data. All information is stored strictly on your local device. There are no advertisements, analytics, or third-party tracking services.
+    </div>
+
+    <h2>1. Zero Data Collection Policy</h2>
+    <p>Rutin is designed from the ground up to respect your privacy. Medication schedules, dose histories, inventory levels, and appointment records are stored exclusively in your device's isolated local storage. No data is ever transmitted to external servers.</p>
+
+    <h2>2. Permissions and Their Use</h2>
+    <ul>
+      <li><strong>Notifications (POST_NOTIFICATIONS):</strong> To deliver timely dose and appointment reminders.</li>
+      <li><strong>Exact Alarms (SCHEDULE_EXACT_ALARM):</strong> To ensure critical reminders trigger precisely on time.</li>
+      <li><strong>Camera (CAMERA):</strong> Used only during active scanning to decode medication barcodes/QR codes locally. No images are saved or transmitted.</li>
+      <li><strong>Boot Completed (RECEIVE_BOOT_COMPLETED):</strong> To reschedule alarms automatically after your phone reboots.</li>
+      <li><strong>Vibration (VIBRATE):</strong> For tactile alert feedback.</li>
+    </ul>
+
+    <h2>3. Data Retention and Deletion</h2>
+    <p>You have full ownership and control of your data:</p>
+    <ul>
+      <li>You can purge all records at any time using <strong>"Settings &gt; Data &amp; Reset"</strong>.</li>
+      <li>Uninstalling the app immediately deletes all locally stored data.</li>
+      <li>User-initiated backup files are sent only to destinations explicitly chosen by you.</li>
+    </ul>
+
+    <div class="disclaimer-box">
+      <strong style="color: #ef4444;">Medical Disclaimer:</strong><br>
+      Rutin is a personal organization and reminder utility; it is not a medical device and does not offer medical advice, diagnosis, or treatment. Always consult your healthcare provider regarding medical decisions.
+    </div>
+
+    <h2>4. Children's Privacy</h2>
+    <p>Rutin is intended for adults and is not directed to children under 13. We do not collect information from children.</p>
+
+    <h2>5. Contact Information</h2>
+    <p>For any inquiries regarding this policy:<br>
+    <strong>Email:</strong> <a href="mailto:tepe.aykut05@gmail.com">tepe.aykut05@gmail.com</a><br>
+    <strong>Developer:</strong> Aykut Tepe<br>
+    <strong>Repository:</strong> <a href="https://github.com/aykuttepe/reminder-health" target="_blank" rel="noopener">github.com/aykuttepe/reminder-health</a></p>
+
+    <footer>
+      &copy; 2026 Rutin: İlaç Hatırlatıcı. Tüm hakları saklıdır.
+    </footer>
+  </div>
+</body>
+</html>

@@ -1571,8 +1571,138 @@
   border-top: 1px solid #192736;
   background: #081624;
 }
+/* --- Stock Threshold Slider & Manual Input (Web Prototype) --- */
+.stock-threshold-control {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
+.stock-threshold-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
 
+.stock-threshold-hint {
+  font-size: 12px;
+  color: #8e9aa8;
+  line-height: 1.3;
+  flex: 1;
+}
 
+.stock-threshold-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0c1926;
+  border: 1px solid #22364c;
+  border-radius: 9px;
+  padding: 3px 6px;
+}
 
+.stock-threshold-stepper button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #162838;
+  border: 1px solid #243b50;
+  color: var(--mint);
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
 
+.stock-threshold-stepper button:hover:not(:disabled) {
+  background: #1e364c;
+  border-color: var(--mint);
+}
+
+.stock-threshold-stepper button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stock-threshold-num-input {
+  width: 44px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: var(--mint);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.stock-threshold-num-input::-webkit-outer-spin-button,
+.stock-threshold-num-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stock-threshold-unit {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+  padding-right: 4px;
+}
+
+.stock-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.stock-range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #182838;
+  outline: none;
+  cursor: pointer;
+}
+
+.stock-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mint);
+  border: 2.5px solid #081624;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.stock-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.stock-range-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mint);
+  border: 2.5px solid #081624;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.stock-scale-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+  padding: 0 2px;
+}

@@ -65,6 +65,7 @@ import {
 import { CameraScannerModal } from './src/components/CameraScannerModal';
 import { CalendarModal, formatLocalizedDate, formatTurkishDate } from './src/components/CalendarModal';
 import { AppointmentEditorModal } from './src/components/AppointmentEditorModal';
+import { StockThresholdSlider } from './src/components/StockThresholdSlider';
 import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
@@ -169,7 +170,6 @@ const LEAD_TIME_OPTIONS = [
   { value: 15, label: '15 Dk Önce' },
 ];
 
-const STOCK_THRESHOLD_OPTIONS = [3, 5, 7, 10];
 const SYNC_INTERVAL_OPTIONS = [1, 3, 5, 10, 15, 30];
 
 /**
@@ -3360,23 +3360,17 @@ function MainApp() {
                       <Text style={styles.settingSub}>
                         {language === 'en' ? 'Low stock alert is shown when medication count falls below this threshold' : 'İlaç miktarı bu sayının altına inince eczane uyarısı verilir'}
                       </Text>
-                      <View style={styles.chipSelector}>
-                        {STOCK_THRESHOLD_OPTIONS.map(thresholdVal => (
-                          <TouchableOpacity
-                            key={thresholdVal}
-                            style={[styles.choiceChip, defaultStockThreshold === thresholdVal && styles.choiceChipActive]}
-                            onPress={() => {
-                              triggerHaptic();
-                              setDefaultStockThreshold(thresholdVal);
-                              showToast(language === 'en' ? `Low stock alert threshold set to ${thresholdVal} doses` : `Kritik stok eşiği ${thresholdVal} doz olarak ayarlandı`);
-                            }}
-                          >
-                            <Text style={[styles.choiceChipText, defaultStockThreshold === thresholdVal && styles.choiceChipTextActive]}>
-                              {thresholdVal} {language === 'en' ? 'Doses' : 'Doz'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+                      <StockThresholdSlider
+                        value={defaultStockThreshold}
+                        onChange={(val) => {
+                          setDefaultStockThreshold(val);
+                        }}
+                        language={language}
+                        onHaptic={triggerHaptic}
+                        quickOptions={[3, 5, 7, 10, 15, 20]}
+                        min={1}
+                        max={30}
+                      />
                     </View>
 
                     <View style={styles.settingDivider} />

@@ -3933,21 +3933,99 @@ function InnerPrototype() {
                     </button>
 
                     <div className="setting-card" style={{ marginTop: 12 }}>
-                      <span className="sub-label">VARSAYILAN KRİTİK STOK EŞİĞİ</span>
-                      <div className="choice-chip-row" style={{ marginTop: 8 }}>
-                        {[3, 5, 7, 10].map((th) => (
-                          <button
-                            key={th}
-                            type="button"
-                            className={`chip-btn ${defaultStockThreshold === th ? 'active' : ''}`}
-                            onClick={() => {
-                              setDefaultStockThreshold(th);
-                              setToast({ text: `Kritik stok eşiği ${th} adet olarak ayarlandı` });
+                      <div className="flex-row items-center justify-between">
+                        <span className="sub-label">VARSAYILAN KRİTİK STOK EŞİĞİ</span>
+                        <div className="flex-row items-center gap-6">
+                          <span className="selected-pill-badge" style={{ background: '#163832', color: 'var(--mint)', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>
+                            {defaultStockThreshold} {language === 'en' ? 'doses' : 'adet'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="stock-threshold-control">
+                        <div className="stock-threshold-input-row">
+                          <span className="stock-threshold-hint">
+                            {language === 'en'
+                              ? 'Enter value manually or use the slider:'
+                              : 'Elle sayı girin veya kaydırarak ayarlayın:'}
+                          </span>
+
+                          <div className="stock-threshold-stepper">
+                            <button
+                              type="button"
+                              disabled={defaultStockThreshold <= 1}
+                              onClick={() => {
+                                const next = Math.max(1, defaultStockThreshold - 1);
+                                setDefaultStockThreshold(next);
+                              }}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              max="30"
+                              className="stock-threshold-num-input"
+                              value={defaultStockThreshold}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val)) {
+                                  setDefaultStockThreshold(Math.max(1, Math.min(30, val)));
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              disabled={defaultStockThreshold >= 30}
+                              onClick={() => {
+                                const next = Math.min(30, defaultStockThreshold + 1);
+                                setDefaultStockThreshold(next);
+                              }}
+                            >
+                              +
+                            </button>
+                            <span className="stock-threshold-unit">
+                              {language === 'en' ? 'doses' : 'adet'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Interactive Range Slider (1 to 30) */}
+                        <div className="stock-slider-wrapper">
+                          <input
+                            type="range"
+                            min="1"
+                            max="30"
+                            value={defaultStockThreshold}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setDefaultStockThreshold(val);
                             }}
-                          >
-                            {th} adet
-                          </button>
-                        ))}
+                            className="stock-range-slider"
+                          />
+                          <div className="stock-scale-row">
+                            <span>1</span>
+                            <span>15</span>
+                            <span>30</span>
+                          </div>
+                        </div>
+
+                        {/* Quick Selection Chips */}
+                        <div className="choice-chip-row" style={{ marginTop: 2 }}>
+                          {[3, 5, 7, 10, 15, 20].map((th) => (
+                            <button
+                              key={th}
+                              type="button"
+                              className={`chip-btn ${defaultStockThreshold === th ? 'active' : ''}`}
+                              onClick={() => {
+                                setDefaultStockThreshold(th);
+                                setToast({ text: `Kritik stok eşiği ${th} adet olarak ayarlandı` });
+                              }}
+                            >
+                              {th} adet
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>

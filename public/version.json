@@ -1,7 +1,7 @@
 {
-  "version": "1.2.13",
+  "version": "1.2.14",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.13: Android paket kimliği Google Play yayını için com.aykuttepe.rutin olarak güncellendi.",
-  "publishedAt": "2026-09-26T22:15:00Z"
+  "releaseNotes": "v1.2.14: Stok ve Envanter kritik stok eşiği ayarına elle giriş ve kaydırma çubuğu (slider) eklendi.",
+  "publishedAt": "2026-09-27T15:37:00Z"
 }
