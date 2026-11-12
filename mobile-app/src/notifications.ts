@@ -528,6 +528,17 @@ export async function initNotifications(lang: 'tr' | 'en' = 'tr'): Promise<void>
   }
 }
 
+/** Reads the current permission without showing the system prompt. */
+export async function isNotificationPermissionGranted(): Promise<boolean> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch (e) {
+    console.log('isNotificationPermissionGranted failed:', e);
+    return false;
+  }
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();

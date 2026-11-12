@@ -1,7 +1,7 @@
 {
-  "version": "1.2.15",
+  "version": "1.2.16",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.15: Kritik stok eşiği kaydırma çubuğundaki sürükleme, boş alan ve değer uyuşmazlığı hataları düzeltildi.",
-  "publishedAt": "2026-11-12T19:03:00Z"
+  "releaseNotes": "v1.2.16: Bildirim izni kapalıyken Bugün ekranında uyarı gösterilir; Aç düğmesi gerekirse telefon ayarlarını açar.",
+  "publishedAt": "2026-11-12T19:23:00Z"
 }

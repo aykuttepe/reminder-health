@@ -30,6 +30,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   initNotifications,
   requestNotificationPermissions,
+  isNotificationPermissionGranted,
   syncMedicationNotifications,
   scheduleTestNotification,
   playTestSound,
@@ -746,6 +747,31 @@ function MainApp() {
     }
   };
 
+  // Android stops showing the system prompt after repeated refusals, so a denial sends the
+  // user to the app's notification settings instead of leaving the button without effect.
+  const enableNotifications = async () => {
+    triggerHaptic();
+    const granted = await requestNotificationPermissions();
+    setHasNotificationPermission(granted);
+    if (granted) {
+      showToast(language === 'en' ? 'Notification permission granted!' : 'Bildirim izni verildi!');
+      return;
+    }
+    Alert.alert(
+      language === 'en' ? 'Notifications are off' : 'Bildirimler kapalı',
+      language === 'en'
+        ? 'Allow notifications for Rutin in phone Settings so dose reminders can be shown.'
+        : 'Doz hatırlatmalarının görünmesi için telefon Ayarlar\'ından Rutin\'e bildirim izni verin.',
+      [
+        { text: language === 'en' ? 'Cancel' : 'Vazgeç', style: 'cancel' },
+        {
+          text: language === 'en' ? 'Open Settings' : 'Ayarları Aç',
+          onPress: () => { Linking.openSettings().catch(e => console.log('openSettings failed:', e)); },
+        },
+      ],
+    );
+  };
+
   const mainScrollViewRef = useRef<ScrollView>(null);
   const heroCarouselRef = useRef<ScrollView>(null);
 
@@ -1111,6 +1137,15 @@ function MainApp() {
     if (!hydrated) return;
     void initNotifications(language);
   }, [hydrated, language]);
+
+  // The user may allow or block notifications in system settings while the app is in the
+  // background; re-read without prompting so the warning and the schedule follow that change.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void isNotificationPermissionGranted().then(setHasNotificationPermission);
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Re-read exact-alarm access on launch and whenever the user returns from system settings.
   useEffect(() => {
@@ -2242,6 +2277,24 @@ function MainApp() {
           style={styles.scrollArea}
           contentContainerStyle={[styles.scrollContent, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}
         >
+          {/* Without notification permission no reminder is shown at all; warn where doses are taken. */}
+          {tab === 'Bugün' && hasNotificationPermission === false && doses.some(d => !d.deletedAt && !d.muted) && (
+            <TouchableOpacity
+              style={styles.exactAlarmBanner}
+              onPress={enableNotifications}
+              accessibilityRole="button"
+              accessibilityLabel={language === 'en' ? 'Notifications are off. Turn on' : 'Bildirimler kapalı. Aç'}
+            >
+              <Ionicons name="notifications-off-outline" size={22} color="#f0b484" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.exactAlarmBannerTitle}>{language === 'en' ? 'Notifications are off' : 'Bildirimler kapalı'}</Text>
+                <Text style={styles.exactAlarmBannerText}>
+                  {language === 'en' ? 'Dose reminders will not be shown.' : 'İlaç hatırlatmaları gösterilemez.'}
+                </Text>
+              </View>
+              <Text style={styles.exactAlarmBannerAction}>{language === 'en' ? 'Turn on' : 'Aç'}</Text>
+            </TouchableOpacity>
+          )}
           {/* Play installs start without exact-alarm access on Android 14+; without it reminders run late. */}
           {tab === 'Bugün' && exactAlarmAllowed === false && doses.some(d => !d.deletedAt && !d.muted) && (
             <TouchableOpacity
@@ -2368,15 +2421,7 @@ function MainApp() {
                   {hasNotificationPermission === false && (
                     <TouchableOpacity
                       style={styles.permBanner}
-                      onPress={async () => {
-                        const granted = await requestNotificationPermissions();
-                        setHasNotificationPermission(granted);
-                        if (granted) showToast(language === 'en' ? 'Notification permission granted!' : 'Bildirim izni verildi!');
-                        else Alert.alert(
-                          language === 'en' ? 'Permission Denied' : 'İzin Reddedildi',
-                          language === 'en' ? 'Please grant notification permissions in phone Settings.' : 'Telefonunuzun Ayarlar > Bildirimler menüsünden bildirim izni vermeniz gerekebilir.'
-                        );
-                      }}
+                      onPress={enableNotifications}
                     >
                       <Ionicons name="warning-outline" size={20} color="#f0b484" />
                       <Text style={styles.permBannerText}>
