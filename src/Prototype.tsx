@@ -609,6 +609,10 @@ export interface AppointmentItem {
   updatedAt: number;
 }
 
+const STOCK_THRESHOLD_MIN = 1;
+const STOCK_THRESHOLD_MAX = 30;
+const STOCK_THRESHOLD_QUICK_OPTIONS = [3, 5, 7, 10, 15, 20];
+
 const DEFAULT_SETTINGS: PrototypeSettings = {
   userName: '',
   doctorName: '',
@@ -1038,6 +1042,11 @@ function InnerPrototype() {
   const [snoozeMinutes, setSnoozeMinutes] = useState<number>(storedSettings.snoozeMinutes);
   const [leadTimeMinutes, setLeadTimeMinutes] = useState<number>(storedSettings.leadTimeMinutes);
   const [defaultStockThreshold, setDefaultStockThreshold] = useState<number>(storedSettings.defaultStockThreshold);
+  // Text shown in the number field, so it can be emptied while typing.
+  const [stockThresholdText, setStockThresholdText] = useState(String(storedSettings.defaultStockThreshold));
+  useEffect(() => {
+    setStockThresholdText(String(defaultStockThreshold));
+  }, [defaultStockThreshold]);
   const [stockAlertsEnabled, setStockAlertsEnabled] = useState<boolean>(storedSettings.stockAlertsEnabled);
   const [hideDoseAmount, setHideDoseAmount] = useState<boolean>(storedSettings.hideDoseAmount);
   const [autoCollapseTaken, setAutoCollapseTaken] = useState<boolean>(storedSettings.autoCollapseTaken);
@@ -3953,34 +3962,35 @@ function InnerPrototype() {
                           <div className="stock-threshold-stepper">
                             <button
                               type="button"
-                              disabled={defaultStockThreshold <= 1}
-                              onClick={() => {
-                                const next = Math.max(1, defaultStockThreshold - 1);
-                                setDefaultStockThreshold(next);
-                              }}
+                              disabled={defaultStockThreshold <= STOCK_THRESHOLD_MIN}
+                              onClick={() => setDefaultStockThreshold(Math.max(STOCK_THRESHOLD_MIN, defaultStockThreshold - 1))}
                             >
                               -
                             </button>
-                            <input
-                              type="number"
-                              min="1"
-                              max="30"
+                            <KeyboardInput
                               className="stock-threshold-num-input"
-                              value={defaultStockThreshold}
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={2}
+                              value={stockThresholdText}
+                              onFocus={(e) => e.target.select()}
                               onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                if (!isNaN(val)) {
-                                  setDefaultStockThreshold(Math.max(1, Math.min(30, val)));
+                                const digits = e.target.value.replace(/\D/g, '');
+                                const num = parseInt(digits, 10);
+                                if (Number.isNaN(num)) {
+                                  setStockThresholdText('');
+                                  return;
                                 }
+                                const clamped = Math.max(STOCK_THRESHOLD_MIN, Math.min(STOCK_THRESHOLD_MAX, num));
+                                setStockThresholdText(String(clamped));
+                                setDefaultStockThreshold(clamped);
                               }}
+                              onBlur={() => setStockThresholdText(String(defaultStockThreshold))}
                             />
                             <button
                               type="button"
-                              disabled={defaultStockThreshold >= 30}
-                              onClick={() => {
-                                const next = Math.min(30, defaultStockThreshold + 1);
-                                setDefaultStockThreshold(next);
-                              }}
+                              disabled={defaultStockThreshold >= STOCK_THRESHOLD_MAX}
+                              onClick={() => setDefaultStockThreshold(Math.min(STOCK_THRESHOLD_MAX, defaultStockThreshold + 1))}
                             >
                               +
                             </button>
@@ -3990,29 +4000,26 @@ function InnerPrototype() {
                           </div>
                         </div>
 
-                        {/* Interactive Range Slider (1 to 30) */}
-                        <div className="stock-slider-wrapper">
+                        {/* The thumb must own the drag; otherwise MobileScroll treats it as a page scroll. */}
+                        <div className="stock-slider-wrapper" data-scroll-drag="ignore">
                           <input
                             type="range"
-                            min="1"
-                            max="30"
+                            min={STOCK_THRESHOLD_MIN}
+                            max={STOCK_THRESHOLD_MAX}
                             value={defaultStockThreshold}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setDefaultStockThreshold(val);
-                            }}
+                            onChange={(e) => setDefaultStockThreshold(Number(e.target.value))}
                             className="stock-range-slider"
                           />
                           <div className="stock-scale-row">
-                            <span>1</span>
-                            <span>15</span>
-                            <span>30</span>
+                            <span>{STOCK_THRESHOLD_MIN}</span>
+                            <span>{Math.round((STOCK_THRESHOLD_MIN + STOCK_THRESHOLD_MAX) / 2)}</span>
+                            <span>{STOCK_THRESHOLD_MAX}</span>
                           </div>
                         </div>
 
                         {/* Quick Selection Chips */}
                         <div className="choice-chip-row" style={{ marginTop: 2 }}>
-                          {[3, 5, 7, 10, 15, 20].map((th) => (
+                          {STOCK_THRESHOLD_QUICK_OPTIONS.map((th) => (
                             <button
                               key={th}
                               type="button"

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   PanResponder,
   GestureResponderEvent,
-  PanResponderGestureState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,22 +22,28 @@ export interface StockThresholdSliderProps {
 
 const THUMB_SIZE = 24;
 
+export const STOCK_THRESHOLD_MIN = 1;
+export const STOCK_THRESHOLD_MAX = 30;
+export const STOCK_THRESHOLD_QUICK_OPTIONS = [3, 5, 7, 10, 15, 20];
+
 export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
   value,
   onChange,
   language,
   onHaptic,
-  quickOptions = [3, 5, 7, 10, 15, 20],
-  min = 1,
-  max = 30,
+  quickOptions = STOCK_THRESHOLD_QUICK_OPTIONS,
+  min = STOCK_THRESHOLD_MIN,
+  max = STOCK_THRESHOLD_MAX,
 }) => {
   const [trackWidth, setTrackWidth] = useState(0);
   const [textInputVal, setTextInputVal] = useState(String(value));
   const trackWidthRef = useRef(0);
   trackWidthRef.current = trackWidth;
 
-  const valueRef = useRef(value);
-  valueRef.current = value;
+  // PanResponder is created once; it must read the latest props through a ref
+  // instead of capturing the first render's min/max/callbacks.
+  const latest = useRef({ value, min, max, onChange, onHaptic });
+  latest.current = { value, min, max, onChange, onHaptic };
 
   // Sync internal text input state when value changes externally
   useEffect(() => {
@@ -48,14 +53,13 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
   const updateFromPosition = (x: number) => {
     const width = trackWidthRef.current;
     if (width <= 0) return;
-    const clampedX = Math.max(0, Math.min(width, x));
-    const ratio = clampedX / width;
-    const newVal = Math.round(min + ratio * (max - min));
-    const clampedVal = Math.max(min, Math.min(max, newVal));
+    const { min: lo, max: hi, value: current, onChange: emit, onHaptic: haptic } = latest.current;
+    const ratio = Math.max(0, Math.min(width, x)) / width;
+    const next = Math.max(lo, Math.min(hi, Math.round(lo + ratio * (hi - lo))));
 
-    if (clampedVal !== valueRef.current) {
-      onChange(clampedVal);
-      onHaptic?.();
+    if (next !== current) {
+      emit(next);
+      haptic?.();
     }
   };
 
@@ -63,14 +67,11 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt: GestureResponderEvent) => {
-        updateFromPosition(evt.nativeEvent.locationX);
-      },
-      onPanResponderMove: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
-        // locationX in Grant + dx gives reliable drag across track
-        updateFromPosition(evt.nativeEvent.locationX);
-      },
-      onPanResponderRelease: () => {},
+      // Keep the drag even if the surrounding settings ScrollView wants the gesture.
+      onPanResponderTerminationRequest: () => false,
+      // Track children use pointerEvents="none", so locationX is relative to the track itself.
+      onPanResponderGrant: (evt: GestureResponderEvent) => updateFromPosition(evt.nativeEvent.locationX),
+      onPanResponderMove: (evt: GestureResponderEvent) => updateFromPosition(evt.nativeEvent.locationX),
     })
   ).current;
 
@@ -82,23 +83,16 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
       const num = parseInt(digitsOnly, 10);
       if (!isNaN(num)) {
         const clamped = Math.max(min, Math.min(max, num));
+        // Show the value that is actually stored (e.g. 45 -> 30).
+        if (clamped !== num) setTextInputVal(String(clamped));
         onChange(clamped);
       }
     }
   };
 
   const handleTextBlur = () => {
-    const num = parseInt(textInputVal, 10);
-    if (isNaN(num) || num < min) {
-      setTextInputVal(String(min));
-      onChange(min);
-    } else if (num > max) {
-      setTextInputVal(String(max));
-      onChange(max);
-    } else {
-      setTextInputVal(String(num));
-      onChange(num);
-    }
+    // An empty field keeps the current threshold; typed values are already clamped.
+    setTextInputVal(String(value));
   };
 
   const handleStep = (delta: number) => {
@@ -173,10 +167,11 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
           {...panResponder.panHandlers}
         >
           {/* Base Unfilled Track */}
-          <View style={styles.trackBase} />
+          <View pointerEvents="none" style={styles.trackBase} />
 
           {/* Active Filled Track */}
           <View
+            pointerEvents="none"
             style={[
               styles.trackActive,
               { width: `${ratio * 100}%` },
@@ -186,6 +181,7 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
           {/* Interactive Thumb */}
           {trackWidth > 0 && (
             <View
+              pointerEvents="none"
               style={[
                 styles.thumb,
                 {

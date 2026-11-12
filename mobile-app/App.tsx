@@ -3362,14 +3362,9 @@ function MainApp() {
                       </Text>
                       <StockThresholdSlider
                         value={defaultStockThreshold}
-                        onChange={(val) => {
-                          setDefaultStockThreshold(val);
-                        }}
+                        onChange={setDefaultStockThreshold}
                         language={language}
                         onHaptic={triggerHaptic}
-                        quickOptions={[3, 5, 7, 10, 15, 20]}
-                        min={1}
-                        max={30}
                       />
                     </View>
 
