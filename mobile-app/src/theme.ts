@@ -47,6 +47,11 @@ const PALETTE = {
 
   // Effects
   overlay: 'rgba(53, 39, 31, 0.45)',
+  // Camera viewfinder chrome sits on a live image, so it stays dark with light content.
+  cameraScrim: 'rgba(35, 26, 20, 0.35)',
+  cameraBar: 'rgba(35, 26, 20, 0.78)',
+  onCamera: '#FFF7EB',
+  textShadowStrong: 'rgba(0, 0, 0, 0.8)',
   shadow: '#5A3A24',
   switchTrackOff: '#E3D0BF',
 } as const;

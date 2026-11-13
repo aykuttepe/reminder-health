@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { parseITSKarekod, ITSParsedData } from '../itsParser';
 import { findMedicineByGTIN, CatalogMedicine, TURKISH_MED_CATALOG } from '../data/medCatalog';
@@ -179,13 +180,15 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               }}
               onBarcodeScanned={handleBarcodeScanned}
             />
+            {/* The app bar is light elsewhere; over the live camera the status icons must be light. */}
+            <StatusBar style="light" />
 
             {/* Dark Mask Around Viewfinder */}
             <View style={styles.overlay}>
               {/* Top Bar */}
               <View style={styles.topBar}>
                 <TouchableOpacity style={styles.iconCircleBtn} onPress={onClose}>
-                  <Ionicons name="close" size={24} color={COLORS.text} />
+                  <Ionicons name="close" size={24} color={COLORS.onCamera} />
                 </TouchableOpacity>
 
                 <View style={styles.headerTitleBox}>
@@ -201,7 +204,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   style={[styles.iconCircleBtn, flash && styles.iconCircleBtnActive]}
                   onPress={() => setFlash(!flash)}
                 >
-                  <Ionicons name={flash ? 'flashlight' : 'flashlight-outline'} size={20} color={flash ? COLORS.onAccent : COLORS.text} />
+                  <Ionicons name={flash ? 'flashlight' : 'flashlight-outline'} size={20} color={flash ? COLORS.onAccent : COLORS.onCamera} />
                 </TouchableOpacity>
               </View>
 
@@ -230,13 +233,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   style={styles.presetsToggleBtn}
                   onPress={() => setShowTestPresets(!showTestPresets)}
                 >
-                  <Ionicons name="flask-outline" size={16} color={COLORS.accent} />
+                  <Ionicons name="flask-outline" size={16} color={COLORS.onCamera} />
                   <Text style={styles.presetsToggleBtnText}>
                     {showTestPresets
                       ? (lang === 'en' ? 'Hide Sample List' : 'Örnek Listeyi Gizle')
                       : (lang === 'en' ? 'No Box? Try Sample Medication' : 'Kutu Bulunmuyorsa: Örnek İlaç Dene')}
                   </Text>
-                  <Ionicons name={showTestPresets ? 'chevron-down' : 'chevron-up'} size={14} color={COLORS.accent} />
+                  <Ionicons name={showTestPresets ? 'chevron-down' : 'chevron-up'} size={14} color={COLORS.onCamera} />
                 </TouchableOpacity>
 
                 {showTestPresets && (
@@ -324,7 +327,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'space-between',
-    backgroundColor: COLORS.overlay,
+    backgroundColor: COLORS.cameraScrim,
   },
   topBar: {
     flexDirection: 'row',
@@ -333,19 +336,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 54 : 32,
     paddingBottom: 16,
-    backgroundColor: COLORS.overlay,
+    backgroundColor: COLORS.cameraBar,
   },
   headerTitleBox: {
     alignItems: 'center',
   },
   headerTitle: {
-    color: COLORS.accent,
+    color: COLORS.onCamera,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
   },
   headerSub: {
-    color: COLORS.text,
+    color: COLORS.onCamera,
     fontSize: 11,
     marginTop: 2,
   },
@@ -353,11 +356,11 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: COLORS.overlay,
+    backgroundColor: COLORS.cameraBar,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.cameraBar,
   },
   iconCircleBtnActive: {
     backgroundColor: COLORS.accent,
@@ -419,13 +422,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accent,
   },
   scanInstruction: {
-    color: COLORS.text,
+    color: COLORS.onCamera,
     fontSize: 12.5,
     textAlign: 'center',
     marginTop: 18,
     paddingHorizontal: 36,
     lineHeight: 18,
-    textShadowColor: COLORS.shadow,
+    textShadowColor: COLORS.textShadowStrong,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
@@ -439,15 +442,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: COLORS.overlay,
+    backgroundColor: COLORS.cameraBar,
     borderWidth: 1,
-    borderColor: COLORS.borderStrong,
+    borderColor: COLORS.cameraBar,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: RADII.button,
   },
   presetsToggleBtnText: {
-    color: COLORS.accent,
+    color: COLORS.onCamera,
     fontSize: 12,
     fontWeight: '700',
   },

@@ -118,7 +118,7 @@ Add Test Medication At Time
     [Arguments]    ${name}    ${hour}    ${minute}
     Open Treatment Plan
     Click Element    android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Yeni İlaç Ekle"))
-    Wait Until Page Contains Element    android=new UiSelector().text("Yeni İlaç Ekle")    15s
+    Wait Until Page Contains Element    accessibility_id=Kaydet    15s
     Input Text    android=new UiSelector().className("android.widget.EditText").instance(0)    ${name}
     # The time slot sits below the fold on the phone; a new form starts at 09:00.
     Swipe Editor Until Visible    android=new UiSelector().className("android.widget.EditText").text("09")

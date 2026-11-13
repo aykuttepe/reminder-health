@@ -15,7 +15,7 @@ Medication Persists And Can Be Edited
     Click Element    android=new UiSelector().descriptionContains(", İlaçlarım").clickable(true)
     Wait Until Page Contains    Tedavi Planı    15s
     Click Element    android=new UiSelector().textContains("Yeni İlaç Ekle")
-    Wait Until Page Contains Element    android=new UiSelector().text("Yeni İlaç Ekle")    15s
+    Wait Until Page Contains Element    accessibility_id=Kaydet    15s
     Input Text    android=new UiSelector().className("android.widget.EditText").instance(0)    ${MEDICATION}
     Click Element    accessibility_id=Kaydet
     Wait Until Page Contains    ${MEDICATION}    15s

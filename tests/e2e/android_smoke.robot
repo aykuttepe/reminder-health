@@ -44,7 +44,7 @@ Handle Android Permission Dialogs
 
 Tab Opens
     [Arguments]    ${tab}    ${marker}    ${screenshot}
-    ${locator}=    Set Variable    android=new UiSelector().className("android.view.ViewGroup").descriptionContains(", ${tab}").clickable(true)
+    ${locator}=    Set Variable    android=new UiSelector().descriptionContains(", ${tab}").clickable(true)
     Wait Until Page Contains Element    ${locator}    15s
     Click Element    ${locator}
     Wait Until Page Contains Element    android=new UiSelector().text("${marker}")    15s

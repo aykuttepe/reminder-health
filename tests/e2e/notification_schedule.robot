@@ -97,7 +97,7 @@ Add Medication At Time
     Click Element    ${TAB_MEDS}
     Wait Until Page Contains    Tedavi Planı    15s
     Click Element    android=new UiSelector().textContains("Yeni İlaç Ekle")
-    Wait Until Page Contains Element    android=new UiSelector().text("Yeni İlaç Ekle")    15s
+    Wait Until Page Contains Element    accessibility_id=Kaydet    15s
     Input Text    android=new UiSelector().className("android.widget.EditText").instance(0)    ${name}
     # EditText order in the form: name, amount, slot hour, slot minute.
     Input Text    android=new UiSelector().className("android.widget.EditText").instance(2)    ${hour}

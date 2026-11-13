@@ -51,8 +51,8 @@ Handle Android Permission Dialogs
 
 Open Settings Main
     # Tapping another tab and back resets the sub-page and scroll position.
-    Click Element    android=new UiSelector().className("android.view.ViewGroup").descriptionContains(", Bugün").clickable(true)
-    Click Element    android=new UiSelector().className("android.view.ViewGroup").descriptionContains(", Ayarlar").clickable(true)
+    Click Element    android=new UiSelector().descriptionContains(", Bugün").clickable(true)
+    Click Element    android=new UiSelector().descriptionContains(", Ayarlar").clickable(true)
     Wait Until Page Contains Element    android=new UiSelector().text("AYAR KATEGORİLERİ")    15s
 
 Swipe Up
