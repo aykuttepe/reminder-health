@@ -189,7 +189,7 @@ const QUICK_TIME_CHIP_MAX_FONT_SCALE = 1.6;
 /**
  * Dual Clock Picker Component:
  * - Pure numeric pad (keyboardType="number-pad")
- * - Dedicated SAAT and DAKİKA touch targets
+ * - Dedicated SAAT and DK (minute) touch targets
  * - Instant selection on focus (selectTextOnFocus)
  * - Auto-advances focus to minute when 2 hour digits are entered
  */
@@ -339,7 +339,7 @@ function TimeSlotPicker({
         onPress={() => minuteRef.current?.focus()}
       >
         <Text style={[styles.clockBoxLabel, isMinuteFocused && styles.clockBoxLabelFocused]} numberOfLines={1} maxFontSizeMultiplier={CLOCK_LABEL_MAX_FONT_SCALE}>
-          {lang === 'en' ? 'MIN' : 'DAKİKA'}
+          {lang === 'en' ? 'MIN' : 'DK'}
         </Text>
         <TextInput
           ref={minuteRef}
@@ -3277,7 +3277,7 @@ function MainApp() {
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={styles.settingTitle}>{language === 'en' ? 'Default Snooze Duration' : 'Varsayılan Erteleme Süresi'}</Text>
                         <View style={styles.selectedPillBadge}>
-                          <Text style={styles.selectedPillBadgeText}>{snoozeMinutes} {language === 'en' ? 'Minutes' : 'Dakika'}</Text>
+                          <Text style={styles.selectedPillBadgeText}>{snoozeMinutes} {language === 'en' ? 'min' : 'dk'}</Text>
                         </View>
                       </View>
                       <Text style={styles.settingSub}>{language === 'en' ? 'Duration of snooze button in notifications' : 'Bildirimlerdeki erteleme butonunun süresi'}</Text>
