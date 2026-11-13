@@ -25,12 +25,12 @@ Add Medication And Record Dose
     Page Should Contain Text    30
     Click Element    android=new UiSelector().descriptionContains(", Bugün").clickable(true)
     Wait Until Page Contains    ${MEDICATION}    15s
-    ${late_take}=    Set Variable    android=new UiSelector().text("Şimdi Al (Geç)")
+    ${late_take}=    Set Variable    android=new UiSelector().text("Aldım")
     ${late_visible}=    Run Keyword And Return Status    Wait Until Page Contains Element    ${late_take}    5s
     IF    ${late_visible}
         Click Element    ${late_take}
     ELSE
-        Click Element    android=new UiSelector().text("Al")
+        Click Element    android=new UiSelector().text("Aldım")
     END
     Click Element    android=new UiSelector().descriptionContains(", Geçmiş").clickable(true)
     Wait Until Page Contains    Bugünün Kayıtları    15s

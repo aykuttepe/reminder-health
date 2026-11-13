@@ -14,7 +14,7 @@ ${APPIUM_URL}    http://127.0.0.1:4723
 Medication List Opens On Phone              İlaçlarım    Tedavi Planı
 History Opens On Phone                      Geçmiş       Son 7 Gün
 Settings Opens On Phone                     Ayarlar      Kullanıcı Profili
-Today Opens On Phone                        Bugün        Günün Kalanı
+Today Opens On Phone                        Bugün        Bekleyen dozlar
 
 *** Keywords ***
 Open Installed Reminder Application

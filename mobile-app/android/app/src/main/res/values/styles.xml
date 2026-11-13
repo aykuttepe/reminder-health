@@ -2,10 +2,19 @@
   <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
     <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     <item name="colorPrimary">@color/colorPrimary</item>
+    <item name="colorAccent">@color/colorAccent</item>
+    <item name="android:windowBackground">@color/windowBackground</item>
+    <item name="alertDialogTheme">@style/RutinAlertDialog</item>
     <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:navigationBarColor">@android:color/transparent</item>
   </style>
   <style name="Theme.App.SplashScreen" parent="AppTheme">
     <item name="android:windowBackground">@drawable/splashscreen_logo</item>
+  </style>
+  <style name="RutinAlertDialog" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+    <item name="colorAccent">@color/colorAccent</item>
+    <item name="android:windowBackground">@drawable/rutin_dialog_background</item>
+    <item name="android:textColorPrimary">@color/textPrimary</item>
+    <item name="android:textColorSecondary">@color/textSecondary</item>
   </style>
 </resources>

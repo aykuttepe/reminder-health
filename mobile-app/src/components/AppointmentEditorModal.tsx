@@ -19,6 +19,7 @@ import { formatLocalizedDate, toDateKey } from './CalendarModal';
 import { useResponsive } from '../useResponsive';
 import { TimePickerModal } from './TimePickerModal';
 
+import { COLORS, RADII } from '../theme';
 const POPULAR_SPECIALTIES_TR = [
   'Dahiliye',
   'Göz',
@@ -236,7 +237,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
         {/* Header */}
         <View style={[styles.header, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
           <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
-            <Ionicons name="close" size={24} color="#f5f3f0" />
+            <Ionicons name="close" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {appointment ? (isEn ? 'Edit Appointment' : 'Randevuyu Düzenle') : (isEn ? 'New Appointment' : 'Yeni Randevu Ekle')}
@@ -268,13 +269,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
               })}
             </ScrollView>
             <View style={styles.inputBox}>
-              <Ionicons name="fitness-outline" size={18} color="#a9dfca" style={styles.inputIcon} />
+              <Ionicons name="fitness-outline" size={18} color={COLORS.accent} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 value={specialty}
                 onChangeText={setSpecialty}
                 placeholder={isEn ? 'e.g. Ophthalmology, Internal Med' : 'Örn. Göz Hastalıkları, Dahiliye'}
-                placeholderTextColor="#5c6e80"
+                placeholderTextColor={COLORS.textMuted}
               />
             </View>
           </View>
@@ -283,13 +284,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Doctor Name' : 'Doktor Adı'}</Text>
             <View style={styles.inputBox}>
-              <Ionicons name="person-outline" size={18} color="#a9dfca" style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={18} color={COLORS.accent} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 value={doctorName}
                 onChangeText={setDoctorName}
                 placeholder={isEn ? 'e.g. Dr. Jane Smith' : 'Örn. Uzm. Dr. Ahmet Yılmaz'}
-                placeholderTextColor="#5c6e80"
+                placeholderTextColor={COLORS.textMuted}
               />
             </View>
           </View>
@@ -298,13 +299,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Hospital / Clinic' : 'Hastane / Klinik'}</Text>
             <View style={styles.inputBox}>
-              <Ionicons name="business-outline" size={18} color="#a9dfca" style={styles.inputIcon} />
+              <Ionicons name="business-outline" size={18} color={COLORS.accent} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 value={hospital}
                 onChangeText={setHospital}
                 placeholder={isEn ? 'e.g. City Hospital' : 'Örn. Şehir Hastanesi, Acıbadem'}
-                placeholderTextColor="#5c6e80"
+                placeholderTextColor={COLORS.textMuted}
               />
             </View>
           </View>
@@ -313,13 +314,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Phone (Optional)' : 'Randevu / Doktor Telefonu (İsteğe Bağlı)'}</Text>
             <View style={styles.inputBox}>
-              <Ionicons name="call-outline" size={18} color="#a9dfca" style={styles.inputIcon} />
+              <Ionicons name="call-outline" size={18} color={COLORS.accent} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="0555 000 0000"
-                placeholderTextColor="#5c6e80"
+                placeholderTextColor={COLORS.textMuted}
                 keyboardType="phone-pad"
               />
             </View>
@@ -334,14 +335,14 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
               activeOpacity={0.8}
             >
               <View style={styles.datePickerLeft}>
-                <Ionicons name="calendar" size={20} color="#a9dfca" />
+                <Ionicons name="calendar" size={20} color={COLORS.accent} />
                 <Text style={date ? styles.datePickerValueText : styles.datePickerPlaceholderText}>
                   {date ? formatLocalizedDate(date, lang) : (isEn ? 'Tap to choose date' : 'Tarih seçmek için dokunun')}
                 </Text>
               </View>
               <View style={styles.datePickerBadge}>
                 <Text style={styles.datePickerBadgeText}>{isEn ? 'Choose' : 'Seç'}</Text>
-                <Ionicons name="chevron-forward" size={13} color="#a9dfca" />
+                <Ionicons name="chevron-forward" size={13} color={COLORS.accent} />
               </View>
             </TouchableOpacity>
 
@@ -366,10 +367,10 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Appointment Time' : 'Randevu Saati'}</Text>
             <TouchableOpacity style={styles.timeSelectField} onPress={() => setTimePickerFor('appointment')} activeOpacity={0.8}>
-              <Ionicons name="time-outline" size={20} color="#a9dfca" />
+              <Ionicons name="time-outline" size={20} color={COLORS.accent} />
               <Text style={styles.timeSelectValue}>{time || '13:00'}</Text>
               <Text style={styles.timeSelectHint}>{isEn ? 'Tap to change' : 'Değiştirmek için dokunun'}</Text>
-              <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+              <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -405,7 +406,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
                     <Ionicons
                       name={active ? 'checkmark-circle' : 'add-circle-outline'}
                       size={15}
-                      color={active ? '#a9dfca' : '#94a3b8'}
+                      color={active ? COLORS.accent : COLORS.textSecondary}
                     />
                     <Text style={[styles.leadChipText, active && styles.leadChipTextActive]}>
                       {opt.label}
@@ -423,7 +424,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
             <View style={styles.bloodTestHeaderRow}>
               <View style={styles.bloodTestHeaderLeft}>
                 <View style={styles.bloodTestIconWrap}>
-                  <Ionicons name="flask" size={18} color="#a78bfa" />
+                  <Ionicons name="flask" size={18} color={COLORS.purple} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bloodTestTitle}>
@@ -439,7 +440,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
               <Switch
                 value={hasBloodTest}
                 onValueChange={handleToggleBloodTest}
-                trackColor={{ true: '#a78bfa', false: '#3a4655' }}
+                trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
               />
             </View>
 
@@ -455,14 +456,14 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
                   activeOpacity={0.8}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                    <Ionicons name="flask-outline" size={18} color="#c4b5fd" />
+                    <Ionicons name="flask-outline" size={18} color={COLORS.purple} />
                     <Text style={bloodTestDate ? styles.bloodDateText : styles.bloodPlaceholderText}>
                       {bloodTestDate ? formatLocalizedDate(bloodTestDate, lang) : (isEn ? 'Select test date' : 'Tahlil tarihi seçin')}
                     </Text>
                   </View>
                   <View style={styles.bloodChangeBadge}>
                     <Text style={styles.bloodChangeBadgeText}>{isEn ? 'Choose' : 'Seç'}</Text>
-                    <Ionicons name="chevron-forward" size={12} color="#c4b5fd" />
+                    <Ionicons name="chevron-forward" size={12} color={COLORS.purple} />
                   </View>
                 </TouchableOpacity>
 
@@ -483,20 +484,20 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
                 <View style={{ marginTop: 12 }}>
                   <Text style={styles.bloodFieldLabel}>{isEn ? 'Test Time (Morning)' : 'Kan Verme Saati (Sabah)'}</Text>
                   <TouchableOpacity style={styles.timeSelectField} onPress={() => setTimePickerFor('bloodTest')} activeOpacity={0.8}>
-                    <Ionicons name="time-outline" size={20} color="#a9dfca" />
+                    <Ionicons name="time-outline" size={20} color={COLORS.accent} />
                     <Text style={styles.timeSelectValue}>{bloodTestTime}</Text>
                     <Text style={styles.timeSelectHint}>{isEn ? 'Tap to change' : 'Değiştirmek için dokunun'}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                    <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Aç Karnına Uyarısı Toggle */}
                 <View style={styles.fastingToggleRow}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
-                    <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '600' }}>
+                    <Text style={{ color: COLORS.text, fontSize: 13, fontWeight: '600' }}>
                       {isEn ? 'Fasting Required (8-10h)' : 'Aç Karnına Kan Verme (8-10 Saat)'}
                     </Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
+                    <Text style={{ color: COLORS.textSecondary, fontSize: 11, marginTop: 2 }}>
                       {isEn
                         ? 'Sends evening-before reminder to stop eating and morning alarm before test'
                         : 'Önceki akşam yemek yemeyi kesme ve tahlil sabahı aç gitme uyarısı gönderir'}
@@ -505,7 +506,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
                   <Switch
                     value={bloodTestFasting}
                     onValueChange={setBloodTestFasting}
-                    trackColor={{ true: '#a78bfa', false: '#3a4655' }}
+                    trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                   />
                 </View>
 
@@ -517,7 +518,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
                     value={bloodTestNotes}
                     onChangeText={setBloodTestNotes}
                     placeholder={isEn ? 'e.g. Fasting blood sugar & thyroid panel, drink only water' : 'Örn. Açlık şekeri ve tiroid paneli, su dışında bir şey içilmeyecek'}
-                    placeholderTextColor="#5c6e80"
+                    placeholderTextColor={COLORS.textMuted}
                   />
                 </View>
               </View>
@@ -528,13 +529,13 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Appointment Notes / Prep' : 'Randevu Notları / Hazırlık'}</Text>
             <View style={[styles.inputBox, { height: 'auto', minHeight: 80, alignItems: 'flex-start', paddingVertical: 8 }]}>
-              <Ionicons name="reader-outline" size={18} color="#a9dfca" style={[styles.inputIcon, { marginTop: 3 }]} />
+              <Ionicons name="reader-outline" size={18} color={COLORS.accent} style={[styles.inputIcon, { marginTop: 3 }]} />
               <TextInput
                 style={[styles.textInput, { minHeight: 70, textAlignVertical: 'top' }]}
                 value={notes}
                 onChangeText={setNotes}
                 placeholder={isEn ? 'Questions for doctor, previous reports to bring...' : 'Doktora sorulacak sorular, yanına alınacak eski tahlil sonuçları...'}
-                placeholderTextColor="#5c6e80"
+                placeholderTextColor={COLORS.textMuted}
                 multiline
                 numberOfLines={3}
               />
@@ -552,14 +553,14 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="trash-outline" size={18} color="#ff8585" />
+                <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
               <Text style={styles.cancelBtnText}>{isEn ? 'Cancel' : 'Vazgeç'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Ionicons name="checkmark-circle" size={18} color="#081624" />
+              <Ionicons name="checkmark-circle" size={18} color={COLORS.onAccent} />
               <Text style={styles.saveBtnText}>
                 {appointment ? (isEn ? 'Update Appointment' : 'Randevuyu Güncelle') : (isEn ? 'Save Appointment' : 'Randevuyu Kaydet')}
               </Text>
@@ -590,7 +591,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#081624',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
@@ -599,24 +600,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#172738',
+    borderBottomColor: COLORS.border,
   },
   headerBtn: {
     padding: 4,
   },
   headerTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 17,
     fontWeight: '700',
   },
   headerSaveBtn: {
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: RADII.button,
   },
   headerSaveBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -631,13 +632,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fieldLabel: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 6,
   },
   fieldSub: {
-    color: '#8892a0',
+    color: COLORS.textSecondary,
     fontSize: 11,
     marginBottom: 8,
   },
@@ -646,34 +647,34 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   specialtyChip: {
-    backgroundColor: '#12202e',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     marginRight: 6,
     borderWidth: 1,
-    borderColor: '#1e384f',
+    borderColor: COLORS.border,
   },
   specialtyChipActive: {
-    backgroundColor: '#173d34',
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accentSoft,
+    borderColor: COLORS.accent,
   },
   specialtyChipText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '600',
   },
   specialtyChipTextActive: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontWeight: '700',
   },
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#101d29',
-    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
     paddingHorizontal: 12,
     height: 46,
   },
@@ -682,17 +683,17 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
   },
   datePickerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#101d29',
-    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.button,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
     paddingHorizontal: 14,
     height: 48,
   },
@@ -703,25 +704,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   datePickerValueText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
   },
   datePickerPlaceholderText: {
-    color: '#5c6e80',
+    color: COLORS.textMuted,
     fontSize: 14,
   },
   datePickerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(169, 223, 202, 0.15)',
+    backgroundColor: COLORS.accentSoft,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   datePickerBadgeText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -732,15 +733,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   quickDateChip: {
-    backgroundColor: '#152535',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#243a4e',
+    borderColor: COLORS.border,
   },
   quickDateChipText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '500',
   },
@@ -753,33 +754,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#101d29',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   leadChipActive: {
-    backgroundColor: '#163832',
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accentSoft,
+    borderColor: COLORS.accent,
   },
   leadChipText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     fontWeight: '500',
   },
   leadChipTextActive: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontWeight: '700',
   },
 
   // In-Card Blood Test Section
   bloodTestCard: {
-    backgroundColor: '#121829',
-    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderColor: COLORS.purpleBorder,
     padding: 14,
     marginBottom: 16,
   },
@@ -799,17 +800,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(167, 139, 250, 0.15)',
+    backgroundColor: COLORS.purpleSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bloodTestTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '700',
   },
   bloodTestSub: {
-    color: '#a78bfa',
+    color: COLORS.purple,
     fontSize: 11,
     marginTop: 2,
     lineHeight: 15,
@@ -819,11 +820,11 @@ const styles = StyleSheet.create({
   },
   bloodDivider: {
     height: 1,
-    backgroundColor: 'rgba(167, 139, 250, 0.2)',
+    backgroundColor: COLORS.purpleSoft,
     marginVertical: 10,
   },
   bloodFieldLabel: {
-    color: '#c4b5fd',
+    color: COLORS.purple,
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 6,
@@ -832,66 +833,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0c111e',
-    borderRadius: 8,
+    backgroundColor: COLORS.bg,
+    borderRadius: RADII.button,
     borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.4)',
+    borderColor: COLORS.purpleBorder,
     paddingHorizontal: 12,
     height: 44,
   },
   bloodDateText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '600',
   },
   bloodPlaceholderText: {
-    color: '#6b7280',
+    color: COLORS.textMuted,
     fontSize: 13,
   },
   bloodChangeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(167, 139, 250, 0.2)',
+    backgroundColor: COLORS.purpleSoft,
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 4,
   },
   bloodChangeBadgeText: {
-    color: '#c4b5fd',
+    color: COLORS.purple,
     fontSize: 11,
     fontWeight: '700',
   },
   bloodQuickChip: {
-    backgroundColor: '#1b1b36',
+    backgroundColor: COLORS.purpleSoft,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderColor: COLORS.purpleBorder,
   },
   bloodQuickChipText: {
-    color: '#c4b5fd',
-    fontSize: 10.5,
+    color: COLORS.purple,
+    fontSize: 11,
     fontWeight: '600',
   },
   fastingToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0c111e',
+    backgroundColor: COLORS.bg,
     borderRadius: 8,
     padding: 10,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.25)',
+    borderColor: COLORS.purpleBorder,
   },
   bloodNotesInput: {
-    backgroundColor: '#0c111e',
+    backgroundColor: COLORS.bg,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
-    color: '#f5f3f0',
+    borderColor: COLORS.purpleBorder,
+    color: COLORS.text,
     fontSize: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -906,40 +907,40 @@ const styles = StyleSheet.create({
   deleteBtn: {
     width: 48,
     height: 48,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.4)',
+    borderColor: COLORS.dangerBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    backgroundColor: COLORS.dangerSoft,
   },
   cancelBtn: {
     flex: 1,
     height: 48,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     borderWidth: 1,
-    borderColor: '#243a4e',
+    borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#101d29',
+    backgroundColor: COLORS.surface,
   },
   cancelBtnText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   saveBtn: {
     flex: 2,
     height: 48,
-    borderRadius: 10,
-    backgroundColor: '#a9dfca',
+    borderRadius: RADII.button,
+    backgroundColor: COLORS.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   saveBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -950,13 +951,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 14,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: RADII.card,
     borderWidth: 1,
-    borderColor: '#28394a',
-    backgroundColor: '#101d29',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
   timeSelectValue: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: 1,
@@ -964,7 +965,7 @@ const styles = StyleSheet.create({
   timeSelectHint: {
     flex: 1,
     textAlign: 'right',
-    color: '#5c6e80',
+    color: COLORS.textMuted,
     fontSize: 12,
   },
 });

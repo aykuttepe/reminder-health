@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { COLORS, RADII } from '../theme';
 const MONTH_NAMES_TR = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
@@ -233,11 +234,11 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               {/* Başlık & Kapat Butonu */}
               <View style={styles.headerRow}>
                 <View style={styles.headerLeft}>
-                  <Ionicons name="calendar" size={20} color="#34d399" />
+                  <Ionicons name="calendar" size={20} color={COLORS.accent} />
                   <Text style={styles.sheetTitle}>{modalTitle}</Text>
                 </View>
                 <TouchableOpacity style={styles.closeIconBtn} onPress={onClose}>
-                  <Ionicons name="close" size={20} color="#94a3b8" />
+                  <Ionicons name="close" size={20} color={COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -289,7 +290,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                   onPress={handlePrevMonth}
                   accessibilityLabel={isEn ? 'Previous Month' : 'Önceki Ay'}
                 >
-                  <Ionicons name="chevron-back" size={20} color="#f5f3f0" />
+                  <Ionicons name="chevron-back" size={20} color={COLORS.text} />
                 </TouchableOpacity>
 
                 <View style={styles.monthYearBox}>
@@ -303,7 +304,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                   onPress={handleNextMonth}
                   accessibilityLabel={isEn ? 'Next Month' : 'Sonraki Ay'}
                 >
-                  <Ionicons name="chevron-forward" size={20} color="#f5f3f0" />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
 
@@ -360,7 +361,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 
               {/* Seçili Tarih Özeti Banner'ı */}
               <View style={styles.selectedBanner}>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#34d399" />
+                <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.accent} />
                 <Text style={styles.selectedBannerText} numberOfLines={1}>
                   {formatLocalizedDate(currentSelected, lang)}
                 </Text>
@@ -386,7 +387,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(5, 11, 20, 0.75)',
+    backgroundColor: COLORS.overlay,
     justifyContent: 'flex-end',
   },
   backdropTablet: {
@@ -395,11 +396,11 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   sheetContainer: {
-    backgroundColor: '#0f1c2c',
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
-    borderColor: '#1e3852',
+    borderColor: COLORS.border,
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 36 : 20,
@@ -416,7 +417,7 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#2b4c6b',
+    backgroundColor: COLORS.surfaceMuted,
     borderRadius: 2,
     alignSelf: 'center',
     marginVertical: 6,
@@ -427,7 +428,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#172e44',
+    borderBottomColor: COLORS.border,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -437,12 +438,12 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#f5f3f0',
+    color: COLORS.text,
   },
   closeIconBtn: {
     padding: 6,
-    borderRadius: 8,
-    backgroundColor: '#16283b',
+    borderRadius: RADII.button,
+    backgroundColor: COLORS.surface,
   },
   presetsRow: {
     flexDirection: 'row',
@@ -454,23 +455,23 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#162a3f',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#244463',
+    borderColor: COLORS.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
   presetChipActive: {
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
-    borderColor: '#34d399',
+    backgroundColor: COLORS.accentSoft,
+    borderColor: COLORS.accent,
   },
   presetChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#cbd5e1',
+    color: COLORS.text,
   },
   presetChipTextActive: {
-    color: '#34d399',
+    color: COLORS.accent,
     fontWeight: '700',
   },
   monthNavRow: {
@@ -484,32 +485,32 @@ const styles = StyleSheet.create({
   navArrowBtn: {
     width: 38,
     height: 38,
-    borderRadius: 10,
-    backgroundColor: '#172d42',
+    borderRadius: RADII.button,
+    backgroundColor: COLORS.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#244566',
+    borderColor: COLORS.borderStrong,
   },
   monthYearBox: {
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: '#122335',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#1d3752',
+    borderColor: COLORS.border,
   },
   monthYearText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#f5f3f0',
+    color: COLORS.text,
     letterSpacing: 0.3,
   },
   weekDaysRow: {
     flexDirection: 'row',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#172a3c',
+    borderBottomColor: COLORS.border,
     marginBottom: 6,
   },
   weekDayCol: {
@@ -519,11 +520,11 @@ const styles = StyleSheet.create({
   weekDayText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#7e93a7',
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
   },
   weekendDayText: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
   },
   gridContainer: {
     flexDirection: 'row',
@@ -539,8 +540,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dayCellSelected: {
-    backgroundColor: '#34d399',
-    shadowColor: '#34d399',
+    backgroundColor: COLORS.accent,
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
@@ -548,33 +549,33 @@ const styles = StyleSheet.create({
   },
   dayCellToday: {
     borderWidth: 1.5,
-    borderColor: '#38bdf8',
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    borderColor: COLORS.info,
+    backgroundColor: COLORS.infoSoft,
   },
   dayText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#f1f5f9',
+    color: COLORS.text,
   },
   dayTextDimmed: {
-    color: '#475e75',
+    color: COLORS.textMuted,
     fontWeight: '400',
   },
   dayTextToday: {
-    color: '#38bdf8',
+    color: COLORS.info,
     fontWeight: '700',
   },
   dayTextSelected: {
-    color: '#0a1624',
+    color: COLORS.onAccent,
     fontWeight: '800',
   },
   selectedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    backgroundColor: COLORS.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.3)',
+    borderColor: COLORS.accentBorder,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -584,7 +585,7 @@ const styles = StyleSheet.create({
   selectedBannerText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#a9dfca',
+    color: COLORS.accent,
     flex: 1,
   },
   actionRow: {
@@ -594,26 +595,26 @@ const styles = StyleSheet.create({
   cancelBtn: {
     flex: 1,
     paddingVertical: 13,
-    borderRadius: 12,
-    backgroundColor: '#16283b',
+    borderRadius: RADII.button,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#24405d',
+    borderColor: COLORS.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#cbd5e1',
+    color: COLORS.text,
   },
   confirmBtn: {
     flex: 2,
     paddingVertical: 13,
     borderRadius: 12,
-    backgroundColor: '#34d399',
+    backgroundColor: COLORS.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#34d399',
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -622,6 +623,6 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#061320',
+    color: COLORS.onAccent,
   },
 });

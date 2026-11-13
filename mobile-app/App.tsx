@@ -22,7 +22,6 @@ import {
 } from 'react-native';
 import { useResponsive } from './src/useResponsive';
 
-const CAROUSEL_SPACING = 10;
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,6 +66,7 @@ import { CameraScannerModal } from './src/components/CameraScannerModal';
 import { CalendarModal, formatLocalizedDate, formatTurkishDate } from './src/components/CalendarModal';
 import { AppointmentEditorModal } from './src/components/AppointmentEditorModal';
 import { StockThresholdSlider } from './src/components/StockThresholdSlider';
+import { appointmentDayBadge } from './src/components/today/AppointmentSummary';
 import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
@@ -126,6 +126,7 @@ import {
   formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots, summarizeDay, dayAdherence, adherenceOverDays,
   type MealCondition, type MedicineForm, type FrequencyType, type Dose, type ScheduledSlot, type AppointmentItem,
 } from './src/medicationPlan';
+import { COLORS, MIN_TOUCH, RADII, SPACING, TYPE } from './src/theme';
 export * from './src/medicationPlan';
 
 const initialDoses: Dose[] = [];
@@ -281,7 +282,7 @@ function TimeSlotPicker({
         onPress={() => onStep(-15)}
         activeOpacity={0.7}
       >
-        <Ionicons name="remove" size={16} color="#a9dfca" />
+        <Ionicons name="remove" size={16} color={COLORS.accent} />
         <Text style={styles.stepBtnText}>{lang === 'en' ? '15 min' : '15 dk'}</Text>
       </TouchableOpacity>
 
@@ -306,7 +307,7 @@ function TimeSlotPicker({
             maxLength={2}
             selectTextOnFocus={true}
             placeholder="09"
-            placeholderTextColor="#50667d"
+            placeholderTextColor={COLORS.textMuted}
           />
         </TouchableOpacity>
 
@@ -337,7 +338,7 @@ function TimeSlotPicker({
             maxLength={2}
             selectTextOnFocus={true}
             placeholder="00"
-            placeholderTextColor="#50667d"
+            placeholderTextColor={COLORS.textMuted}
           />
         </TouchableOpacity>
       </View>
@@ -347,7 +348,7 @@ function TimeSlotPicker({
         onPress={() => onStep(15)}
         activeOpacity={0.7}
       >
-        <Ionicons name="add" size={16} color="#a9dfca" />
+        <Ionicons name="add" size={16} color={COLORS.accent} />
         <Text style={styles.stepBtnText}>{lang === 'en' ? '15 min' : '15 dk'}</Text>
       </TouchableOpacity>
     </View>
@@ -355,7 +356,7 @@ function TimeSlotPicker({
 }
 
 function MainApp() {
-  const { isTablet, isCompactText, contentMaxWidth, tabBarMaxWidth, modalMaxWidth, carouselCardWidth } = useResponsive();
+  const { isTablet, isCompactText, contentMaxWidth, tabBarMaxWidth, modalMaxWidth } = useResponsive();
   const [tab, setTab] = useState<Tab>('Bugün');
   const [settingsSubPage, setSettingsSubPage] = useState<SettingsSubPage>('main');
   const [today, setToday] = useState(localDateKey);
@@ -390,7 +391,6 @@ function MainApp() {
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [muted, setMuted] = useState(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [heroCarouselIndex, setHeroCarouselIndex] = useState(0);
 
   // Diagnostics & Logger State
   const [diagnosticsLogs, setDiagnosticsLogs] = useState<LogEntry[]>([]);
@@ -773,7 +773,6 @@ function MainApp() {
   };
 
   const mainScrollViewRef = useRef<ScrollView>(null);
-  const heroCarouselRef = useRef<ScrollView>(null);
 
   const handleTabPress = (targetTab: Tab) => {
     logger.breadcrumb(`Sekme değiştirildi: ${targetTab}`);
@@ -1245,11 +1244,6 @@ function MainApp() {
   todaySlots.sort((a, b) => a.time.localeCompare(b.time));
 
   const pendingSlots = todaySlots.filter(s => s.status === 'pending');
-  const nextSlot = pendingSlots[0];
-  const nextTime = nextSlot?.time;
-  // All pending slots for today go into the swipeable carousel deck
-  const carouselSlots = pendingSlots;
-  const restOfDaySlots = pendingSlots.slice(1);
 
   const getSlotTimingText = (timeStr: string) => {
     const [h, m] = timeStr.split(':').map(Number);
@@ -1291,7 +1285,7 @@ function MainApp() {
       return {
         type: 'double_dose_warning',
         icon: 'warning',
-        title: language === 'en' ? '⚠️ Double Dose Risk!' : '⚠️ Çift Doz Riski!',
+        title: language === 'en' ? 'Double Dose Risk!' : 'Çift Doz Riski!',
         message: language === 'en'
           ? `Next dose is at ${sameMedUpcoming.time}. To prevent double-dosing, it is safer to skip this delayed dose.`
           : `Sonraki dozunuz saat ${sameMedUpcoming.time}'de. Çift doz etkisini önlemek için bu geciken dozu atlamanız önerilir.`,
@@ -1305,7 +1299,7 @@ function MainApp() {
         return {
           type: 'meal_guidance',
           icon: 'restaurant',
-          title: language === 'en' ? '🍽️ Meal Time Passed' : '🍽️ Öğün Saati Geçti',
+          title: language === 'en' ? 'Meal Time Passed' : 'Öğün Saati Geçti',
           message: language === 'en'
             ? 'This med is for after meals. Take with a light snack or with your next meal; avoid taking on an empty stomach.'
             : 'Bu ilaç tok karnına alınmalıdır. Midenizi korumak için hafif bir atıştırmalıkla veya sonraki öğünle alınız.',
@@ -1314,7 +1308,7 @@ function MainApp() {
         return {
           type: 'meal_guidance',
           icon: 'hourglass',
-          title: language === 'en' ? '⏳ Empty Stomach Needed' : '⏳ Aç Karnına Alınmalı',
+          title: language === 'en' ? 'Empty Stomach Needed' : 'Aç Karnına Alınmalı',
           message: language === 'en'
             ? 'Must be taken on an empty stomach: at least 30-60 mins before eating or 2 hours after.'
             : 'Aç karnına alınmalıdır: Yemekten en az 30-60 dk önce veya yemekten 2 saat sonra alınız.',
@@ -1323,7 +1317,7 @@ function MainApp() {
         return {
           type: 'meal_guidance',
           icon: 'restaurant',
-          title: language === 'en' ? '🍲 Take With Meal' : '🍲 Yemekle Alınmalı',
+          title: language === 'en' ? 'Take With Meal' : 'Yemekle Alınmalı',
           message: language === 'en'
             ? 'Take along with food to ensure proper absorption and stomach comfort.'
             : 'İlacın emilimi ve mide konforu için yemeğin hemen yanında alınız.',
@@ -1332,7 +1326,7 @@ function MainApp() {
         return {
           type: 'general_overdue',
           icon: 'time',
-          title: language === 'en' ? '⏰ Missed / Overdue Dose' : '⏰ Unutulmuş / Gecikmiş Doz',
+          title: language === 'en' ? 'Missed / Overdue Dose' : 'Unutulmuş / Gecikmiş Doz',
           message: language === 'en'
             ? 'If your next dose is far away, take it now. If your next dose is near, skip this one.'
             : 'Sonraki doza daha çok vakit varsa şimdi alabilir, sonraki doza yakınsanız bu dozu atlayabilirsiniz.',
@@ -2234,41 +2228,67 @@ function MainApp() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
 
       <View style={styles.container}>
-        {/* Header */}
+        {/* Header: brand row, then the screen title and its date or subtitle */}
         <View style={[styles.header, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}>
-          <View style={styles.headerTitleCol}>
-            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
-              {tab === 'Bugün' && t.tabToday}
-              {tab === 'İlaçlarım' && t.tabMedicines}
-              {tab === 'Geçmiş' && t.tabHistory}
-              {tab === 'Ayarlar' && t.tabSettings}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
-              {tab === 'Bugün' || tab === 'Geçmiş'
-                ? dateFromKey(today).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })
-                : tab === 'İlaçlarım'
-                  ? (language === 'en' ? 'Your medication plan, all in one place.' : 'Kullanım planın, bir arada.')
-                  : (userName
-                      ? (language === 'en' ? `Hello ${userName}, a routine tailored to you.` : `Merhaba ${userName}, sana uygun bir rutin.`)
-                      : (language === 'en' ? 'A routine tailored to you.' : 'Sana uygun bir rutin.'))}
-            </Text>
+          <View style={styles.brandRow}>
+            <View style={styles.brandLogo} accessible accessibilityRole="image" accessibilityLabel="Rutin">
+              <View style={styles.brandMark}>
+                <MaterialCommunityIcons name="pill" size={16} color={COLORS.onAccent} />
+              </View>
+              <Text style={styles.brandText} maxFontSizeMultiplier={1.3}>Rutin</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.avatarBtn}
+              onPress={() => {
+                handleTabPress('Ayarlar');
+                setSettingsSubPage('profile');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t.profileAvatarLabel}
+            >
+              <View style={styles.avatar}>
+                {userName.trim() ? (
+                  <Text style={styles.avatarText} maxFontSizeMultiplier={1.2}>
+                    {userName.trim().charAt(0).toLocaleUpperCase(language === 'en' ? 'en-US' : 'tr-TR')}
+                  </Text>
+                ) : (
+                  <Ionicons name="person-outline" size={18} color={COLORS.textSecondary} />
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
-          {tab === 'Bugün' && (
-            <View style={styles.progressBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#a9dfca" />
-              <Text style={styles.progressText}>
-                {language === 'en' ? `${takenSlots.length} of ${todaySlots.length} doses taken` : `${todaySlots.length} dozdan ${takenSlots.length}'i alındı`}
+          <View style={styles.headerTitleRow}>
+            <View style={styles.headerTitleCol}>
+              <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail" accessibilityRole="header">
+                {tab === 'Bugün' && t.tabToday}
+                {tab === 'İlaçlarım' && t.tabMedicines}
+                {tab === 'Geçmiş' && t.tabHistory}
+                {tab === 'Ayarlar' && t.tabSettings}
+              </Text>
+              <Text style={styles.headerSubtitle} numberOfLines={2} ellipsizeMode="tail">
+                {tab === 'Bugün' || tab === 'Geçmiş'
+                  ? dateFromKey(today).toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })
+                  : tab === 'İlaçlarım'
+                    ? (language === 'en' ? 'Your medication plan, all in one place.' : 'Kullanım planın, bir arada.')
+                    : (userName
+                        ? (language === 'en' ? `Hello ${userName}, a routine tailored to you.` : `Merhaba ${userName}, sana uygun bir rutin.`)
+                        : (language === 'en' ? 'A routine tailored to you.' : 'Sana uygun bir rutin.'))}
               </Text>
             </View>
-          )}
-          {tab === 'İlaçlarım' && (
-            <TouchableOpacity style={styles.addBtn} onPress={() => openEditor()}>
-              <Ionicons name="add" size={24} color="#081624" />
-            </TouchableOpacity>
-          )}
+            {tab === 'İlaçlarım' && (
+              <TouchableOpacity
+                style={styles.addBtn}
+                onPress={() => openEditor()}
+                accessibilityRole="button"
+                accessibilityLabel={t.modalAddTitle}
+              >
+                <Ionicons name="add" size={26} color={COLORS.onAccent} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Content Tabs */}
@@ -2277,58 +2297,57 @@ function MainApp() {
           style={styles.scrollArea}
           contentContainerStyle={[styles.scrollContent, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}
         >
-          {/* Without notification permission no reminder is shown at all; warn where doses are taken. */}
-          {tab === 'Bugün' && hasNotificationPermission === false && doses.some(d => !d.deletedAt && !d.muted) && (
-            <TouchableOpacity
-              style={styles.exactAlarmBanner}
-              onPress={enableNotifications}
-              accessibilityRole="button"
-              accessibilityLabel={language === 'en' ? 'Notifications are off. Turn on' : 'Bildirimler kapalı. Aç'}
-            >
-              <Ionicons name="notifications-off-outline" size={22} color="#f0b484" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.exactAlarmBannerTitle}>{language === 'en' ? 'Notifications are off' : 'Bildirimler kapalı'}</Text>
-                <Text style={styles.exactAlarmBannerText}>
-                  {language === 'en' ? 'Dose reminders will not be shown.' : 'İlaç hatırlatmaları gösterilemez.'}
-                </Text>
-              </View>
-              <Text style={styles.exactAlarmBannerAction}>{language === 'en' ? 'Turn on' : 'Aç'}</Text>
-            </TouchableOpacity>
-          )}
-          {/* Play installs start without exact-alarm access on Android 14+; without it reminders run late. */}
-          {tab === 'Bugün' && exactAlarmAllowed === false && doses.some(d => !d.deletedAt && !d.muted) && (
-            <TouchableOpacity
-              style={styles.exactAlarmBanner}
-              onPress={async () => { triggerHaptic(); await openExactAlarmSettings(); }}
-              accessibilityRole="button"
-              accessibilityLabel={`${t.exactAlarmBannerTitle}. ${t.reliabilityOpenSettings}`}
-            >
-              <Ionicons name="alarm-outline" size={22} color="#f0b484" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.exactAlarmBannerTitle}>{t.exactAlarmBannerTitle}</Text>
-                <Text style={styles.exactAlarmBannerText}>{t.exactAlarmBannerText}</Text>
-              </View>
-              <Text style={styles.exactAlarmBannerAction}>{t.reliabilityOpenSettings}</Text>
-            </TouchableOpacity>
-          )}
           {tab === 'Bugün' && (
             <TodayView
-              carouselSlots={carouselSlots}
+              pendingSlots={pendingSlots}
               todaySlots={todaySlots}
               takenSlots={takenSlots}
               offCycleDoses={offCycleDoses}
               completedDoses={completedDoses}
-              restOfDaySlots={restOfDaySlots}
-              heroCarouselIndex={heroCarouselIndex}
-              setHeroCarouselIndex={setHeroCarouselIndex}
-              heroCarouselRef={heroCarouselRef}
+              notices={
+                <>
+              {/* Without notification permission no reminder is shown at all; warn where doses are taken. */}
+              {hasNotificationPermission === false && doses.some(d => !d.deletedAt && !d.muted) && (
+                <TouchableOpacity
+                  style={styles.exactAlarmBanner}
+                  onPress={enableNotifications}
+                  accessibilityRole="button"
+                  accessibilityLabel={language === 'en' ? 'Notifications are off. Turn on' : 'Bildirimler kapalı. Aç'}
+                >
+                  <Ionicons name="notifications-off-outline" size={22} color={COLORS.warning} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.exactAlarmBannerTitle}>{language === 'en' ? 'Notifications are off' : 'Bildirimler kapalı'}</Text>
+                    <Text style={styles.exactAlarmBannerText}>
+                      {language === 'en' ? 'Dose reminders will not be shown.' : 'İlaç hatırlatmaları gösterilemez.'}
+                    </Text>
+                  </View>
+                  <Text style={styles.exactAlarmBannerAction}>{language === 'en' ? 'Turn on' : 'Aç'}</Text>
+                </TouchableOpacity>
+              )}
+              {/* Play installs start without exact-alarm access on Android 14+; without it reminders run late. */}
+              {exactAlarmAllowed === false && doses.some(d => !d.deletedAt && !d.muted) && (
+                <TouchableOpacity
+                  style={styles.exactAlarmBanner}
+                  onPress={async () => { triggerHaptic(); await openExactAlarmSettings(); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t.exactAlarmBannerTitle}. ${t.reliabilityOpenSettings}`}
+                >
+                  <Ionicons name="alarm-outline" size={22} color={COLORS.warning} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.exactAlarmBannerTitle}>{t.exactAlarmBannerTitle}</Text>
+                    <Text style={styles.exactAlarmBannerText}>{t.exactAlarmBannerText}</Text>
+                  </View>
+                  <Text style={styles.exactAlarmBannerAction}>{t.reliabilityOpenSettings}</Text>
+                </TouchableOpacity>
+              )}
+                </>
+              }
               takeSlot={takeSlot}
               snoozeDose={snoozeDose}
               skipSlot={skipSlot}
               onRevertRecord={(slot) => confirmRevertRecord(slot.doseId, slot.time, today)}
               triggerHaptic={triggerHaptic}
               openEditor={openEditor}
-              onNavigateSettings={() => setTab('Ayarlar')}
               onNavigateDoctorProfile={() => {
                 setTab('Ayarlar');
                 setSettingsSubPage('profile');
@@ -2349,8 +2368,6 @@ function MainApp() {
               formatStock={formatStock}
               getCycleInfo={getCycleInfo}
               getDurationInfo={getDurationInfo}
-              CAROUSEL_CARD_WIDTH={carouselCardWidth}
-              CAROUSEL_SPACING={CAROUSEL_SPACING}
             />
           )}
 
@@ -2398,7 +2415,7 @@ function MainApp() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="chevron-back" size={18} color="#a9dfca" />
+                    <Ionicons name="chevron-back" size={18} color={COLORS.accent} />
                     <Text style={styles.settingsBackBtnText}>{t.tabSettings}</Text>
                   </TouchableOpacity>
                   <Text style={styles.settingsSubHeaderTitle} numberOfLines={2}>
@@ -2423,7 +2440,7 @@ function MainApp() {
                       style={styles.permBanner}
                       onPress={enableNotifications}
                     >
-                      <Ionicons name="warning-outline" size={20} color="#f0b484" />
+                      <Ionicons name="warning-outline" size={20} color={COLORS.warning} />
                       <Text style={styles.permBannerText}>
                         {language === 'en' ? 'Notifications are disabled. Tap to enable dose reminders.' : 'Bildirim izni kapalı. Doz hatırlatıcıları için dokunun.'}
                       </Text>
@@ -2434,7 +2451,7 @@ function MainApp() {
                   )}
 
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="options-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="options-outline" size={16} color={COLORS.textSecondary} />
                     <Text style={styles.settingGroupTitle}>{language === 'en' ? 'SETTINGS CATEGORIES' : 'AYAR KATEGORİLERİ'}</Text>
                   </View>
 
@@ -2445,8 +2462,8 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('profile'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#182b3a' }]}>
-                        <Ionicons name="person-circle-outline" size={22} color="#a9dfca" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="person-circle-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsProfile}</Text>
@@ -2456,7 +2473,7 @@ function MainApp() {
                             : t.settingsProfileDesc}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     <View style={styles.menuListDivider} />
@@ -2467,14 +2484,14 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('language'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#13352c' }]}>
-                        <Ionicons name="globe-outline" size={22} color="#5eead4" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="globe-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsLanguage}</Text>
                         <Text style={styles.menuItemSub}>{language === 'tr' ? 'Türkçe (Varsayılan)' : 'English'}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     <View style={styles.menuListDivider} />
@@ -2485,8 +2502,8 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('notifications'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#183335' }]}>
-                        <Ionicons name="notifications-outline" size={22} color="#a9dfca" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="notifications-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsNotifications}</Text>
@@ -2498,7 +2515,7 @@ function MainApp() {
                               : `${soundEnabled ? 'Sesli' : 'Sessiz'} · ${snoozeMinutes} dk erteleme · ${repeatNagEnabled ? `${repeatNagCount} tekrar` : 'Tekrarsız'}`}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     <View style={styles.menuListDivider} />
@@ -2509,14 +2526,14 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('reliability'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#1b342b' }]}>
-                        <Ionicons name="shield-checkmark-outline" size={22} color="#34d399" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="shield-checkmark-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsReliability}</Text>
                         <Text style={styles.menuItemSub}>{t.settingsReliabilityDesc}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     <View style={styles.menuListDivider} />
@@ -2527,14 +2544,14 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('stock'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#2a2838' }]}>
-                        <Ionicons name="cube-outline" size={22} color="#c4b5fd" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="cube-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsStock}</Text>
                         <Text style={styles.menuItemSub}>{language === 'en' ? `Threshold: ${defaultStockThreshold} doses · ${stockAlertsEnabled ? 'Alerts on' : 'Off'}` : `Kritik eşik: ${defaultStockThreshold} doz · ${stockAlertsEnabled ? 'Uyarılar aktif' : 'Kapalı'}`}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     <View style={styles.menuListDivider} />
@@ -2545,8 +2562,8 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('experience'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#2d2538' }]}>
-                        <Ionicons name="sparkles-outline" size={22} color="#f472b6" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="sparkles-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{t.settingsExperience}</Text>
@@ -2556,7 +2573,7 @@ function MainApp() {
                             : t.settingsExperienceDesc}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     {/* 8. Senkronizasyon & Yedekleme */}
@@ -2565,8 +2582,8 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('sync'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#173347' }]}>
-                        <Ionicons name="cloud-upload-outline" size={22} color="#38bdf8" />
+                      <View style={styles.menuIconBox}>
+                        <Ionicons name="cloud-upload-outline" size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.menuTextContainer}>
                         <Text style={styles.menuItemTitle}>{CLOUD_SYNC_AVAILABLE ? t.settingsSync : t.settingsBackup}</Text>
@@ -2574,7 +2591,7 @@ function MainApp() {
                           {!cloudActive ? t.settingsSyncLocalDesc : lastSyncAt ? (language === 'en' ? `Last sync: ${lastSyncAt}` : `Son eşitleme: ${lastSyncAt}`) : t.settingsSyncDesc}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                     </TouchableOpacity>
 
                     {DIAGNOSTICS_AVAILABLE && (
@@ -2585,15 +2602,15 @@ function MainApp() {
                         onPress={() => { triggerHaptic(); setSettingsSubPage('diagnostics'); }}
                         activeOpacity={0.7}
                       >
-                        <View style={[styles.menuIconBox, { backgroundColor: '#281a17' }]}>
-                          <Ionicons name="bug-outline" size={22} color="#f0b484" />
+                        <View style={[styles.menuIconBox, { backgroundColor: COLORS.dangerSoft }]}>
+                          <Ionicons name="bug-outline" size={22} color={COLORS.warning} />
                         </View>
                         <View style={styles.menuTextContainer}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <Text style={styles.menuItemTitle}>{t.settingsDiagnostics}</Text>
                             {diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') && (
-                              <View style={{ backgroundColor: '#4c1d1d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700' }}>
+                              <View style={{ backgroundColor: COLORS.dangerSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text style={{ color: COLORS.danger, fontSize: 11, fontWeight: '700' }}>
                                   {diagnosticsLogs.filter(l => l.level === 'ERROR' || l.level === 'FATAL').length} {language === 'en' ? 'Errors' : 'Hata'}
                                 </Text>
                               </View>
@@ -2601,7 +2618,7 @@ function MainApp() {
                           </View>
                           <Text style={styles.menuItemSub}>{t.settingsDiagnosticsDesc}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color="#4e6173" />
+                        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                       </TouchableOpacity>
 
                       <View style={styles.menuListDivider} />
@@ -2614,14 +2631,14 @@ function MainApp() {
                       onPress={() => { triggerHaptic(); setSettingsSubPage('reset'); }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.menuIconBox, { backgroundColor: '#361c22' }]}>
-                        <Ionicons name="refresh-outline" size={22} color="#ff9696" />
+                      <View style={[styles.menuIconBox, { backgroundColor: COLORS.dangerSoft }]}>
+                        <Ionicons name="refresh-outline" size={22} color={COLORS.danger} />
                       </View>
                       <View style={styles.menuTextContainer}>
-                        <Text style={[styles.menuItemTitle, { color: '#ff9696' }]}>{t.settingsReset}</Text>
+                        <Text style={[styles.menuItemTitle, { color: COLORS.danger }]}>{t.settingsReset}</Text>
                         <Text style={styles.menuItemSub}>{t.settingsResetDesc}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#ff9696" />
+                      <Ionicons name="chevron-forward" size={18} color={COLORS.danger} />
                     </TouchableOpacity>
                   </View>
 
@@ -2629,7 +2646,7 @@ function MainApp() {
                   <View style={styles.updateCard}>
                     <View style={styles.updateHeaderRow}>
                       <View style={styles.updateIconBox}>
-                        <Ionicons name="information-circle-outline" size={20} color="#a9dfca" />
+                        <Ionicons name="information-circle-outline" size={20} color={COLORS.accent} />
                       </View>
                       <View style={styles.updateTextBox}>
                         <Text style={styles.updateTitle}>Rutin v{CURRENT_APP_VERSION}</Text>
@@ -2647,7 +2664,7 @@ function MainApp() {
                           disabled={checkingUpdate}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name={checkingUpdate ? 'sync' : 'refresh-outline'} size={14} color="#081624" />
+                          <Ionicons name={checkingUpdate ? 'sync' : 'refresh-outline'} size={14} color={COLORS.onAccent} />
                           <Text style={styles.checkUpdateBtnText}>
                             {checkingUpdate
                               ? (language === 'en' ? 'Checking...' : 'Denetleniyor...')
@@ -2660,7 +2677,7 @@ function MainApp() {
                     {updateInfo?.updateAvailable && (
                       <View style={styles.updateAlertBox}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="sparkles" size={18} color="#5eead4" />
+                          <Ionicons name="sparkles" size={18} color={COLORS.accent} />
                           <Text style={styles.updateAlertTitle}>
                             {language === 'en' ? `New Version Available: v${updateInfo.latestVersion}` : `Yeni Sürüm Mevcut: v${updateInfo.latestVersion}`}
                           </Text>
@@ -2675,7 +2692,7 @@ function MainApp() {
                           onPress={handleDownloadUpdate}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="cloud-download-outline" size={18} color="#081624" />
+                          <Ionicons name="cloud-download-outline" size={18} color={COLORS.onAccent} />
                           <Text style={styles.downloadUpdateBtnText}>
                             {language === 'en' ? 'Download & Install Update' : 'İndir ve Güncellemeyi Yükle'}
                           </Text>
@@ -2685,7 +2702,7 @@ function MainApp() {
 
                     {updateCheckedOnce && !updateInfo?.updateAvailable && !checkingUpdate && (
                       <View style={styles.upToDateRow}>
-                        <Ionicons name="checkmark-circle-outline" size={15} color="#34d399" />
+                        <Ionicons name="checkmark-circle-outline" size={15} color={COLORS.success} />
                         <Text style={styles.upToDateText}>
                           {language === 'en' ? 'Your app is up to date.' : 'Uygulamanız en güncel sürümde.'}
                         </Text>
@@ -2701,20 +2718,20 @@ function MainApp() {
                   <>
                     {/* KULLANICI BİLGİSİ */}
                     <View style={styles.settingGroupHeader}>
-                      <Ionicons name="person-circle-outline" size={16} color="#a9dfca" />
+                      <Ionicons name="person-circle-outline" size={16} color={COLORS.accent} />
                       <Text style={styles.settingGroupTitle}>{t.profileUserSection}</Text>
                     </View>
                     <View style={styles.settingCard}>
                       <Text style={styles.settingTitle}>{t.userNameLabel}</Text>
                       <Text style={styles.settingSub}>{t.userNameDesc}</Text>
                       <View style={styles.profileInputRow}>
-                        <Ionicons name="person-outline" size={16} color="#a9dfca" style={{ marginRight: 8 }} />
+                        <Ionicons name="person-outline" size={16} color={COLORS.accent} style={{ marginRight: 8 }} />
                         <TextInput
                           style={styles.profileInput}
                           value={userName}
                           onChangeText={setUserName}
                           placeholder={t.userNamePlaceholder}
-                          placeholderTextColor="#5c6e80"
+                          placeholderTextColor={COLORS.textMuted}
                           maxLength={32}
                           onBlur={() => syncProfileSettings()}
                         />
@@ -2723,7 +2740,7 @@ function MainApp() {
                             showToast(language === 'en' ? `Name updated to "${userName}"` : `İsim "${userName}" olarak güncellendi`);
                             syncProfileSettings();
                           }}>
-                            <Ionicons name="checkmark-circle" size={18} color="#a9dfca" />
+                            <Ionicons name="checkmark-circle" size={18} color={COLORS.accent} />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -2732,23 +2749,23 @@ function MainApp() {
                     {/* RANDEVULAR VE DOKTOR TAKİBİ */}
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 16, marginBottom: 8, paddingHorizontal: 4 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-                        <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
+                        <Ionicons name="calendar-outline" size={16} color={COLORS.accent} />
                         <Text style={[styles.settingGroupTitle, { flexShrink: 1 }]}>
                           {language === 'en' ? 'APPOINTMENTS & LAB TESTS' : 'RANDEVULAR VE TAHLİLLER'}
                         </Text>
                         {appointments.length > 0 && (
-                          <View style={{ backgroundColor: 'rgba(169, 223, 202, 0.2)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
-                            <Text style={{ color: '#a9dfca', fontSize: 10, fontWeight: '700' }}>{appointments.length}</Text>
+                          <View style={{ backgroundColor: COLORS.accentSoft, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
+                            <Text style={{ color: COLORS.accent, fontSize: 11, fontWeight: '700' }}>{appointments.length}</Text>
                           </View>
                         )}
                       </View>
                       <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(169, 223, 202, 0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(169, 223, 202, 0.3)' }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: COLORS.accentBorder }}
                         onPress={() => handleOpenAppointmentEditor()}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="add" size={14} color="#a9dfca" />
-                        <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '700' }}>
+                        <Ionicons name="add" size={14} color={COLORS.accent} />
+                        <Text style={{ color: COLORS.accent, fontSize: 12, fontWeight: '700' }}>
                           {language === 'en' ? 'Add Appointment' : 'Yeni Randevu Ekle'}
                         </Text>
                       </TouchableOpacity>
@@ -2776,7 +2793,7 @@ function MainApp() {
                               ? (language === 'en' ? 'Appointment card enabled' : 'Randevu kartı açıldı')
                               : (language === 'en' ? 'Appointment card hidden' : 'Randevu kartı gizlendi'));
                           }}
-                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                          trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                         />
                       </View>
                     </View>
@@ -2785,12 +2802,12 @@ function MainApp() {
                     {appointments.length === 0 ? (
                       <TouchableOpacity
                         style={{
-                          backgroundColor: '#101d29',
+                          backgroundColor: COLORS.surface,
                           borderRadius: 12,
                           padding: 16,
                           marginBottom: 14,
                           borderWidth: 1,
-                          borderColor: 'rgba(169, 223, 202, 0.2)',
+                          borderColor: COLORS.accentBorder,
                           borderStyle: 'dashed',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -2799,18 +2816,18 @@ function MainApp() {
                         onPress={() => handleOpenAppointmentEditor()}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="calendar-outline" size={28} color="#a9dfca" />
-                        <Text style={{ color: '#f5f3f0', fontSize: 14, fontWeight: '600' }}>
+                        <Ionicons name="calendar-outline" size={28} color={COLORS.accent} />
+                        <Text style={{ color: COLORS.text, fontSize: 14, fontWeight: '600' }}>
                           {language === 'en' ? 'No Appointments Added' : 'Kayıtlı Randevu Bulunmuyor'}
                         </Text>
-                        <Text style={{ color: '#adb3bf', fontSize: 12, textAlign: 'center' }}>
+                        <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: 'center' }}>
                           {language === 'en'
                             ? 'Tap here to add doctor appointments and fasting lab reminders.'
                             : 'Doktor randevusu ve aç karnına kan verme hatırlatıcısı eklemek için dokunun.'}
                         </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#a9dfca', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginTop: 4 }}>
-                          <Ionicons name="add" size={14} color="#081624" />
-                          <Text style={{ color: '#081624', fontSize: 12, fontWeight: '700' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accent, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginTop: 4 }}>
+                          <Ionicons name="add" size={14} color={COLORS.onAccent} />
+                          <Text style={{ color: COLORS.onAccent, fontSize: 12, fontWeight: '700' }}>
                             {language === 'en' ? 'Add Appointment' : 'Randevu Ekle'}
                           </Text>
                         </View>
@@ -2818,37 +2835,18 @@ function MainApp() {
                     ) : (
                       appointments.map(appt => {
                         const diff = getCalendarDayDiff(today, appt.date);
-                        let bText = '';
-                        let bBg = 'rgba(52, 211, 153, 0.18)';
-                        let bColor = '#34d399';
-                        if (diff === 0) {
-                          bText = language === 'en' ? 'Today' : 'Bugün';
-                          bBg = 'rgba(251, 191, 36, 0.2)';
-                          bColor = '#fbbf24';
-                        } else if (diff === 1) {
-                          bText = language === 'en' ? 'Tomorrow' : 'Yarın';
-                          bBg = 'rgba(52, 211, 153, 0.2)';
-                          bColor = '#34d399';
-                        } else if (diff > 1) {
-                          bText = language === 'en' ? `in ${diff} days` : `${diff} gün kaldı`;
-                          bBg = 'rgba(56, 189, 248, 0.18)';
-                          bColor = '#38bdf8';
-                        } else {
-                          bText = language === 'en' ? `${Math.abs(diff)} days ago` : `${Math.abs(diff)} gün önce`;
-                          bBg = 'rgba(148, 163, 184, 0.15)';
-                          bColor = '#94a3b8';
-                        }
+                        const { text: bText, bg: bBg, fg: bColor } = appointmentDayBadge(diff, language === 'en');
 
                         return (
                           <View
                             key={appt.id}
                             style={{
-                              backgroundColor: appt.completed ? '#0c1520' : '#101d29',
+                              backgroundColor: appt.completed ? COLORS.bg : COLORS.surface,
                               borderRadius: 12,
                               padding: 14,
                               marginBottom: 12,
                               borderWidth: 1,
-                              borderColor: appt.completed ? '#192634' : 'rgba(169, 223, 202, 0.25)',
+                              borderColor: appt.completed ? COLORS.border : COLORS.accentBorder,
                               opacity: appt.completed ? 0.7 : 1,
                             }}
                           >
@@ -2856,16 +2854,16 @@ function MainApp() {
                               <View style={{ flex: 1, marginRight: 8 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                   {appt.specialty ? (
-                                    <View style={{ backgroundColor: 'rgba(169, 223, 202, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                      <Text style={{ color: '#a9dfca', fontSize: 11, fontWeight: '700' }}>{appt.specialty}</Text>
+                                    <View style={{ backgroundColor: COLORS.accentSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <Text style={{ color: COLORS.accent, fontSize: 11, fontWeight: '700' }}>{appt.specialty}</Text>
                                     </View>
                                   ) : null}
-                                  <Text style={{ color: '#f5f3f0', fontSize: 14, fontWeight: '700' }}>
+                                  <Text style={{ color: COLORS.text, fontSize: 14, fontWeight: '700' }}>
                                     {appt.doctorName || (language === 'en' ? 'Doctor Appointment' : 'Doktor Randevusu')}
                                   </Text>
                                 </View>
                                 {appt.hospital ? (
-                                  <Text style={{ color: '#adb3bf', fontSize: 12, marginTop: 3 }}>
+                                  <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginTop: 3 }}>
                                     🏥 {appt.hospital}
                                   </Text>
                                 ) : null}
@@ -2878,13 +2876,13 @@ function MainApp() {
                             {/* Tarih ve Saat */}
                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 10 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
-                                <Ionicons name="calendar-outline" size={14} color="#a9dfca" />
-                                <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '600', flexShrink: 1 }}>
+                                <Ionicons name="calendar-outline" size={14} color={COLORS.accent} />
+                                <Text style={{ color: COLORS.text, fontSize: 13, fontWeight: '600', flexShrink: 1 }}>
                                   {formatLocalizedDate(appt.date, language)}
                                 </Text>
                               </View>
-                              <View style={{ backgroundColor: 'rgba(169, 223, 202, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(169, 223, 202, 0.3)' }}>
-                                <Text style={{ color: '#a9dfca', fontSize: 11, fontWeight: '700' }}>
+                              <View style={{ backgroundColor: COLORS.accentSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: COLORS.accentBorder }}>
+                                <Text style={{ color: COLORS.accent, fontSize: 11, fontWeight: '700' }}>
                                   ⏰ {appt.time || '13:00'}
                                 </Text>
                               </View>
@@ -2893,24 +2891,24 @@ function MainApp() {
                             {/* Randevu İçi Tahlil / Kan Verme Bölümü */}
                             {appt.hasBloodTest && appt.bloodTestDate ? (
                               <View style={{
-                                backgroundColor: 'rgba(167, 139, 250, 0.12)',
+                                backgroundColor: COLORS.purpleSoft,
                                 borderWidth: 1,
-                                borderColor: 'rgba(167, 139, 250, 0.3)',
+                                borderColor: COLORS.purpleBorder,
                                 borderRadius: 8,
                                 padding: 10,
                                 marginTop: 10,
                               }}>
                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2 }}>
-                                  <Ionicons name="flask" size={15} color="#c4b5fd" />
-                                  <Text style={{ color: '#c4b5fd', fontSize: 12, fontWeight: '700' }}>
+                                  <Ionicons name="flask" size={15} color={COLORS.purple} />
+                                  <Text style={{ color: COLORS.purple, fontSize: 12, fontWeight: '700' }}>
                                     {language === 'en' ? 'Fasting Lab Test' : 'Aç Karnına Kan Verme'}
                                   </Text>
-                                  <Text style={{ color: '#94a3b8', fontSize: 11 }}>
+                                  <Text style={{ color: COLORS.textSecondary, fontSize: 11 }}>
                                     • {formatLocalizedDate(appt.bloodTestDate, language)} ({appt.bloodTestTime || '08:30'})
                                   </Text>
                                 </View>
                                 {appt.bloodTestNotes ? (
-                                  <Text style={{ color: '#e2e8f0', fontSize: 11, marginTop: 4, fontStyle: 'italic' }}>
+                                  <Text style={{ color: COLORS.text, fontSize: 11, marginTop: 4, fontStyle: 'italic' }}>
                                     💬 {appt.bloodTestNotes}
                                   </Text>
                                 ) : null}
@@ -2919,41 +2917,41 @@ function MainApp() {
 
                             {/* Notlar */}
                             {appt.notes ? (
-                              <Text style={{ color: '#94a3b8', fontSize: 11.5, marginTop: 8 }}>
+                              <Text style={{ color: COLORS.textSecondary, fontSize: 11.5, marginTop: 8 }}>
                                 📝 {appt.notes}
                               </Text>
                             ) : null}
 
                             {/* Kart Aksiyonları: Arama, Düzenle, Tamamla, Sil */}
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1a2736' }}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: COLORS.border }}>
                               {appt.phone ? (
                                 <TouchableOpacity
-                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(52, 211, 153, 0.15)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
+                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: COLORS.successSoft, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
                                   onPress={() => {
                                     triggerHaptic();
                                     const clean = appt.phone?.replace(/[^0-9+]/g, '');
                                     if (clean) Linking.openURL(`tel:${clean}`).catch(() => {});
                                   }}
                                 >
-                                  <Ionicons name="call" size={13} color="#34d399" />
-                                  <Text style={{ color: '#34d399', fontSize: 11, fontWeight: '700' }}>{language === 'en' ? 'Call' : 'Ara'}</Text>
+                                  <Ionicons name="call" size={13} color={COLORS.success} />
+                                  <Text style={{ color: COLORS.success, fontSize: 11, fontWeight: '700' }}>{language === 'en' ? 'Call' : 'Ara'}</Text>
                                 </TouchableOpacity>
                               ) : null}
 
                               <TouchableOpacity
-                                style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#182b3a', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: COLORS.surface, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
                                 onPress={() => handleOpenAppointmentEditor(appt)}
                               >
-                                <Ionicons name="pencil" size={13} color="#38bdf8" />
-                                <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '600' }}>{language === 'en' ? 'Edit' : 'Düzenle'}</Text>
+                                <Ionicons name="pencil" size={13} color={COLORS.accent} />
+                                <Text style={{ color: COLORS.accent, fontSize: 12, fontWeight: '600' }}>{language === 'en' ? 'Edit' : 'Düzenle'}</Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
-                                style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: appt.completed ? '#1f3040' : '#143532', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: appt.completed ? COLORS.surfaceMuted : COLORS.accentSoft, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6 }}
                                 onPress={() => handleToggleCompleteAppointment(appt.id)}
                               >
-                                <Ionicons name={appt.completed ? 'refresh' : 'checkmark'} size={13} color={appt.completed ? '#94a3b8' : '#a9dfca'} />
-                                <Text style={{ color: appt.completed ? '#94a3b8' : '#a9dfca', fontSize: 11, fontWeight: '600' }}>
+                                <Ionicons name={appt.completed ? 'refresh' : 'checkmark'} size={13} color={appt.completed ? COLORS.textSecondary : COLORS.accent} />
+                                <Text style={{ color: appt.completed ? COLORS.textSecondary : COLORS.accent, fontSize: 11, fontWeight: '600' }}>
                                   {appt.completed ? (language === 'en' ? 'Reopen' : 'Tekrar Aç') : (language === 'en' ? 'Complete' : 'Tamamlandı')}
                                 </Text>
                               </TouchableOpacity>
@@ -2964,7 +2962,7 @@ function MainApp() {
                                 accessibilityLabel={language === 'en' ? 'Delete appointment' : 'Randevuyu sil'}
                                 onPress={() => handleDeleteAppointment(appt.id)}
                               >
-                                <Ionicons name="trash-outline" size={15} color="#ff9696" />
+                                <Ionicons name="trash-outline" size={15} color={COLORS.danger} />
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -2979,7 +2977,7 @@ function MainApp() {
                         onPress={handleShareMedList}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="share-social-outline" size={18} color="#38bdf8" />
+                        <Ionicons name="share-social-outline" size={18} color={COLORS.accent} />
                         <Text style={styles.profileShareBtnText}>{t.doctorShareMedList}</Text>
                       </TouchableOpacity>
 
@@ -2992,7 +2990,7 @@ function MainApp() {
               {settingsSubPage === 'language' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="globe-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="globe-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.languageTitle.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3025,7 +3023,7 @@ function MainApp() {
                       <Ionicons
                         name={language === 'tr' ? 'radio-button-on' : 'radio-button-off'}
                         size={22}
-                        color={language === 'tr' ? '#a9dfca' : '#4e6173'}
+                        color={language === 'tr' ? COLORS.accent : COLORS.textMuted}
                       />
                     </TouchableOpacity>
 
@@ -3051,7 +3049,7 @@ function MainApp() {
                       <Ionicons
                         name={language === 'en' ? 'radio-button-on' : 'radio-button-off'}
                         size={22}
-                        color={language === 'en' ? '#a9dfca' : '#4e6173'}
+                        color={language === 'en' ? COLORS.accent : COLORS.textMuted}
                       />
                     </TouchableOpacity>
                   </View>
@@ -3062,7 +3060,7 @@ function MainApp() {
               {settingsSubPage === 'notifications' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="notifications-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="notifications-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.settingsNotifications.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3077,7 +3075,7 @@ function MainApp() {
                           triggerHaptic();
                           setNotifications(val);
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
 
@@ -3095,7 +3093,7 @@ function MainApp() {
                           setSoundEnabled(val);
                           showToast(val ? (language === 'en' ? '🔊 Notification sound turned on' : '🔊 Bildirim sesi açıldı') : (language === 'en' ? '🔕 Notification sound turned off (Silent mode)' : '🔕 Bildirim sesi kapatıldı (Sessiz mod)'));
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
 
@@ -3112,7 +3110,7 @@ function MainApp() {
                               showToast(language === 'en' ? '🔊 Playing sound preview...' : '🔊 Bildirim sesi önizlemesi çalınıyor...');
                             }}
                           >
-                            <Ionicons name="volume-high-outline" size={13} color="#a9dfca" />
+                            <Ionicons name="volume-high-outline" size={13} color={COLORS.accent} />
                             <Text style={styles.testSoundHeaderBtnText}>{language === 'en' ? 'Play Sound' : 'Sesi Dinle'}</Text>
                           </TouchableOpacity>
                         </View>
@@ -3137,7 +3135,7 @@ function MainApp() {
                                   <Ionicons
                                     name={opt.icon as any}
                                     size={18}
-                                    color={isSelected ? '#081624' : '#a9dfca'}
+                                    color={isSelected ? COLORS.onAccent : COLORS.accent}
                                   />
                                 </View>
                                 <View style={{ flex: 1, marginLeft: 10 }}>
@@ -3156,7 +3154,7 @@ function MainApp() {
                                 <Ionicons
                                   name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
                                   size={20}
-                                  color={isSelected ? '#a9dfca' : '#455668'}
+                                  color={isSelected ? COLORS.accent : COLORS.textMuted}
                                 />
                               </TouchableOpacity>
                             );
@@ -3175,7 +3173,7 @@ function MainApp() {
                           }}
                         >
                           <View style={styles.deviceSoundActionIcon}>
-                            <Ionicons name="phone-portrait-outline" size={20} color="#081624" />
+                            <Ionicons name="phone-portrait-outline" size={20} color={COLORS.onAccent} />
                           </View>
                           <View style={{ flex: 1, marginLeft: 12 }}>
                             <Text style={styles.deviceSoundActionTitle}>
@@ -3187,11 +3185,11 @@ function MainApp() {
                                 : 'Android sistem ekranını açarak telefonunuzdaki dahili bildirim seslerinden birini seçin'}
                             </Text>
                           </View>
-                          <Ionicons name="open-outline" size={18} color="#a9dfca" />
+                          <Ionicons name="open-outline" size={18} color={COLORS.accent} />
                         </TouchableOpacity>
 
                         <View style={styles.deviceSoundTipCard}>
-                          <Ionicons name="information-circle-outline" size={16} color="#a9dfca" style={{ marginTop: 1 }} />
+                          <Ionicons name="information-circle-outline" size={16} color={COLORS.accent} style={{ marginTop: 1 }} />
                           <Text style={styles.deviceSoundTipText}>
                             {language === 'en'
                               ? 'Tip: Tap the button above and select "Sound" on the Android screen to assign Samsung, Xiaomi, Pixel, or your own custom ringtone to this channel.'
@@ -3208,7 +3206,7 @@ function MainApp() {
               {settingsSubPage === 'notifications' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="time-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="time-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.settingsReminders.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3290,7 +3288,7 @@ function MainApp() {
                             setRepeatNagEnabled(val);
                             showToast(val ? (language === 'en' ? '3-minute persistent repeat enabled' : '3 dakikada bir ısrarcı bildirim açıldı') : (language === 'en' ? 'Repeat reminders disabled' : 'Tekrar bildirimleri kapatıldı'));
                           }}
-                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                          trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                         />
                       </View>
 
@@ -3329,7 +3327,7 @@ function MainApp() {
               {settingsSubPage === 'reliability' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.settingsReliability.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3347,7 +3345,7 @@ function MainApp() {
                             {index > 0 && <View style={styles.settingDivider} />}
                             <View style={styles.reliabilityItem}>
                               <View style={styles.reliabilityItemIconWrap}>
-                                <Ionicons name={item.icon} size={18} color="#a9dfca" />
+                                <Ionicons name={item.icon} size={18} color={COLORS.accent} />
                               </View>
                               <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
                                 <Text style={styles.settingTitle}>{item.title}</Text>
@@ -3380,7 +3378,7 @@ function MainApp() {
                         );
                       }}
                     >
-                      <Ionicons name="flash" size={18} color="#081624" />
+                      <Ionicons name="flash" size={18} color={COLORS.onAccent} />
                       <Text style={styles.reliabilityTestBtnText}>{t.reliabilityTestButton}</Text>
                     </TouchableOpacity>
                   </View>
@@ -3391,7 +3389,7 @@ function MainApp() {
               {settingsSubPage === 'stock' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="cube-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="cube-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.settingsStock.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3427,7 +3425,7 @@ function MainApp() {
                           setStockAlertsEnabled(val);
                           showToast(val ? (language === 'en' ? 'Stock alerts enabled' : 'Stok uyarıları açıldı') : (language === 'en' ? 'Stock alerts disabled' : 'Stok uyarıları kapatıldı'));
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
                   </View>
@@ -3438,7 +3436,7 @@ function MainApp() {
               {settingsSubPage === 'experience' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.settingsPrivacy.toUpperCase()}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3453,7 +3451,7 @@ function MainApp() {
                           triggerHaptic();
                           setPrivateMode(val);
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
 
@@ -3470,7 +3468,7 @@ function MainApp() {
                           triggerHaptic();
                           setHideDoseAmount(val);
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
 
@@ -3482,7 +3480,7 @@ function MainApp() {
                           <Ionicons
                             name={soundEnabled && soundType !== 'silent' ? 'volume-medium' : 'volume-mute'}
                             size={12}
-                            color={soundEnabled && soundType !== 'silent' ? '#a9dfca' : '#adb3bf'}
+                            color={soundEnabled && soundType !== 'silent' ? COLORS.accent : COLORS.textSecondary}
                           />
                           <Text style={styles.previewSoundBadgeText}>
                             {soundEnabled && soundType !== 'silent'
@@ -3520,7 +3518,7 @@ function MainApp() {
                         return (
                           <View style={styles.notifPreviewContent}>
                             <View style={styles.notifPreviewIconCircle}>
-                              <Ionicons name="notifications" size={18} color="#a9dfca" />
+                              <Ionicons name="notifications" size={18} color={COLORS.accent} />
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
                               <Text style={styles.notifPreviewTitle}>
@@ -3531,7 +3529,7 @@ function MainApp() {
                               </Text>
                               {notifications && repeatNagEnabled && (
                                 <View style={styles.notifRepeatNagBadge}>
-                                  <Ionicons name="repeat" size={12} color="#a9dfca" />
+                                  <Ionicons name="repeat" size={12} color={COLORS.accent} />
                                   <Text style={styles.notifRepeatNagBadgeText}>
                                     {language === 'en'
                                       ? `Repeats every 3 min until confirmed (${repeatNagCount} repeats)`
@@ -3558,7 +3556,7 @@ function MainApp() {
                         );
                       }}
                     >
-                      <Ionicons name="paper-plane-outline" size={18} color="#081624" />
+                      <Ionicons name="paper-plane-outline" size={18} color={COLORS.onAccent} />
                       <Text style={styles.testNotificationBtnText}>{language === 'en' ? 'Send Test Notification in 3s' : '3 Sn Sonra Test Bildirimi Gönder'}</Text>
                     </TouchableOpacity>
                   </View>
@@ -3569,7 +3567,7 @@ function MainApp() {
               {settingsSubPage === 'experience' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="sparkles-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="sparkles-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>{t.settingsExperienceSection.toLocaleUpperCase(language === 'en' ? 'en-US' : 'tr-TR')}</Text>
                   </View>
                   <View style={styles.settingCard}>
@@ -3584,7 +3582,7 @@ function MainApp() {
                           triggerHaptic();
                           setAutoCollapseTaken(val);
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
 
@@ -3606,7 +3604,7 @@ function MainApp() {
                             ? (language === 'en' ? 'Haptic feedback enabled' : 'Titreşimli geri bildirim açıldı')
                             : (language === 'en' ? 'Haptic feedback disabled' : 'Titreşim kapatıldı'));
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
 
@@ -3632,7 +3630,7 @@ function MainApp() {
                             ? (language === 'en' ? 'Appointment card enabled' : 'Randevu kartı açıldı')
                             : (language === 'en' ? 'Appointment card hidden' : 'Randevu kartı gizlendi'));
                         }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                       />
                     </View>
                   </View>
@@ -3645,8 +3643,8 @@ function MainApp() {
                   {CLOUD_SYNC_AVAILABLE && (
                     <>
                     <View style={styles.settingGroupHeader}>
-                      <Ionicons name="cloud-upload-outline" size={16} color="#38bdf8" />
-                      <Text style={[styles.settingGroupTitle, { color: '#38bdf8' }]}>
+                      <Ionicons name="cloud-upload-outline" size={16} color={COLORS.info} />
+                      <Text style={[styles.settingGroupTitle, { color: COLORS.info }]}>
                         {language === 'en' ? 'CLOUD SYNCHRONIZATION' : 'BULUT EŞİTLEME (SENKRONİZASYON)'}
                       </Text>
                     </View>
@@ -3661,7 +3659,7 @@ function MainApp() {
                           value={cloudSyncEnabled}
                           onValueChange={handleCloudSyncToggle}
                           accessibilityLabel={t.cloudSyncTitle}
-                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                          trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                         />
                       </View>
                     </View>
@@ -3675,19 +3673,19 @@ function MainApp() {
                       <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        backgroundColor: '#071626',
+                        backgroundColor: COLORS.bg,
                         paddingHorizontal: 10,
                         paddingVertical: 7,
                         borderRadius: 8,
                         marginBottom: 10,
                         borderWidth: 1,
-                        borderColor: '#1e293b',
+                        borderColor: COLORS.border,
                         gap: 8
                       }}>
-                        <Ionicons name="cloud-done-outline" size={15} color="#38bdf8" />
-                        <Text style={{ color: '#94a3b8', fontSize: 11, flex: 1 }}>
+                        <Ionicons name="cloud-done-outline" size={15} color={COLORS.info} />
+                        <Text style={{ color: COLORS.textSecondary, fontSize: 11, flex: 1 }}>
                           {language === 'en' ? 'Server: ' : 'Sunucu: '}
-                          <Text style={{ color: '#38bdf8', fontWeight: '700' }}>Rutin Cloud (Cloudflare & Turso)</Text>
+                          <Text style={{ color: COLORS.info, fontWeight: '700' }}>Rutin Cloud (Cloudflare & Turso)</Text>
                         </Text>
                       </View>
 
@@ -3699,12 +3697,12 @@ function MainApp() {
 
                       {session ? (
                         <View>
-                          <Text style={styles.syncCardDesc}>{t.syncConnectedAccount}: <Text style={{ color: '#34d399', fontWeight: '700' }}>{session.user.name}</Text></Text>
+                          <Text style={styles.syncCardDesc}>{t.syncConnectedAccount}: <Text style={{ color: COLORS.success, fontWeight: '700' }}>{session.user.name}</Text></Text>
                         
-                          <View style={{ backgroundColor: '#071626', padding: 10, borderRadius: 8, marginVertical: 6, borderWidth: 1, borderColor: '#1e293b' }}>
+                          <View style={{ backgroundColor: COLORS.bg, padding: 10, borderRadius: 8, marginVertical: 6, borderWidth: 1, borderColor: COLORS.border }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                              <Text style={{ color: '#94a3b8', fontSize: 12, flexShrink: 1 }}>
-                                ✉️ {t.syncEmailLabel}: <Text style={{ color: session.user.email ? '#38bdf8' : '#64748b', fontWeight: '600' }}>{session.user.email || (language === 'en' ? 'Not set' : 'Belirtilmedi')}</Text>
+                              <Text style={{ color: COLORS.textSecondary, fontSize: 12, flexShrink: 1 }}>
+                                ✉️ {t.syncEmailLabel}: <Text style={{ color: session.user.email ? COLORS.info : COLORS.textMuted, fontWeight: '600' }}>{session.user.email || (language === 'en' ? 'Not set' : 'Belirtilmedi')}</Text>
                               </Text>
                               <TouchableOpacity
                                 onPress={() => {
@@ -3713,7 +3711,7 @@ function MainApp() {
                                 }}
                                 style={{ paddingHorizontal: 8, paddingVertical: 4 }}
                               >
-                                <Text style={{ color: '#38bdf8', fontSize: 11, fontWeight: '700' }}>
+                                <Text style={{ color: COLORS.info, fontSize: 11, fontWeight: '700' }}>
                                   {editingEmail ? t.cancel : (session.user.email ? (language === 'en' ? 'Edit' : 'Değiştir') : (language === 'en' ? '+ Add' : '+ Ekle'))}
                                 </Text>
                               </TouchableOpacity>
@@ -3725,7 +3723,7 @@ function MainApp() {
                                   value={authEmail}
                                   onChangeText={setAuthEmail}
                                   placeholder={t.syncEmailPlaceholder}
-                                  placeholderTextColor="#667"
+                                  placeholderTextColor={COLORS.textMuted}
                                   autoCapitalize="none"
                                   keyboardType="email-address"
                                   autoCorrect={false}
@@ -3744,22 +3742,22 @@ function MainApp() {
                           </View>
                         
                           {activeSyncCode && (
-                            <View style={{ backgroundColor: '#071626', padding: 12, borderRadius: 8, marginVertical: 10, borderWidth: 1, borderColor: '#1e293b' }}>
-                              <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
+                            <View style={{ backgroundColor: COLORS.bg, padding: 12, borderRadius: 8, marginVertical: 10, borderWidth: 1, borderColor: COLORS.border }}>
+                              <Text style={{ color: COLORS.accent, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
                                 {language === 'en' ? '📱 SYNC CODE FOR 2ND DEVICE:' : '📱 2. CİHAZ İÇİN EŞİTLEME KODUNUZ:'}
                               </Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#030c14', padding: 8, borderRadius: 6, gap: 8 }}>
-                                <Text selectable style={{ color: '#f8fafc', fontSize: 11, flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.bg, padding: 8, borderRadius: 6, gap: 8 }}>
+                                <Text selectable style={{ color: COLORS.text, fontSize: 11, flex: 1 }}>
                                   {activeSyncCode}
                                 </Text>
                                 <TouchableOpacity
-                                  style={{ backgroundColor: '#38bdf8', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4 }}
+                                  style={{ backgroundColor: COLORS.info, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4 }}
                                   onPress={() => Share.share({ message: language === 'en' ? `Reminder Sync Code: ${activeSyncCode}` : `Reminder Eşitleme Kodu: ${activeSyncCode}` })}
                                 >
-                                  <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                                  <Text style={{ color: COLORS.onAccent, fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
                                 </TouchableOpacity>
                               </View>
-                              <Text style={{ color: '#64748b', fontSize: 11, marginTop: 6 }}>
+                              <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 6 }}>
                                 {language === 'en'
                                   ? 'Enter this code on your second phone to link to the same account instantly.'
                                   : 'İkinci telefonunuza bu kodu girerek aynı hesaba anında bağlayabilirsiniz.'}
@@ -3779,7 +3777,7 @@ function MainApp() {
                             value={recoveryKey}
                             onChangeText={setRecoveryKey}
                             placeholder={t.syncRecoveryKeyPlaceholder}
-                            placeholderTextColor="#667"
+                            placeholderTextColor={COLORS.textMuted}
                             autoCapitalize="characters"
                             autoCorrect={false}
                           />
@@ -3804,14 +3802,14 @@ function MainApp() {
                         </View>
                       ) : (
                         <View>
-                          <View style={{ backgroundColor: '#071b2e', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#38bdf8', marginBottom: 12 }}>
+                          <View style={{ backgroundColor: COLORS.surface, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: COLORS.info, marginBottom: 12 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                              <Ionicons name="sparkles" size={16} color="#38bdf8" style={{ marginRight: 6 }} />
-                              <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '700' }}>
+                              <Ionicons name="sparkles" size={16} color={COLORS.info} style={{ marginRight: 6 }} />
+                              <Text style={{ color: COLORS.info, fontSize: 13, fontWeight: '700' }}>
                                 {language === 'en' ? 'INITIAL SETUP (DEVICE 1)' : 'İLK KURULUM (1. CİHAZ)'}
                               </Text>
                             </View>
-                            <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                            <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginBottom: 10 }}>
                               {language === 'en'
                                 ? 'Enter your email (optional) and generate a new sync code.'
                                 : 'E-posta adresinizi girin ve yeni bir eşitleme kodu oluşturarak başlayın.'}
@@ -3823,7 +3821,7 @@ function MainApp() {
                                 value={authEmail}
                                 onChangeText={setAuthEmail}
                                 placeholder={t.syncEmailPlaceholder}
-                                placeholderTextColor="#667"
+                                placeholderTextColor={COLORS.textMuted}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 autoCorrect={false}
@@ -3834,7 +3832,7 @@ function MainApp() {
                               onPress={handleRegister}
                               disabled={authBusy}
                             >
-                              <Ionicons name="key-outline" size={16} color="#081624" />
+                              <Ionicons name="key-outline" size={16} color={COLORS.onAccent} />
                               <Text style={styles.syncPrimaryBtnText}>
                                 {authBusy
                                   ? (language === 'en' ? 'Creating…' : 'Oluşturuluyor…')
@@ -3844,11 +3842,11 @@ function MainApp() {
                           </View>
 
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
-                            <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
-                            <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700', marginHorizontal: 10 }}>
+                            <View style={{ flex: 1, height: 1, backgroundColor: COLORS.surfaceMuted }} />
+                            <Text style={{ color: COLORS.textMuted, fontSize: 11, fontWeight: '700', marginHorizontal: 10 }}>
                               {language === 'en' ? 'OR CONNECT 2ND DEVICE' : 'VEYA 2. CİHAZI BAĞLA'}
                             </Text>
-                            <View style={{ flex: 1, height: 1, backgroundColor: '#1e293b' }} />
+                            <View style={{ flex: 1, height: 1, backgroundColor: COLORS.surfaceMuted }} />
                           </View>
 
                           <View style={{ gap: 8 }}>
@@ -3858,7 +3856,7 @@ function MainApp() {
                               value={syncCode}
                               onChangeText={setSyncCode}
                               placeholder={language === 'en' ? 'Enter code from 1st device here' : '1. cihazdaki kodu buraya girin'}
-                              placeholderTextColor="#667"
+                              placeholderTextColor={COLORS.textMuted}
                               autoCapitalize="none"
                               autoCorrect={false}
                               secureTextEntry
@@ -3877,7 +3875,7 @@ function MainApp() {
                               onPress={() => setRecoveryMode(true)}
                               disabled={authBusy}
                             >
-                              <Text style={{ color: '#38bdf8', fontSize: 13, fontWeight: '500' }}>🔑 {t.syncForgotCode}</Text>
+                              <Text style={{ color: COLORS.info, fontSize: 13, fontWeight: '500' }}>🔑 {t.syncForgotCode}</Text>
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -3885,36 +3883,36 @@ function MainApp() {
 
                       {recoveredCredentials && (
                         <View style={{
-                          backgroundColor: '#0c2238',
-                          borderColor: '#38bdf8',
+                          backgroundColor: COLORS.surface,
+                          borderColor: COLORS.info,
                           borderWidth: 1,
                           borderRadius: 8,
                           padding: 12,
                           marginTop: 12
                         }}>
-                          <Text style={{ color: '#38bdf8', fontSize: 15, fontWeight: '700', marginBottom: 4 }}>
+                          <Text style={{ color: COLORS.info, fontSize: 15, fontWeight: '700', marginBottom: 4 }}>
                             {t.syncNewCredentialsTitle}
                           </Text>
-                          <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                          <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginBottom: 10 }}>
                             {t.syncNewCredentialsWarning}
                           </Text>
                           <View style={{ marginBottom: 8 }}>
-                            <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                            <Text style={{ color: COLORS.accent, fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
                               {t.syncNewSyncCode}
                             </Text>
                             <View style={{
-                              backgroundColor: '#071626',
+                              backgroundColor: COLORS.bg,
                               padding: 8,
                               borderRadius: 6,
                               flexDirection: 'row',
                               alignItems: 'center',
                               justifyContent: 'space-between'
                             }}>
-                              <Text selectable style={{ color: '#f1f5f9', fontSize: 11, flex: 1, marginRight: 8 }}>
+                              <Text selectable style={{ color: COLORS.text, fontSize: 11, flex: 1, marginRight: 8 }}>
                                 {recoveredCredentials.syncCode}
                               </Text>
                               <TouchableOpacity
-                                style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                                style={{ backgroundColor: COLORS.info, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
                                 onPress={() => {
                                   Share.share({
                                     message: language === 'en'
@@ -3923,27 +3921,27 @@ function MainApp() {
                                   });
                                 }}
                               >
-                                <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                                <Text style={{ color: COLORS.onAccent, fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
                               </TouchableOpacity>
                             </View>
                           </View>
                           <View style={{ marginBottom: 12 }}>
-                            <Text style={{ color: '#a9dfca', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+                            <Text style={{ color: COLORS.accent, fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
                               {t.syncNewRecoveryKey}
                             </Text>
                             <View style={{
-                              backgroundColor: '#071626',
+                              backgroundColor: COLORS.bg,
                               padding: 8,
                               borderRadius: 6,
                               flexDirection: 'row',
                               alignItems: 'center',
                               justifyContent: 'space-between'
                             }}>
-                              <Text selectable style={{ color: '#f1f5f9', fontSize: 11, letterSpacing: 1, flex: 1, marginRight: 8 }}>
+                              <Text selectable style={{ color: COLORS.text, fontSize: 11, letterSpacing: 1, flex: 1, marginRight: 8 }}>
                                 {recoveredCredentials.recoveryKey}
                               </Text>
                               <TouchableOpacity
-                                style={{ backgroundColor: '#38bdf8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                                style={{ backgroundColor: COLORS.info, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
                                 onPress={() => {
                                   Share.share({
                                     message: language === 'en'
@@ -3952,7 +3950,7 @@ function MainApp() {
                                   });
                                 }}
                               >
-                                <Text style={{ color: '#04101e', fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
+                                <Text style={{ color: COLORS.onAccent, fontSize: 11, fontWeight: '700' }}>{t.share}</Text>
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -3975,11 +3973,11 @@ function MainApp() {
                           <Ionicons
                             name={syncStatus === 'connected' ? 'checkmark-circle' : syncStatus === 'error' ? 'alert-circle' : 'information-circle'}
                             size={16}
-                            color={syncStatus === 'connected' ? '#34d399' : syncStatus === 'error' ? '#f87171' : '#38bdf8'}
+                            color={syncStatus === 'connected' ? COLORS.success : syncStatus === 'error' ? COLORS.danger : COLORS.info}
                           />
                           <Text style={[
                             styles.syncStatusText,
-                            { color: syncStatus === 'connected' ? '#34d399' : syncStatus === 'error' ? '#f87171' : '#38bdf8' }
+                            { color: syncStatus === 'connected' ? COLORS.success : syncStatus === 'error' ? COLORS.danger : COLORS.info }
                           ]}>
                             {syncStatusMsg}
                           </Text>
@@ -3993,7 +3991,7 @@ function MainApp() {
                           onPress={handleTestConnection}
                           disabled={authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                         >
-                          <Ionicons name="wifi-outline" size={16} color="#a9dfca" />
+                          <Ionicons name="wifi-outline" size={16} color={COLORS.accent} />
                           <Text style={styles.syncSecondaryBtnText}>
                             {syncStatus === 'testing'
                               ? (language === 'en' ? 'Connecting...' : 'Bağlanıyor...')
@@ -4006,7 +4004,7 @@ function MainApp() {
                           onPress={handleSyncNow}
                           disabled={!session || authBusy || syncStatus === 'testing' || syncStatus === 'syncing'}
                         >
-                          <Ionicons name="sync-outline" size={16} color="#081624" />
+                          <Ionicons name="sync-outline" size={16} color={COLORS.onAccent} />
                           <Text style={styles.syncPrimaryBtnText}>
                             {syncStatus === 'syncing'
                               ? (language === 'en' ? 'Syncing...' : 'Eşitleniyor...')
@@ -4017,7 +4015,7 @@ function MainApp() {
                     </View>
 
                     <View style={styles.settingGroupHeader}>
-                      <Ionicons name="options-outline" size={16} color="#a9dfca" />
+                      <Ionicons name="options-outline" size={16} color={COLORS.accent} />
                       <Text style={styles.settingGroupTitle}>
                         {language === 'en' ? 'AUTO SYNC' : 'OTOMATİK EŞİTLEME'}
                       </Text>
@@ -4054,7 +4052,7 @@ function MainApp() {
                               syncWithServer(session, false).catch(() => {});
                             }
                           }}
-                          trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                          trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                         />
                       </View>
 
@@ -4104,18 +4102,18 @@ function MainApp() {
                               flexDirection: 'row',
                               alignItems: 'center',
                               marginTop: 10,
-                              backgroundColor: '#101d29',
+                              backgroundColor: COLORS.surface,
                               borderRadius: 8,
                               borderWidth: 1,
-                              borderColor: '#203244',
+                              borderColor: COLORS.border,
                               paddingHorizontal: 12,
                               paddingVertical: 8,
                             }}>
                               <View style={{ flex: 1, marginRight: 8 }}>
-                                <Text style={{ fontSize: 12.5, color: '#f5f3f0', fontWeight: '500' }}>
+                                <Text style={{ fontSize: 12.5, color: COLORS.text, fontWeight: '500' }}>
                                   {language === 'en' ? 'Custom Interval' : 'Özel Aralık'}
                                 </Text>
-                                <Text style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>
+                                <Text style={{ fontSize: 11.5, color: COLORS.textSecondary, marginTop: 1 }}>
                                   {language === 'en' ? '1 - 1440 minutes' : '1 - 1440 dakika arası'}
                                 </Text>
                               </View>
@@ -4124,12 +4122,12 @@ function MainApp() {
                                 style={{
                                   width: 36,
                                   height: 36,
-                                  backgroundColor: '#162838',
+                                  backgroundColor: COLORS.surface,
                                   borderRadius: 6,
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   borderWidth: 1,
-                                  borderColor: '#2c3e50',
+                                  borderColor: COLORS.borderStrong,
                                 }}
                                 onPress={() => {
                                   triggerHaptic();
@@ -4139,7 +4137,7 @@ function MainApp() {
                                 }}
                                 accessibilityLabel={language === 'en' ? 'Decrease interval' : 'Aralığı azalt'}
                               >
-                                <Ionicons name="remove" size={16} color="#a9dfca" />
+                                <Ionicons name="remove" size={16} color={COLORS.accent} />
                               </TouchableOpacity>
 
                               <TextInput
@@ -4151,11 +4149,11 @@ function MainApp() {
                                   paddingHorizontal: 6,
                                   includeFontPadding: false,
                                   textAlignVertical: 'center',
-                                  backgroundColor: '#0d1822',
+                                  backgroundColor: COLORS.bg,
                                   borderRadius: 6,
                                   borderWidth: 1,
-                                  borderColor: '#2c3e50',
-                                  color: '#f5f3f0',
+                                  borderColor: COLORS.borderStrong,
+                                  color: COLORS.text,
                                   textAlign: 'center',
                                   fontSize: 14,
                                   fontWeight: '700',
@@ -4188,12 +4186,12 @@ function MainApp() {
                                 style={{
                                   width: 36,
                                   height: 36,
-                                  backgroundColor: '#162838',
+                                  backgroundColor: COLORS.surface,
                                   borderRadius: 6,
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   borderWidth: 1,
-                                  borderColor: '#2c3e50',
+                                  borderColor: COLORS.borderStrong,
                                 }}
                                 onPress={() => {
                                   triggerHaptic();
@@ -4203,10 +4201,10 @@ function MainApp() {
                                 }}
                                 accessibilityLabel={language === 'en' ? 'Increase interval' : 'Aralığı artır'}
                               >
-                                <Ionicons name="add" size={16} color="#a9dfca" />
+                                <Ionicons name="add" size={16} color={COLORS.accent} />
                               </TouchableOpacity>
 
-                              <Text style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8, fontWeight: '600' }}>
+                              <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginLeft: 8, fontWeight: '600' }}>
                                 {language === 'en' ? 'min' : 'dk'}
                               </Text>
                             </View>
@@ -4216,7 +4214,7 @@ function MainApp() {
 
                       {lastSyncAt && (
                         <View style={styles.settingDivider}>
-                          <Text style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 8 }}>
+                          <Text style={{ fontSize: 11.5, color: COLORS.textSecondary, marginTop: 8 }}>
                             {language === 'en' ? '🕒 Last successful sync: ' : '🕒 Son başarılı eşitleme: '}{lastSyncAt}
                           </Text>
                         </View>
@@ -4226,14 +4224,14 @@ function MainApp() {
                   ) : (
                     <View style={styles.syncCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                        <Ionicons name="phone-portrait-outline" size={16} color="#f0b484" style={{ marginTop: 2 }} />
+                        <Ionicons name="phone-portrait-outline" size={16} color={COLORS.warning} style={{ marginTop: 2 }} />
                         <Text style={[styles.syncCardDesc, { flex: 1, marginBottom: 0 }]}>{t.localModeBackupHint}</Text>
                       </View>
                     </View>
                   )}
 
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="save-outline" size={16} color="#a9dfca" />
+                    <Ionicons name="save-outline" size={16} color={COLORS.accent} />
                     <Text style={styles.settingGroupTitle}>
                       {t.backupTitle.toLocaleUpperCase(language === 'en' ? 'en-US' : 'tr-TR')}
                     </Text>
@@ -4243,7 +4241,7 @@ function MainApp() {
                     <Text style={styles.syncCardDesc}>{t.backupDesc}</Text>
 
                     <TouchableOpacity style={styles.backupExportBtn} onPress={handleExportBackup}>
-                      <Ionicons name="share-outline" size={18} color="#a9dfca" />
+                      <Ionicons name="share-outline" size={18} color={COLORS.accent} />
                       <Text style={styles.backupExportBtnText}>{t.backupExport}</Text>
                     </TouchableOpacity>
 
@@ -4252,7 +4250,7 @@ function MainApp() {
                       onPress={handleImportBackup}
                       accessibilityLabel={t.backupImport}
                     >
-                      <Ionicons name="download-outline" size={18} color="#a9dfca" />
+                      <Ionicons name="download-outline" size={18} color={COLORS.accent} />
                       <Text style={styles.backupExportBtnText}>{t.backupImport}</Text>
                     </TouchableOpacity>
                   </View>
@@ -4263,8 +4261,8 @@ function MainApp() {
               {settingsSubPage === 'diagnostics' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="bug-outline" size={16} color="#f0b484" />
-                    <Text style={[styles.settingGroupTitle, { color: '#f0b484' }]}>{t.settingsDiagnostics.toUpperCase()}</Text>
+                    <Ionicons name="bug-outline" size={16} color={COLORS.warning} />
+                    <Text style={[styles.settingGroupTitle, { color: COLORS.warning }]}>{t.settingsDiagnostics.toUpperCase()}</Text>
                   </View>
 
                   {/* Summary & Action Card */}
@@ -4279,15 +4277,15 @@ function MainApp() {
                         </Text>
                       </View>
                       <View style={{
-                        backgroundColor: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? '#381616' : '#143532',
+                        backgroundColor: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? COLORS.dangerSoft : COLORS.accentSoft,
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 8,
                         borderWidth: 1,
-                        borderColor: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? '#6e2727' : '#225e53',
+                        borderColor: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? COLORS.dangerBorder : COLORS.accentBorder,
                       }}>
                         <Text style={{
-                          color: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? '#fca5a5' : '#a9dfca',
+                          color: diagnosticsLogs.some(l => l.level === 'ERROR' || l.level === 'FATAL') ? COLORS.danger : COLORS.accent,
                           fontSize: 12,
                           fontWeight: '700',
                         }}>
@@ -4299,7 +4297,7 @@ function MainApp() {
                     {/* Action buttons */}
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
                       <TouchableOpacity
-                        style={[styles.diagActionBtn, { backgroundColor: '#172c3d', borderColor: '#244763' }]}
+                        style={[styles.diagActionBtn, { backgroundColor: COLORS.surface, borderColor: COLORS.borderStrong }]}
                         onPress={async () => {
                           triggerHaptic();
                           const text = logger.exportLogsAsText();
@@ -4313,12 +4311,12 @@ function MainApp() {
                           }
                         }}
                       >
-                        <Ionicons name="share-outline" size={16} color="#38bdf8" />
-                        <Text style={[styles.diagActionBtnText, { color: '#38bdf8' }]}>{t.diagShareExport}</Text>
+                        <Ionicons name="share-outline" size={16} color={COLORS.info} />
+                        <Text style={[styles.diagActionBtnText, { color: COLORS.info }]}>{t.diagShareExport}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.diagActionBtn, { backgroundColor: '#2b171a', borderColor: '#522929' }]}
+                        style={[styles.diagActionBtn, { backgroundColor: COLORS.dangerSoft, borderColor: COLORS.dangerBorder }]}
                         onPress={() => {
                           triggerHaptic();
                           Alert.alert(
@@ -4338,30 +4336,30 @@ function MainApp() {
                           );
                         }}
                       >
-                        <Ionicons name="trash-outline" size={16} color="#ff9696" />
-                        <Text style={[styles.diagActionBtnText, { color: '#ff9696' }]}>{t.diagClear}</Text>
+                        <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                        <Text style={[styles.diagActionBtnText, { color: COLORS.danger }]}>{t.diagClear}</Text>
                       </TouchableOpacity>
                     </View>
 
                     {/* Test Error Generation */}
-                    <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#203244' }}>
-                      <Text style={{ fontSize: 11.5, color: '#8e9eaf', marginBottom: 8, fontWeight: '600' }}>
+                    <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+                      <Text style={{ fontSize: 11.5, color: COLORS.textSecondary, marginBottom: 8, fontWeight: '600' }}>
                         {language === 'en' ? 'Error Testing & Diagnostics Simulation:' : 'Hata Test ve Tanılama Simülasyonu:'}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
                         <TouchableOpacity
-                          style={[styles.diagTestBtn, { backgroundColor: '#281a13', borderColor: '#573318' }]}
+                          style={[styles.diagTestBtn, { backgroundColor: COLORS.warningSoft, borderColor: COLORS.warningBorder }]}
                           onPress={() => {
                             triggerHaptic();
                             logger.warn('Test', 'User simulated test warning.', { source: 'DiagnosticsUI' });
-                            showToast(language === 'en' ? '⚠️ Test warning added to log' : '⚠️ Test uyarısı günlüğe eklendi');
+                            showToast(language === 'en' ? '⚠️ Test warning added to log' : 'Test uyarısı günlüğe eklendi');
                           }}
                         >
-                          <Text style={[styles.diagTestBtnText, { color: '#f0b484' }]}>{t.diagSimulateWarn}</Text>
+                          <Text style={[styles.diagTestBtnText, { color: COLORS.warning }]}>{t.diagSimulateWarn}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.diagTestBtn, { backgroundColor: '#33171a', borderColor: '#66282e' }]}
+                          style={[styles.diagTestBtn, { backgroundColor: COLORS.dangerSoft, borderColor: COLORS.dangerBorder }]}
                           onPress={() => {
                             triggerHaptic();
                             try {
@@ -4372,7 +4370,7 @@ function MainApp() {
                             showToast(language === 'en' ? '💥 Test error caught and logged' : '💥 Test hatası yakalandı ve kaydedildi');
                           }}
                         >
-                          <Text style={[styles.diagTestBtnText, { color: '#fca5a5' }]}>{t.diagSimulateError}</Text>
+                          <Text style={[styles.diagTestBtnText, { color: COLORS.danger }]}>{t.diagSimulateError}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -4420,11 +4418,11 @@ function MainApp() {
                     })
                     .length === 0 ? (
                     <View style={[styles.settingCard, { alignItems: 'center', paddingVertical: 32 }]}>
-                      <Ionicons name="checkmark-circle-outline" size={44} color="#a9dfca" />
-                      <Text style={{ color: '#f5f3f0', fontSize: 15, fontWeight: '700', marginTop: 10 }}>
+                      <Ionicons name="checkmark-circle-outline" size={44} color={COLORS.accent} />
+                      <Text style={{ color: COLORS.text, fontSize: 15, fontWeight: '700', marginTop: 10 }}>
                         {t.diagCleanTitle}
                       </Text>
-                      <Text style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
+                      <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
                         {diagnosticsFilter === 'ALL'
                           ? t.diagCleanDesc
                           : (language === 'en' ? 'No records match the selected filter.' : 'Seçili filtreye uygun kayıt bulunmuyor.')}
@@ -4441,8 +4439,8 @@ function MainApp() {
                         const isExpanded = expandedLogId === log.id;
                         const isErr = log.level === 'ERROR' || log.level === 'FATAL';
                         const isWarn = log.level === 'WARN';
-                        const badgeBg = isErr ? '#3d1616' : isWarn ? '#36220f' : '#102534';
-                        const badgeColor = isErr ? '#fca5a5' : isWarn ? '#f0b484' : '#7dd3fc';
+                        const badgeBg = isErr ? COLORS.dangerSoft : isWarn ? COLORS.warningSoft : COLORS.surface;
+                        const badgeColor = isErr ? COLORS.danger : isWarn ? COLORS.warning : COLORS.info;
 
                         return (
                           <TouchableOpacity
@@ -4450,7 +4448,7 @@ function MainApp() {
                             style={[
                               styles.diagCard,
                               {
-                                borderColor: isErr ? '#542020' : isWarn ? '#4d3018' : '#203244',
+                                borderColor: isErr ? COLORS.dangerBorder : isWarn ? COLORS.warningBorder : COLORS.border,
                               }
                             ]}
                             onPress={() => {
@@ -4463,35 +4461,35 @@ function MainApp() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <View style={{ backgroundColor: badgeBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                  <Text style={{ color: badgeColor, fontSize: 10, fontWeight: '800' }}>{log.level}</Text>
+                                  <Text style={{ color: badgeColor, fontSize: 11, fontWeight: '800' }}>{log.level}</Text>
                                 </View>
-                                <Text style={{ color: '#a9dfca', fontSize: 11, fontWeight: '600' }}>[{log.tag}]</Text>
+                                <Text style={{ color: COLORS.accent, fontSize: 11, fontWeight: '600' }}>[{log.tag}]</Text>
                               </View>
-                              <Text style={{ color: '#68778d', fontSize: 11 }}>{log.timeStr}</Text>
+                              <Text style={{ color: COLORS.textMuted, fontSize: 11 }}>{log.timeStr}</Text>
                             </View>
 
                             {/* Log Message */}
-                            <Text style={{ color: '#f5f3f0', fontSize: 13, fontWeight: '500', lineHeight: 18 }}>
+                            <Text style={{ color: COLORS.text, fontSize: 13, fontWeight: '500', lineHeight: 18 }}>
                               {log.message}
                             </Text>
 
                             {/* Expandable Indicator */}
                             {(log.stack || (log.breadcrumbs && log.breadcrumbs.length > 0) || log.details) && (
                               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8, gap: 4 }}>
-                                <Text style={{ color: '#68778d', fontSize: 11 }}>
+                                <Text style={{ color: COLORS.textMuted, fontSize: 11 }}>
                                   {isExpanded ? (language === 'en' ? 'Hide' : 'Gizle') : (language === 'en' ? 'View Details' : 'Detayları Gör')}
                                 </Text>
-                                <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={12} color="#68778d" />
+                                <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={12} color={COLORS.textMuted} />
                               </View>
                             )}
 
                             {/* Expanded Details */}
                             {isExpanded && (
-                              <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1c2d3e' }}>
+                              <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border }}>
                                 {log.details && (
                                   <View style={{ marginBottom: 8 }}>
-                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>{t.diagDetails}</Text>
-                                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>
+                                    <Text style={{ color: COLORS.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 2 }}>{t.diagDetails}</Text>
+                                    <Text style={{ color: COLORS.text, fontSize: 11, fontFamily: 'monospace' }}>
                                       {JSON.stringify(log.details, null, 2)}
                                     </Text>
                                   </View>
@@ -4499,9 +4497,9 @@ function MainApp() {
 
                                 {log.breadcrumbs && log.breadcrumbs.length > 0 && (
                                   <View style={{ marginBottom: 8 }}>
-                                    <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700', marginBottom: 3 }}>{t.diagBreadcrumbs}</Text>
+                                    <Text style={{ color: COLORS.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{t.diagBreadcrumbs}</Text>
                                     {log.breadcrumbs.map((b, bi) => (
-                                      <Text key={bi} style={{ color: '#94a3b8', fontSize: 10, fontFamily: 'monospace', marginBottom: 1 }}>
+                                      <Text key={bi} style={{ color: COLORS.textSecondary, fontSize: 11, fontFamily: 'monospace', marginBottom: 1 }}>
                                         {b}
                                       </Text>
                                     ))}
@@ -4510,9 +4508,9 @@ function MainApp() {
 
                                 {log.stack && (
                                   <View>
-                                    <Text style={{ color: '#fca5a5', fontSize: 10, fontWeight: '700', marginBottom: 2 }}>{t.diagStackTrace}</Text>
+                                    <Text style={{ color: COLORS.danger, fontSize: 11, fontWeight: '700', marginBottom: 2 }}>{t.diagStackTrace}</Text>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                      <Text style={{ color: '#fca5a5', fontSize: 10, fontFamily: 'monospace' }}>
+                                      <Text style={{ color: COLORS.danger, fontSize: 11, fontFamily: 'monospace' }}>
                                         {log.stack}
                                       </Text>
                                     </ScrollView>
@@ -4531,8 +4529,8 @@ function MainApp() {
               {settingsSubPage === 'reset' && (
                 <>
                   <View style={styles.settingGroupHeader}>
-                    <Ionicons name="refresh-outline" size={16} color="#ff9696" />
-                    <Text style={[styles.settingGroupTitle, { color: '#ff9696' }]}>
+                    <Ionicons name="refresh-outline" size={16} color={COLORS.danger} />
+                    <Text style={[styles.settingGroupTitle, { color: COLORS.danger }]}>
                       {language === 'en' ? 'DATA RESET' : 'VERİLERİ SIFIRLAMA'}
                     </Text>
                   </View>
@@ -4540,10 +4538,10 @@ function MainApp() {
                     <Text style={styles.resetCardText}>
                       {language === 'en'
                         ? '⚠️ This action will permanently erase all medications, history, and custom settings from this device and return to initial setup. This cannot be undone.'
-                        : '⚠️ Bu işlem tüm ilaç kayıtlarınızı, geçmişinizi ve kişisel ayarlarınızı cihazdan tamamen siler ve ilk kurulum haline döndürür. Bu işlem geri alınamaz.'}
+                        : 'Bu işlem tüm ilaç kayıtlarınızı, geçmişinizi ve kişisel ayarlarınızı cihazdan tamamen siler ve ilk kurulum haline döndürür. Bu işlem geri alınamaz.'}
                     </Text>
                     <TouchableOpacity style={styles.resetBtn} onPress={resetAllData}>
-                      <Ionicons name="trash-outline" size={18} color="#ff9696" />
+                      <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
                       <Text style={styles.resetBtnText}>
                         {language === 'en' ? 'Reset All Data and Settings' : 'Tüm Verileri ve Ayarları Sıfırla'}
                       </Text>
@@ -4568,8 +4566,10 @@ function MainApp() {
                 key={tabItem.id}
                 style={styles.navItem}
                 onPress={() => handleTabPress(tabItem.id)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === tabItem.id }}
               >
-                <Ionicons name={tabItem.icon as any} size={22} color={tab === tabItem.id ? '#a9dfca' : '#adb3bf'} />
+                <Ionicons name={(tab === tabItem.id ? tabItem.icon : `${tabItem.icon}-outline`) as any} size={24} color={tab === tabItem.id ? COLORS.accent : COLORS.textSecondary} />
                 <Text style={[styles.navLabel, tab === tabItem.id && styles.navLabelActive]}>{tabItem.label}</Text>
               </TouchableOpacity>
             ))}
@@ -4597,7 +4597,7 @@ function MainApp() {
           <SafeAreaView style={styles.modalSafe}>
             <View style={[styles.modalHeader, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
               <TouchableOpacity onPress={() => setEditorOpen(false)}>
-                <Ionicons name="close" size={26} color="#f5f3f0" />
+                <Ionicons name="close" size={26} color={COLORS.text} />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>{editingId ? t.modalEditTitle : t.modalAddTitle}</Text>
               <TouchableOpacity onPress={saveDose}>
@@ -4615,19 +4615,19 @@ function MainApp() {
                 }}
               >
                 <View style={styles.scanBarcodeIconCircle}>
-                  <Ionicons name="camera" size={18} color="#081624" />
+                  <Ionicons name="camera" size={18} color={COLORS.onAccent} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.scanBarcodeBtnTitle}>{t.scanBarcodeBanner}</Text>
                   <Text style={styles.scanBarcodeBtnSub}>{t.scanBarcodeDesc}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#a9dfca" />
+                <Ionicons name="chevron-forward" size={18} color={COLORS.accent} />
               </TouchableOpacity>
 
               {/* Scanned Barcode Info Badge if available */}
               {currentGTIN && (
                 <View style={styles.scannedInfoCard}>
-                  <Ionicons name="shield-checkmark" size={16} color="#34d399" />
+                  <Ionicons name="shield-checkmark" size={16} color={COLORS.success} />
                   <View style={{ flex: 1, marginLeft: 8 }}>
                     <Text style={styles.scannedInfoTitle}>{t.itsMatched}</Text>
                     <Text style={styles.scannedInfoSub}>
@@ -4642,7 +4642,7 @@ function MainApp() {
                       setCurrentBatchNo(null);
                     }}
                   >
-                    <Ionicons name="close-circle" size={18} color="#94a3b8" />
+                    <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -4654,7 +4654,7 @@ function MainApp() {
                 value={name}
                 onChangeText={setName}
                 placeholder={t.medNamePlaceholder}
-                placeholderTextColor="#667"
+                placeholderTextColor={COLORS.textMuted}
               />
 
               {/* Amount */}
@@ -4664,7 +4664,7 @@ function MainApp() {
                 value={amount}
                 onChangeText={setAmount}
                 placeholder={t.doseAmountPlaceholder}
-                placeholderTextColor="#667"
+                placeholderTextColor={COLORS.textMuted}
               />
 
               {/* Form & Meal */}
@@ -4698,7 +4698,7 @@ function MainApp() {
                     </Text>
                   </View>
                   <TouchableOpacity style={styles.addSlotMiniBtn} onPress={addDoseSlot}>
-                    <Ionicons name="add-circle" size={16} color="#a9dfca" />
+                    <Ionicons name="add-circle" size={16} color={COLORS.accent} />
                     <Text style={styles.addSlotMiniBtnText}>{t.addTime}</Text>
                   </TouchableOpacity>
                 </View>
@@ -4735,14 +4735,14 @@ function MainApp() {
                     <View key={idx} style={styles.timeSlotCard}>
                       <View style={styles.timeSlotCardHeader}>
                         <View style={styles.timeSlotBadge}>
-                          <Ionicons name="time" size={12} color="#a9dfca" />
+                          <Ionicons name="time" size={12} color={COLORS.accent} />
                           <Text style={styles.timeSlotBadgeText}>
                             {language === 'en' ? `Dose ${idx + 1} · ${mealHint}` : `${idx + 1}. Doz · ${mealHint}`}
                           </Text>
                         </View>
                         {times.length > 1 && (
                           <TouchableOpacity onPress={() => removeDoseSlot(idx)} style={styles.removeSlotBtn}>
-                            <Ionicons name="trash-outline" size={13} color="#ff9696" />
+                            <Ionicons name="trash-outline" size={13} color={COLORS.danger} />
                             <Text style={styles.removeSlotBtnText}>{t.removeTime}</Text>
                           </TouchableOpacity>
                         )}
@@ -4778,12 +4778,12 @@ function MainApp() {
 
                       {/* Saate Özel Doz Miktarı */}
                       {times.length > 1 && (
-                        <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1a2836' }}>
+                        <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                             <Text style={[styles.timeInputLabel, { marginBottom: 0 }]}>{t.slotAmountLabel}</Text>
                             {slotAmounts[slotTime]?.trim() ? (
                               <TouchableOpacity onPress={() => setSlotAmountForTime(slotTime, '')}>
-                                <Text style={{ fontSize: 11, color: '#ff9696' }}>{language === 'en' ? 'Reset' : 'Varsayılana Dön'}</Text>
+                                <Text style={{ fontSize: 11, color: COLORS.danger }}>{language === 'en' ? 'Reset' : 'Varsayılana Dön'}</Text>
                               </TouchableOpacity>
                             ) : null}
                           </View>
@@ -4791,14 +4791,14 @@ function MainApp() {
                             style={[
                               styles.textInput,
                               {
-                                backgroundColor: '#09141f',
-                                borderColor: slotAmounts[slotTime]?.trim() ? '#46a382' : '#23374d',
+                                backgroundColor: COLORS.bg,
+                                borderColor: slotAmounts[slotTime]?.trim() ? COLORS.accent : COLORS.border,
                               },
                             ]}
                             value={slotAmounts[slotTime] ?? ''}
                             onChangeText={val => setSlotAmountForTime(slotTime, val)}
                             placeholder={amount ? `${amount} (${language === 'en' ? 'default' : 'varsayılan'})` : t.slotAmountPlaceholder}
-                            placeholderTextColor="#667"
+                            placeholderTextColor={COLORS.textMuted}
                           />
                         </View>
                       )}
@@ -4830,7 +4830,7 @@ function MainApp() {
                           : 'Gün aşırı, döngü, tedavi süresi, başlangıç tarihi, sessize alma'}
                       </Text>
                       {!advancedInUse && (
-                        <Ionicons name={advancedOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#a9dfca" style={styles.advancedToggleIcon} />
+                        <Ionicons name={advancedOpen ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.accent} style={styles.advancedToggleIcon} />
                       )}
                     </TouchableOpacity>
                     {advancedOpen && (
@@ -4880,7 +4880,7 @@ function MainApp() {
                               value={cyclePhase1Days}
                               onChangeText={v => setCyclePhase1Days(v.replace(/[^0-9]/g, ''))}
                               placeholder="1"
-                              placeholderTextColor="#667"
+                              placeholderTextColor={COLORS.textMuted}
                               keyboardType="numeric"
                             />
                           </View>
@@ -4893,7 +4893,7 @@ function MainApp() {
                               value={cyclePhase2Days}
                               onChangeText={v => setCyclePhase2Days(v.replace(/[^0-9]/g, ''))}
                               placeholder="1"
-                              placeholderTextColor="#667"
+                              placeholderTextColor={COLORS.textMuted}
                               keyboardType="numeric"
                             />
                           </View>
@@ -4928,7 +4928,7 @@ function MainApp() {
                                 value={cyclePhase1Days}
                                 onChangeText={v => setCyclePhase1Days(v.replace(/[^0-9]/g, ''))}
                                 placeholder="1"
-                                placeholderTextColor="#667"
+                                placeholderTextColor={COLORS.textMuted}
                                 keyboardType="numeric"
                               />
                             </View>
@@ -4952,7 +4952,7 @@ function MainApp() {
                                 value={cyclePhase2Days}
                                 onChangeText={v => setCyclePhase2Days(v.replace(/[^0-9]/g, ''))}
                                 placeholder="1"
-                                placeholderTextColor="#667"
+                                placeholderTextColor={COLORS.textMuted}
                                 keyboardType="numeric"
                               />
                             </View>
@@ -4980,7 +4980,7 @@ function MainApp() {
                           style={styles.datePickerBtn}
                           onPress={() => openCalendarPicker('cycleStartDate', language === 'en' ? 'Cycle Start Date' : 'Döngü Başlangıç Tarihi')}
                         >
-                          <Ionicons name="calendar-outline" size={18} color="#34d399" />
+                          <Ionicons name="calendar-outline" size={18} color={COLORS.accent} />
                           <Text style={styles.datePickerBtnText}>{formatLocalizedDate(cycleStartDate, language)}</Text>
                           <View style={styles.datePickerChangeBadge}>
                             <Text style={styles.datePickerChangeBadgeText}>
@@ -5028,7 +5028,7 @@ function MainApp() {
                         style={styles.datePickerBtn}
                         onPress={() => openCalendarPicker('startDate', language === 'en' ? 'Treatment Start Date' : 'Tedavi Başlangıç Tarihi')}
                       >
-                        <Ionicons name="calendar-outline" size={18} color="#34d399" />
+                        <Ionicons name="calendar-outline" size={18} color={COLORS.accent} />
                         <Text style={styles.datePickerBtnText}>{formatLocalizedDate(startDate, language)}</Text>
                         <View style={styles.datePickerChangeBadge}>
                           <Text style={styles.datePickerChangeBadgeText}>
@@ -5072,13 +5072,13 @@ function MainApp() {
                             value={durationDays}
                             onChangeText={v => setDurationDays(v.replace(/[^0-9]/g, ''))}
                             placeholder="7"
-                            placeholderTextColor="#667"
+                            placeholderTextColor={COLORS.textMuted}
                             keyboardType="numeric"
                           />
                         </View>
 
                         <View style={styles.durationSummaryBanner}>
-                          <Ionicons name="calendar-outline" size={16} color="#a9dfca" />
+                          <Ionicons name="calendar-outline" size={16} color={COLORS.accent} />
                           <Text style={styles.durationSummaryBannerText}>
                             {language === 'en'
                               ? `Starts on ${formatLocalizedDate(startDate, language)} · Last dose on ${formatLocalizedDate(calculateEndDate(startDate, Number(durationDays) || 7), language)} (${durationDays || 7} days).`
@@ -5101,7 +5101,7 @@ function MainApp() {
                       <Switch
                         value={muted}
                         onValueChange={val => { triggerHaptic(); setMuted(val); }}
-                        trackColor={{ true: '#a9dfca', false: '#3a4655' }}
+                        trackColor={{ true: COLORS.accent, false: COLORS.switchTrackOff }}
                         accessibilityLabel={language === 'en' ? 'Mute reminders' : 'Bildirimleri sessize al'}
                       />
                     </View>
@@ -5121,7 +5121,7 @@ function MainApp() {
                     value={stock}
                     onChangeText={v => setStock(v.replace(/[^0-9]/g, ''))}
                     placeholder="0"
-                    placeholderTextColor="#667"
+                    placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                   />
                 </View>
@@ -5132,7 +5132,7 @@ function MainApp() {
                     value={stockThreshold}
                     onChangeText={v => setStockThreshold(v.replace(/[^0-9]/g, ''))}
                     placeholder="5"
-                    placeholderTextColor="#667"
+                    placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                   />
                 </View>
@@ -5148,14 +5148,14 @@ function MainApp() {
                   );
                 }}
               >
-                <Ionicons name="refresh" size={16} color="#a9dfca" />
+                <Ionicons name="refresh" size={16} color={COLORS.accent} />
                 <Text style={styles.refillBtnText}>{t.refill30}</Text>
               </TouchableOpacity>
 
               {/* Delete if editing */}
               {editingId && (
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteDose(editingId)}>
-                  <Ionicons name="trash-outline" size={18} color="#ff9696" />
+                  <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
                   <Text style={styles.deleteBtnText}>{t.delete}</Text>
                 </TouchableOpacity>
               )}
@@ -5210,99 +5210,107 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#081624' },
-  container: { flex: 1, backgroundColor: '#081624' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
+  safeArea: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  header: { paddingHorizontal: SPACING.page, paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
+  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md },
+  brandLogo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  brandMark: { width: 28, height: 28, borderRadius: RADII.sm, backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center' },
+  brandText: { color: COLORS.accent, fontSize: TYPE.title, fontWeight: '800', letterSpacing: -0.3 },
+  avatarBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'flex-end', justifyContent: 'center', marginRight: -SPACING.xxs },
+  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: COLORS.accent, fontSize: TYPE.body, fontWeight: '700' },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitleCol: { flex: 1, minWidth: 0, marginRight: 12 },
-  headerTitle: { fontSize: 28, fontWeight: '700', color: '#f5f3f0' },
-  headerSubtitle: { fontSize: 13, color: '#adb3bf', marginTop: 4 },
-  progressBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#152332', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, flexShrink: 0 },
-  progressText: { fontSize: 12, color: '#adb3bf' },
-  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#a9dfca', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: TYPE.display, fontWeight: '700', color: COLORS.text, letterSpacing: -0.4 },
+  headerSubtitle: { fontSize: TYPE.bodySmall, color: COLORS.textSecondary, marginTop: 2 },
+  progressBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.surface, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, flexShrink: 0 },
+  progressText: { fontSize: 12, color: COLORS.textSecondary },
+  addBtn: { width: MIN_TOUCH, height: MIN_TOUCH, borderRadius: RADII.button, backgroundColor: COLORS.accent, justifyContent: 'center', alignItems: 'center' },
   scrollArea: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: SPACING.page, paddingBottom: 110 },
 
   // Hero Card
-  heroCard: { backgroundColor: '#152332', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', marginVertical: 6 },
-  heroEyebrow: { color: '#a9dfca', fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
-  heroTime: { fontSize: 32, fontWeight: '800', color: '#f5f3f0', marginVertical: 1 },
-  heroName: { fontSize: 18, fontWeight: '700', color: '#f5f3f0', textAlign: 'center', lineHeight: 22 },
+  heroCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', marginVertical: 6, borderWidth: 1, borderColor: COLORS.border },
+  heroEyebrow: { color: COLORS.accent, fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  heroTime: { fontSize: 32, fontWeight: '800', color: COLORS.text, marginVertical: 1 },
+  heroName: { fontSize: 18, fontWeight: '700', color: COLORS.text, textAlign: 'center', lineHeight: 22 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center', marginVertical: 4 },
-  chipMeal: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#142d2a', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8, borderWidth: 1, borderColor: '#234842' },
-  chipMealText: { color: '#a9dfca', fontSize: 10.5, fontWeight: '600' },
-  chipForm: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1a2938', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
-  chipFormText: { color: '#f5f3f0', fontSize: 10.5, fontWeight: '500' },
-  chipCycle: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#143532', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
-  chipCycleText: { color: '#a9dfca', fontSize: 10.5, fontWeight: '600' },
-  chipStock: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1a2938', paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
-  chipStockText: { color: '#adb3bf', fontSize: 10.5, fontWeight: '500' },
-  chipStockLow: { backgroundColor: '#332214', borderColor: '#5c3e24', borderWidth: 1 },
-  chipStockLowText: { color: '#f0b484', fontWeight: '700' },
-  heroAmount: { fontSize: 12, color: '#adb3bf', marginTop: 1, marginBottom: 6 },
-  takeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#a9dfca', width: '100%', height: 40, borderRadius: 10 },
-  takeBtnText: { color: '#092326', fontSize: 15, fontWeight: '700' },
+  chipMeal: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8, borderWidth: 1, borderColor: COLORS.accentBorder },
+  chipMealText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
+  chipForm: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.surface, paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
+  chipFormText: { color: COLORS.text, fontSize: 11, fontWeight: '500' },
+  chipCycle: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
+  chipCycleText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
+  chipStock: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.surface, paddingVertical: 2.5, paddingHorizontal: 6, borderRadius: 8 },
+  chipStockText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '500' },
+  chipStockLow: { backgroundColor: COLORS.warningSoft, borderColor: COLORS.warningBorder, borderWidth: 1 },
+  chipStockLowText: { color: COLORS.warning, fontWeight: '700' },
+  heroAmount: { fontSize: 12, color: COLORS.textSecondary, marginTop: 1, marginBottom: 6 },
+  takeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.accent, width: '100%', height: 40, borderRadius: RADII.button },
+  takeBtnText: { color: COLORS.onAccent, fontSize: 15, fontWeight: '700' },
   heroSecondaryActions: { flexDirection: 'row', gap: 6, width: '100%', marginTop: 6 },
-  heroSecBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 32, borderRadius: 8, borderWidth: 1, borderColor: '#3a4655' },
-  heroSecBtnText: { color: '#adb3bf', fontSize: 11.5, fontWeight: '500' },
+  heroSecBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 32, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.borderStrong },
+  heroSecBtnText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '500' },
 
   // Off-Cycle Box
-  offCycleBox: { backgroundColor: '#111e2b', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#233446', marginVertical: 12 },
+  offCycleBox: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 14, borderWidth: 1, borderColor: COLORS.border, marginVertical: 12 },
   offCycleHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  offCycleHeaderText: { color: '#a9dfca', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-  offCycleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#162738', padding: 10, borderRadius: 8, marginTop: 6 },
-  offCycleItemName: { color: '#f5f3f0', fontSize: 14, fontWeight: '600' },
-  offCycleItemSub: { color: '#adb3bf', fontSize: 11, marginTop: 2 },
-  offBadge: { backgroundColor: '#23374a', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  offBadgeText: { color: '#adb3bf', fontSize: 11, fontWeight: '600' },
+  offCycleHeaderText: { color: COLORS.accent, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  offCycleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, padding: 10, borderRadius: 8, marginTop: 6 },
+  offCycleItemName: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  offCycleItemSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+  offBadge: { backgroundColor: COLORS.surfaceMuted, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  offBadgeText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600' },
 
   // Remaining & List
-  sectionHeader: { marginTop: 16, marginBottom: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#23313f' },
-  sectionTitle: { color: '#adb3bf', fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
-  doseRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1a2736', gap: 12 },
-  doseRowTime: { color: '#f5f3f0', fontSize: 16, fontWeight: '600', width: 50 },
+  sectionHeader: { marginTop: 16, marginBottom: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  sectionTitle: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
+  doseRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 12 },
+  doseRowTime: { color: COLORS.text, fontSize: 16, fontWeight: '600', width: 50 },
   doseRowMain: { flex: 1 },
-  doseRowName: { color: '#f5f3f0', fontSize: 15, fontWeight: '600' },
-  doseRowSub: { color: '#adb3bf', fontSize: 12, marginTop: 2 },
-  quickTakeBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: '#234842', justifyContent: 'center', alignItems: 'center' },
-  quietEmpty: { color: '#adb3bf', fontSize: 13, paddingVertical: 12 },
+  doseRowName: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+  doseRowSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  quickTakeBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: COLORS.accentBorder, justifyContent: 'center', alignItems: 'center' },
+  quietEmpty: { color: COLORS.textSecondary, fontSize: 13, paddingVertical: 12 },
 
   // Taken Toggle
   takenToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, marginTop: 10 },
-  takenToggleText: { color: '#adb3bf', fontSize: 14, flex: 1 },
-  takenList: { backgroundColor: '#101d29', borderRadius: 10, paddingHorizontal: 12 },
+  takenToggleText: { color: COLORS.textSecondary, fontSize: 14, flex: 1 },
+  takenList: { backgroundColor: COLORS.surface, borderRadius: RADII.card, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.border },
 
   // Meds Cards
   medsHeader: { marginVertical: 12 },
-  medCard: { backgroundColor: '#152332', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#203244' },
+  medCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   medCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  medCardTime: { color: '#a9dfca', fontSize: 14, fontWeight: '600' },
+  medCardTime: { color: COLORS.accent, fontSize: 14, fontWeight: '600' },
   medCardBadges: { flexDirection: 'row', gap: 6 },
-  cycleTag: { backgroundColor: '#143532', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  cycleTagText: { color: '#a9dfca', fontSize: 10, fontWeight: '600' },
-  cycleTagOff: { backgroundColor: '#232c37' },
-  cycleTagOffText: { color: '#adb3bf' },
-  stockPill: { backgroundColor: '#1a2938', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  stockPillText: { color: '#adb3bf', fontSize: 10, fontWeight: '600' },
-  stockPillLow: { backgroundColor: '#332214' },
-  stockPillLowText: { color: '#f0b484', fontWeight: '700' },
-  medCardName: { color: '#f5f3f0', fontSize: 16, fontWeight: '600' },
-  medCardSub: { color: '#adb3bf', fontSize: 12, marginTop: 3 },
-  fullAddBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1a2a3a', height: 48, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: '#2e4155' },
-  fullAddBtnText: { color: '#f5f3f0', fontSize: 14, fontWeight: '600' },
+  cycleTag: { backgroundColor: COLORS.accentSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  cycleTagText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
+  cycleTagOff: { backgroundColor: COLORS.surfaceMuted },
+  cycleTagOffText: { color: COLORS.textSecondary },
+  stockPill: { backgroundColor: COLORS.surface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  stockPillText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600' },
+  stockPillLow: { backgroundColor: COLORS.warningSoft },
+  stockPillLowText: { color: COLORS.warning, fontWeight: '700' },
+  medCardName: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  medCardSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 3 },
+  fullAddBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.surface, height: 48, borderRadius: RADII.button, marginTop: 10, borderWidth: 1, borderColor: COLORS.borderStrong },
+  fullAddBtnText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
 
   // Adherence History Card
-  adherenceCard: { backgroundColor: '#152332', borderRadius: 14, padding: 16, marginBottom: 20 },
+  adherenceCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: COLORS.border },
   adherencePill: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  adherencePillText: { color: '#a9dfca', fontSize: 15, fontWeight: '700' },
-  adherenceSub: { color: '#adb3bf', fontSize: 12, marginTop: 4, marginBottom: 14 },
+  adherencePillText: { color: COLORS.accent, fontSize: 15, fontWeight: '700' },
+  adherenceSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4, marginBottom: 14 },
   weekStrip: { flexDirection: 'row', justifyContent: 'space-between' },
-  weekPill: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, marginHorizontal: 2, backgroundColor: '#101d29' },
-  weekPillActive: { backgroundColor: '#163832', borderWidth: 1, borderColor: '#a9dfca' },
-  weekPillLabel: { color: '#adb3bf', fontSize: 10 },
-  weekPillNum: { color: '#f5f3f0', fontSize: 14, fontWeight: '700', marginVertical: 3 },
+  weekPill: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8, marginHorizontal: 2, backgroundColor: COLORS.surface },
+  weekPillActive: { backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: COLORS.accent },
+  weekPillLabel: { color: COLORS.textSecondary, fontSize: 11 },
+  weekPillNum: { color: COLORS.text, fontSize: 14, fontWeight: '700', marginVertical: 3 },
   weekDot: { width: 5, height: 5, borderRadius: 2.5 },
-  dotComplete: { backgroundColor: '#a9dfca' },
-  dotToday: { borderWidth: 1, borderColor: '#a9dfca' },
+  dotComplete: { backgroundColor: COLORS.accent },
+  dotToday: { borderWidth: 1, borderColor: COLORS.accent },
 
   // Settings List Menu & Navigation
   settingsSubHeader: {
@@ -5317,41 +5325,43 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    backgroundColor: '#152332',
-    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.button,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   settingsBackBtnText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 13,
     fontWeight: '700',
   },
   settingsSubHeaderTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 12,
     flex: 1,
   },
   menuListCard: {
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderRadius: 14,
     marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   menuListItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 14,
+    minHeight: 64,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.card,
   },
   menuIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: RADII.button,
+    backgroundColor: COLORS.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -5361,30 +5371,30 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   menuItemTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
   },
   menuItemSub: {
-    color: '#8e9eaf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   menuListDivider: {
     height: 1,
-    backgroundColor: '#1c2d3e',
+    backgroundColor: COLORS.surfaceMuted,
     marginLeft: 64,
   },
   resetCard: {
-    backgroundColor: '#1f1618',
+    backgroundColor: COLORS.dangerSoft,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#4d2026',
+    borderColor: COLORS.dangerBorder,
   },
   resetCardText: {
-    color: '#fca5a5',
+    color: COLORS.danger,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 14,
@@ -5393,8 +5403,8 @@ const styles = StyleSheet.create({
   // Settings
   settingsContainer: { paddingTop: 10 },
   settingGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 8, paddingHorizontal: 4 },
-  settingGroupTitle: { color: '#a9dfca', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
-  settingCard: { backgroundColor: '#152332', borderRadius: 12, padding: 16, marginBottom: 12 },
+  settingGroupTitle: { color: COLORS.textSecondary, fontSize: TYPE.caption, fontWeight: '700', letterSpacing: 0.8 },
+  settingCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   // Long descriptions must wrap instead of sliding under the switch at the row's right edge.
   settingRowText: { flex: 1, paddingRight: 12 },
@@ -5402,118 +5412,117 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 14,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#59441f',
-    backgroundColor: '#2d2516',
+    marginBottom: SPACING.lg,
+    padding: SPACING.card,
+    minHeight: MIN_TOUCH,
+    borderRadius: RADII.card,
+    backgroundColor: COLORS.warningSoft,
   },
-  exactAlarmBannerTitle: { color: '#f5f3f0', fontSize: 15, fontWeight: '700' },
-  exactAlarmBannerText: { color: '#d6c7ad', fontSize: 13, marginTop: 2 },
-  exactAlarmBannerAction: { color: '#f0b484', fontSize: 13, fontWeight: '700' },
+  exactAlarmBannerTitle: { color: COLORS.text, fontSize: 15, fontWeight: '700' },
+  exactAlarmBannerText: { color: COLORS.warning, fontSize: 13, marginTop: 2 },
+  exactAlarmBannerAction: { color: COLORS.warning, fontSize: 13, fontWeight: '700' },
   advancedToggle: {
     marginTop: 18,
     paddingVertical: 12,
     paddingHorizontal: 14,
     paddingRight: 40,
-    borderRadius: 10,
+    borderRadius: RADII.card,
     borderWidth: 1,
-    borderColor: '#244763',
-    backgroundColor: '#132433',
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.surface,
   },
-  advancedToggleText: { color: '#a9dfca', fontSize: 15, fontWeight: '700' },
-  advancedToggleHint: { color: '#8a99a8', fontSize: 12, marginTop: 2 },
+  advancedToggleText: { color: COLORS.accent, fontSize: 15, fontWeight: '700' },
+  advancedToggleHint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
   advancedToggleIcon: { position: 'absolute', right: 14, top: 14 },
-  muteRow: { marginTop: 16, backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
-  settingTitle: { color: '#f5f3f0', fontSize: 15, fontWeight: '600' },
-  settingSub: { color: '#adb3bf', fontSize: 12, marginTop: 2 },
-  settingDivider: { height: 1, backgroundColor: '#203244', marginVertical: 14 },
-  profileInputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#101d29', borderRadius: 8, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: '#203244', marginTop: 10 },
-  profileInput: { flex: 1, color: '#f5f3f0', fontSize: 14, fontWeight: '600' },
-  profileFieldLabel: { color: '#adb3bf', fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 2 },
-  doctorCallBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#34d399', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14, marginTop: 12 },
-  doctorCallBtnText: { color: '#081624', fontSize: 13, fontWeight: '700' },
-  appointmentCard: { backgroundColor: '#101d29', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#203244', marginTop: 10 },
+  muteRow: { marginTop: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
+  settingTitle: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+  settingSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  settingDivider: { height: 1, backgroundColor: COLORS.surfaceMuted, marginVertical: 14 },
+  profileInputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 8, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: COLORS.border, marginTop: 10 },
+  profileInput: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  profileFieldLabel: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 2 },
+  doctorCallBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.success, borderRadius: RADII.button, paddingVertical: 10, paddingHorizontal: 14, marginTop: 12 },
+  doctorCallBtnText: { color: COLORS.onAccent, fontSize: 13, fontWeight: '700' },
+  appointmentCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 14, borderWidth: 1, borderColor: COLORS.border, marginTop: 10 },
   appointmentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  appointmentDateText: { color: '#f5f3f0', fontSize: 14, fontWeight: '700' },
-  appointmentPlaceholder: { color: '#5c6e80', fontSize: 14 },
+  appointmentDateText: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
+  appointmentPlaceholder: { color: COLORS.textMuted, fontSize: 14 },
   appointmentBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginTop: 10 },
   appointmentBadgeText: { fontSize: 12, fontWeight: '700' },
-  profileActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 13, marginTop: 10 },
-  profileSaveBtn: { backgroundColor: '#183832', borderWidth: 1, borderColor: '#34d399' },
-  profileSaveBtnText: { color: '#34d399', fontSize: 14, fontWeight: '700' },
-  profileShareBtn: { backgroundColor: '#182b3a', borderWidth: 1, borderColor: '#38bdf8' },
-  profileShareBtnText: { color: '#38bdf8', fontSize: 14, fontWeight: '700' },
-  selectedPillBadge: { backgroundColor: '#143532', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#215c52' },
-  selectedPillBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '700' },
+  profileActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: RADII.button, paddingVertical: 13, marginTop: 10 },
+  profileSaveBtn: { backgroundColor: COLORS.accent, borderWidth: 1, borderColor: COLORS.accent },
+  profileSaveBtnText: { color: COLORS.onAccent, fontSize: 14, fontWeight: '700' },
+  profileShareBtn: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.accentBorder },
+  profileShareBtnText: { color: COLORS.accent, fontSize: 14, fontWeight: '700' },
+  selectedPillBadge: { backgroundColor: COLORS.accentSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: COLORS.accentBorder },
+  selectedPillBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
   chipSelector: { flexDirection: 'row', gap: 6, marginTop: 10 },
-  choiceChip: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, backgroundColor: '#101d29', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#203244' },
-  choiceChipActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
-  choiceChipText: { color: '#adb3bf', fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  choiceChipTextActive: { color: '#a9dfca', fontWeight: '700' },
-  resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 48, borderRadius: 10, borderWidth: 1, borderColor: '#5c2d33', marginTop: 8, marginBottom: 20 },
-  resetBtnText: { color: '#ff9696', fontSize: 14, fontWeight: '600' },
-  permBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#332617', padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: '#664d26' },
-  permBannerText: { color: '#f0b484', fontSize: 12, flex: 1, marginLeft: 8, marginRight: 8 },
-  permBannerBtn: { backgroundColor: '#f0b484', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  permBannerBtnText: { color: '#241708', fontSize: 12, fontWeight: '700' },
-  testNotificationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#a9dfca', height: 46, borderRadius: 10, marginTop: 14 },
-  testNotificationBtnText: { color: '#081624', fontSize: 14, fontWeight: '700' },
-  notifPreviewCard: { backgroundColor: '#101d29', borderRadius: 10, padding: 14, marginTop: 14, borderWidth: 1, borderColor: '#203244' },
+  choiceChip: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
+  choiceChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  choiceChipText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  choiceChipTextActive: { color: COLORS.accent, fontWeight: '700' },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 48, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.dangerBorder, marginTop: 8, marginBottom: 20 },
+  resetBtnText: { color: COLORS.danger, fontSize: 14, fontWeight: '600' },
+  permBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.warningSoft, padding: 12, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: COLORS.warningBorder },
+  permBannerText: { color: COLORS.warning, fontSize: 12, flex: 1, marginLeft: 8, marginRight: 8 },
+  permBannerBtn: { backgroundColor: COLORS.warning, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  permBannerBtnText: { color: COLORS.onAccent, fontSize: 12, fontWeight: '700' },
+  testNotificationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.accent, height: 46, borderRadius: RADII.button, marginTop: 14 },
+  testNotificationBtnText: { color: COLORS.onAccent, fontSize: 14, fontWeight: '700' },
+  notifPreviewCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 14, marginTop: 14, borderWidth: 1, borderColor: COLORS.border },
   notifPreviewHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 },
-  notifPreviewTag: { flexShrink: 1, color: '#a9dfca', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  previewSoundBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#182836', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#23384c' },
-  previewSoundBadgeText: { color: '#a9dfca', fontSize: 10, fontWeight: '600' },
+  notifPreviewTag: { flexShrink: 1, color: COLORS.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  previewSoundBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.surface, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: COLORS.border },
+  previewSoundBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
   notifPreviewContent: { flexDirection: 'row', alignItems: 'center' },
-  notifPreviewIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#143532', alignItems: 'center', justifyContent: 'center' },
-  notifPreviewTitle: { color: '#f5f3f0', fontSize: 14, fontWeight: '600' },
-  notifPreviewBody: { color: '#adb3bf', fontSize: 12, marginTop: 2 },
+  notifPreviewIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  notifPreviewTitle: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  notifPreviewBody: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
 
   // Sound section styles
-  soundSection: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#203244' },
+  soundSection: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: COLORS.border },
   soundSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  soundSectionTitle: { color: '#a9dfca', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
-  testSoundHeaderBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#183335', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#2d5a52' },
-  testSoundHeaderBtnText: { color: '#a9dfca', fontSize: 11, fontWeight: '700' },
+  soundSectionTitle: { color: COLORS.textSecondary, fontSize: TYPE.caption, fontWeight: '700', letterSpacing: 0.8 },
+  testSoundHeaderBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: COLORS.accentBorder },
+  testSoundHeaderBtnText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
   soundOptionsList: { gap: 8 },
-  soundOptionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#101d29', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#203244' },
-  soundOptionCardActive: { borderColor: '#a9dfca', backgroundColor: '#122634' },
-  soundOptionIconCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#182b3a', alignItems: 'center', justifyContent: 'center' },
-  soundOptionIconCircleActive: { backgroundColor: '#a9dfca' },
-  soundOptionTitle: { color: '#f5f3f0', fontSize: 13, fontWeight: '600' },
-  soundOptionTitleActive: { color: '#ffffff' },
-  soundOptionBadge: { backgroundColor: '#1f3040', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  soundOptionBadgeActive: { backgroundColor: '#17403a' },
-  soundOptionBadgeText: { color: '#adb3bf', fontSize: 10, fontWeight: '600' },
-  soundOptionBadgeTextActive: { color: '#a9dfca' },
-  soundOptionSub: { color: '#8892a0', fontSize: 11, marginTop: 2 },
+  soundOptionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, padding: 12, borderRadius: RADII.card, borderWidth: 1, borderColor: COLORS.border },
+  soundOptionCardActive: { borderColor: COLORS.accent, backgroundColor: COLORS.surface },
+  soundOptionIconCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
+  soundOptionIconCircleActive: { backgroundColor: COLORS.accent },
+  soundOptionTitle: { color: COLORS.text, fontSize: 13, fontWeight: '600' },
+  soundOptionTitleActive: { color: COLORS.text },
+  soundOptionBadge: { backgroundColor: COLORS.surfaceMuted, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  soundOptionBadgeActive: { backgroundColor: COLORS.accentSoft },
+  soundOptionBadgeText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '600' },
+  soundOptionBadgeTextActive: { color: COLORS.accent },
+  soundOptionSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
 
   deviceSoundActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#122533',
+    backgroundColor: COLORS.surface,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: RADII.button,
     marginTop: 12,
     borderWidth: 1.5,
-    borderColor: '#26564f',
+    borderColor: COLORS.accentBorder,
   },
   deviceSoundActionIcon: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   deviceSoundActionTitle: {
-    color: '#ffffff',
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '700',
   },
   deviceSoundActionSub: {
-    color: '#cbd5e1',
+    color: COLORS.text,
     fontSize: 11,
     marginTop: 3,
     lineHeight: 15,
@@ -5522,15 +5531,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: '#0c1822',
+    backgroundColor: COLORS.bg,
     padding: 10,
     borderRadius: 8,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#1d3244',
+    borderColor: COLORS.border,
   },
   deviceSoundTipText: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
     fontSize: 11,
     lineHeight: 15,
     flex: 1,
@@ -5545,104 +5554,104 @@ const styles = StyleSheet.create({
   },
   languageOptionCardActive: {},
   languageOptionTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
   },
   languageOptionSub: {
-    color: '#8e9fac',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 3,
   },
   languageDefaultBadge: {
-    backgroundColor: 'rgba(169, 223, 202, 0.15)',
+    backgroundColor: COLORS.accentSoft,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: 8,
   },
   languageDefaultBadgeText: {
-    color: '#a9dfca',
-    fontSize: 10,
+    color: COLORS.accent,
+    fontSize: 11,
     fontWeight: '600',
   },
 
   // Empty Card
-  emptyCard: { backgroundColor: '#152332', borderRadius: 14, padding: 24, alignItems: 'center', marginVertical: 12 },
-  emptyCardTitle: { color: '#f5f3f0', fontSize: 18, fontWeight: '700', marginTop: 10 },
-  emptyCardSub: { color: '#adb3bf', fontSize: 13, marginTop: 4 },
+  emptyCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 24, alignItems: 'center', marginVertical: 12, borderWidth: 1, borderColor: COLORS.border },
+  emptyCardTitle: { color: COLORS.text, fontSize: 18, fontWeight: '700', marginTop: 10 },
+  emptyCardSub: { color: COLORS.textSecondary, fontSize: 13, marginTop: 4 },
 
   // Bottom Navigation
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 75, backgroundColor: '#081624', borderTopWidth: 1, borderTopColor: '#23313f', paddingBottom: Platform.OS === 'ios' ? 15 : 5, justifyContent: 'center' },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 75, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border, paddingBottom: Platform.OS === 'ios' ? 15 : 5, justifyContent: 'center' },
   bottomNavInner: { flexDirection: 'row', flex: 1, justifyContent: 'space-around', alignItems: 'center' },
-  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  navLabel: { color: '#adb3bf', fontSize: 11, marginTop: 4 },
-  navLabelActive: { color: '#a9dfca', fontWeight: '600' },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: MIN_TOUCH },
+  navLabel: { color: COLORS.textSecondary, fontSize: TYPE.micro + 1, marginTop: 4, fontWeight: '500' },
+  navLabelActive: { color: COLORS.accent, fontWeight: '700' },
 
   // Toast
-  toast: { position: 'absolute', bottom: 85, left: 16, right: 16, maxWidth: 560, alignSelf: 'center', backgroundColor: '#193c37', padding: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#48655f' },
-  toastText: { color: '#f5f3f0', fontSize: 13, flex: 1, marginRight: 8 },
-  toastUndo: { color: '#a9dfca', fontSize: 13, fontWeight: '700' },
+  toast: { position: 'absolute', bottom: 85, left: 16, right: 16, maxWidth: 560, alignSelf: 'center', backgroundColor: COLORS.accentSoft, padding: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: COLORS.accentBorder },
+  toastText: { color: COLORS.text, fontSize: 13, flex: 1, marginRight: 8 },
+  toastUndo: { color: COLORS.accent, fontSize: 13, fontWeight: '700' },
 
   // Floating Push Banner
-  notifRepeatNagBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#112926', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#1d4d42' },
-  notifRepeatNagBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '600' },
+  notifRepeatNagBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.accentSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.accentBorder },
+  notifRepeatNagBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
 
   // Modal
-  modalSafe: { flex: 1, backgroundColor: '#081624' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#203244' },
-  modalTitle: { color: '#f5f3f0', fontSize: 17, fontWeight: '700' },
-  modalSaveBtn: { color: '#a9dfca', fontSize: 16, fontWeight: '700' },
+  modalSafe: { flex: 1, backgroundColor: COLORS.bg },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  modalTitle: { color: COLORS.text, fontSize: 17, fontWeight: '700' },
+  modalSaveBtn: { color: COLORS.accent, fontSize: 16, fontWeight: '700' },
   modalScroll: { flex: 1 },
   modalContent: { padding: 16, paddingBottom: 60 },
-  inputLabel: { color: '#adb3bf', fontSize: 13, fontWeight: '600', marginTop: 14, marginBottom: 6 },
-  textInput: { backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', borderRadius: 8, padding: 12, color: '#f5f3f0', fontSize: 15 },
+  inputLabel: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600', marginTop: 14, marginBottom: 6 },
+  textInput: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12, color: COLORS.text, fontSize: 15 },
   selectorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  selectorBtn: { flex: 1, minWidth: '45%', backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  selectorBtnActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
-  selectorBtnText: { color: '#adb3bf', fontSize: 12 },
-  selectorBtnTextActive: { color: '#a9dfca', fontWeight: '600' },
+  selectorBtn: { flex: 1, minWidth: '45%', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, paddingVertical: 10, alignItems: 'center', borderRadius: RADII.button },
+  selectorBtnActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  selectorBtnText: { color: COLORS.textSecondary, fontSize: 12 },
+  selectorBtnTextActive: { color: COLORS.accent, fontWeight: '600' },
   timePickersRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
   timeInputCol: { flex: 1 },
-  timeInputLabel: { color: '#adb3bf', fontSize: 11, marginBottom: 4 },
-  timeInput: { backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a', borderRadius: 8, padding: 10, color: '#f5f3f0', fontSize: 15, textAlign: 'center' },
-  cycleBox: { backgroundColor: '#101d29', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#23374d', marginTop: 8 },
-  cycleBoxTitle: { color: '#a9dfca', fontSize: 12, fontWeight: '700', marginBottom: 8 },
+  timeInputLabel: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 4 },
+  timeInput: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 10, color: COLORS.text, fontSize: 15, textAlign: 'center' },
+  cycleBox: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 12, borderWidth: 1, borderColor: COLORS.border, marginTop: 8 },
+  cycleBoxTitle: { color: COLORS.accent, fontSize: 12, fontWeight: '700', marginBottom: 8 },
   presetRow: { flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
-  presetBtn: { backgroundColor: '#152535', borderWidth: 1, borderColor: '#28394a', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6 },
-  presetBtnHighlight: { borderColor: '#355a50', backgroundColor: '#173b37' },
-  presetBtnText: { color: '#adb3bf', fontSize: 11 },
-  presetBtnHighlightText: { color: '#cbf5e5', fontSize: 11, fontWeight: '700' },
+  presetBtn: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6 },
+  presetBtnHighlight: { borderColor: COLORS.successBorder, backgroundColor: COLORS.accentSoft },
+  presetBtnText: { color: COLORS.textSecondary, fontSize: 11 },
+  presetBtnHighlightText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
   twoColRow: { flexDirection: 'row', gap: 10 },
   col: { flex: 1 },
-  phaseCard: { backgroundColor: '#132230', borderRadius: 8, padding: 10, marginTop: 6, borderWidth: 1, borderColor: '#233547' },
-  phaseCardBadge: { color: '#a9dfca', fontSize: 10, fontWeight: '700', marginBottom: 6 },
-  refillBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 8, borderWidth: 1, borderColor: '#234842', backgroundColor: '#142d2a', marginTop: 10 },
-  refillBtnText: { color: '#a9dfca', fontSize: 13, fontWeight: '600' },
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: 8, borderWidth: 1, borderColor: '#5c2d33', marginTop: 24 },
-  deleteBtnText: { color: '#ff9696', fontSize: 14, fontWeight: '600' },
+  phaseCard: { backgroundColor: COLORS.surface, borderRadius: 8, padding: 10, marginTop: 6, borderWidth: 1, borderColor: COLORS.border },
+  phaseCardBadge: { color: COLORS.accent, fontSize: 11, fontWeight: '700', marginBottom: 6 },
+  refillBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.accentBorder, backgroundColor: COLORS.accentSoft, marginTop: 10 },
+  refillBtnText: { color: COLORS.accent, fontSize: 13, fontWeight: '600' },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.dangerBorder, marginTop: 24 },
+  deleteBtnText: { color: COLORS.danger, fontSize: 14, fontWeight: '600' },
 
   // Professional Time Section Styles
-  timeSectionBox: { backgroundColor: '#101d29', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#23374d', marginTop: 14 },
+  timeSectionBox: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 14, borderWidth: 1, borderColor: COLORS.border, marginTop: 14 },
   timeSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  timeSectionTitle: { color: '#f5f3f0', fontSize: 14, fontWeight: '700' },
-  timeSectionSub: { color: '#adb3bf', fontSize: 11, marginTop: 2 },
-  addSlotMiniBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#163832', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#a9dfca' },
-  addSlotMiniBtnText: { color: '#a9dfca', fontSize: 12, fontWeight: '700' },
+  timeSectionTitle: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
+  timeSectionSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+  addSlotMiniBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.accent },
+  addSlotMiniBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
   doseCountSelectorRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  doseCountChip: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: '#13212f', borderWidth: 1, borderColor: '#28394a' },
-  doseCountChipActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
-  doseCountChipText: { color: '#adb3bf', fontSize: 11 },
-  doseCountChipTextActive: { color: '#a9dfca', fontWeight: '700' },
-  timeSlotCard: { backgroundColor: '#152535', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#283c50' },
+  doseCountChip: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  doseCountChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  doseCountChipText: { color: COLORS.textSecondary, fontSize: 11 },
+  doseCountChipTextActive: { color: COLORS.accent, fontWeight: '700' },
+  timeSlotCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   timeSlotCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  timeSlotBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#163832', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  timeSlotBadgeText: { color: '#a9dfca', fontSize: 11, fontWeight: '700' },
+  timeSlotBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.accentSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  timeSlotBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
   removeSlotBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  removeSlotBtnText: { color: '#ff9696', fontSize: 11 },
+  removeSlotBtnText: { color: COLORS.danger, fontSize: 11 },
   timeStepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
-  stepBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#1b2d3e', height: 42, borderRadius: 8, borderWidth: 1, borderColor: '#2e455c' },
-  stepBtnText: { color: '#a9dfca', fontSize: 12, fontWeight: '600' },
+  stepBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: COLORS.surfaceMuted, height: 42, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.borderStrong },
+  stepBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '600' },
   dualClockContainer: {
     flex: 2.2,
     flexDirection: 'row',
@@ -5653,36 +5662,36 @@ const styles = StyleSheet.create({
   clockBox: {
     flex: 1,
     height: 48,
-    backgroundColor: '#0a1420',
+    backgroundColor: COLORS.bg,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#243b52',
+    borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
     paddingHorizontal: 4,
   },
   clockBoxFocused: {
-    borderColor: '#a9dfca',
-    backgroundColor: '#112929',
-    shadowColor: '#a9dfca',
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accentSoft,
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 5,
     elevation: 3,
   },
   clockBoxLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: '#64748b',
+    color: COLORS.textMuted,
     marginBottom: -2,
   },
   clockBoxLabelFocused: {
-    color: '#a9dfca',
+    color: COLORS.accent,
   },
   clockDigitInput: {
-    color: '#f8fafc',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: '800',
     textAlign: 'center',
@@ -5692,51 +5701,51 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   clockSeparator: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 22,
     fontWeight: '900',
     marginHorizontal: 1,
     paddingBottom: 2,
   },
   slotPresetsRow: { flexDirection: 'row', gap: 6 },
-  slotPresetChip: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 6, backgroundColor: '#101d29', borderWidth: 1, borderColor: '#25374a' },
-  slotPresetChipActive: { backgroundColor: '#163832', borderColor: '#a9dfca' },
-  slotPresetChipText: { color: '#94a3b8', fontSize: 10 },
-  slotPresetChipTextActive: { color: '#cbf5e5', fontWeight: '700' },
+  slotPresetChip: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 6, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  slotPresetChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
+  slotPresetChipText: { color: COLORS.textSecondary, fontSize: 11 },
+  slotPresetChipTextActive: { color: COLORS.accent, fontWeight: '700' },
 
   // Duration Badges & Boxes
-  durationSummaryBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#122533', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#224055' },
-  durationSummaryBannerText: { color: '#cbd5e1', fontSize: 12, flex: 1 },
-  chipDuration: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#13332d', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#276156' },
-  chipDurationExpired: { backgroundColor: '#202832', borderColor: '#334155' },
-  chipDurationText: { color: '#a9dfca', fontSize: 10, fontWeight: '700' },
-  durationTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#13332d', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  durationTagExpired: { backgroundColor: '#1e293b' },
-  durationTagText: { color: '#a9dfca', fontSize: 10, fontWeight: '700' },
-  durationTagTextExpired: { color: '#94a3b8' },
+  durationSummaryBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.surface, padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: COLORS.border },
+  durationSummaryBannerText: { color: COLORS.text, fontSize: 12, flex: 1 },
+  chipDuration: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: COLORS.accentBorder },
+  chipDurationExpired: { backgroundColor: COLORS.surface, borderColor: COLORS.borderStrong },
+  chipDurationText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
+  durationTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  durationTagExpired: { backgroundColor: COLORS.surfaceMuted },
+  durationTagText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
+  durationTagTextExpired: { color: COLORS.textSecondary },
   medCardDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  medCardDurationText: { color: '#a9dfca', fontSize: 11 },
-  completedBox: { backgroundColor: '#10221c', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#224c3d', marginTop: 14 },
+  medCardDurationText: { color: COLORS.accent, fontSize: 11 },
+  completedBox: { backgroundColor: COLORS.successSoft, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: COLORS.successBorder, marginTop: 14 },
   completedHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  completedHeaderText: { color: '#34d399', fontSize: 12, fontWeight: '700' },
-  completedItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#17362b' },
-  completedItemName: { color: '#e2e8f0', fontSize: 13, fontWeight: '600' },
-  completedItemSub: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
-  completedBadge: { backgroundColor: '#163b2f', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#34d399' },
-  completedBadgeText: { color: '#34d399', fontSize: 10, fontWeight: '700' },
+  completedHeaderText: { color: COLORS.success, fontSize: 12, fontWeight: '700' },
+  completedItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.successBorder },
+  completedItemName: { color: COLORS.text, fontSize: 13, fontWeight: '600' },
+  completedItemSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+  completedBadge: { backgroundColor: COLORS.successSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: COLORS.success },
+  completedBadgeText: { color: COLORS.success, fontSize: 11, fontWeight: '700' },
 
   // Reliability & Device Protection Styles
   reliabilityStatusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0c2226',
+    backgroundColor: COLORS.accentSoft,
     borderRadius: 10,
     paddingVertical: 9,
     paddingHorizontal: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#194943',
+    borderColor: COLORS.accentBorder,
   },
   reliabilityStatusLeft: {
     flexDirection: 'row',
@@ -5747,10 +5756,10 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#34d399',
+    backgroundColor: COLORS.success,
   },
   reliabilityStatusText: {
-    color: '#d1fae5',
+    color: COLORS.success,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -5760,7 +5769,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   reliabilityStatusActionText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -5773,22 +5782,22 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#122533',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#224055',
+    borderColor: COLORS.border,
   },
   reliabilityActionBtn: {
-    backgroundColor: '#163832',
+    backgroundColor: COLORS.accentSoft,
     borderWidth: 1,
-    borderColor: '#a9dfca',
-    borderRadius: 8,
+    borderColor: COLORS.accent,
+    borderRadius: RADII.button,
     paddingVertical: 6,
     paddingHorizontal: 10,
   },
   reliabilityActionBtnText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -5796,15 +5805,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#12332e',
+    backgroundColor: COLORS.accentSoft,
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#246156',
+    borderColor: COLORS.accentBorder,
   },
   reliabilityStatusPillActiveText: {
-    color: '#34d399',
+    color: COLORS.success,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -5813,15 +5822,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     minHeight: 46,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     marginTop: 14,
   },
   reliabilityTestBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 13,
     fontWeight: '700',
     flexShrink: 1,
@@ -5831,28 +5840,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#122938',
+    backgroundColor: COLORS.surface,
     borderWidth: 1.5,
-    borderColor: '#245163',
+    borderColor: COLORS.borderStrong,
     padding: 12,
-    borderRadius: 12,
+    borderRadius: RADII.button,
     marginBottom: 16,
   },
   scanBarcodeIconCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scanBarcodeBtnTitle: {
-    color: '#ffffff',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '700',
   },
   scanBarcodeBtnSub: {
-    color: '#cbd5e1',
+    color: COLORS.text,
     fontSize: 11,
     marginTop: 2,
     lineHeight: 15,
@@ -5860,20 +5869,20 @@ const styles = StyleSheet.create({
   scannedInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#12332e',
+    backgroundColor: COLORS.accentSoft,
     borderWidth: 1,
-    borderColor: '#246156',
+    borderColor: COLORS.accentBorder,
     borderRadius: 10,
     padding: 10,
     marginBottom: 14,
   },
   scannedInfoTitle: {
-    color: '#34d399',
+    color: COLORS.success,
     fontSize: 12,
     fontWeight: '700',
   },
   scannedInfoSub: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 11,
     marginTop: 2,
   },
@@ -5881,15 +5890,15 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   syncCard: {
-    backgroundColor: '#12202e',
-    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     borderWidth: 1,
-    borderColor: '#1e384f',
+    borderColor: COLORS.border,
     padding: 16,
     marginBottom: 16,
   },
   syncCardDesc: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
     fontSize: 12,
     lineHeight: 17,
     marginBottom: 12,
@@ -5903,19 +5912,19 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   syncStatusSuccess: {
-    backgroundColor: '#0c2820',
+    backgroundColor: COLORS.successSoft,
     borderWidth: 1,
-    borderColor: '#1e5e4a',
+    borderColor: COLORS.successBorder,
   },
   syncStatusError: {
-    backgroundColor: '#2e1218',
+    backgroundColor: COLORS.dangerSoft,
     borderWidth: 1,
-    borderColor: '#6b2533',
+    borderColor: COLORS.dangerBorder,
   },
   syncStatusNeutral: {
-    backgroundColor: '#102838',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#1d4865',
+    borderColor: COLORS.borderStrong,
   },
   syncStatusText: {
     fontSize: 12,
@@ -5933,14 +5942,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: RADII.button,
   },
   syncPrimaryBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 13,
     fontWeight: '700',
     flexShrink: 1,
@@ -5952,16 +5961,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#172c3d',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#244763',
+    borderColor: COLORS.borderStrong,
     minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: RADII.button,
   },
   syncSecondaryBtnText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 13,
     fontWeight: '600',
     flexShrink: 1,
@@ -5972,15 +5981,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#172c3d',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#244763',
+    borderColor: COLORS.borderStrong,
     height: 46,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     marginTop: 4,
   },
   backupExportBtnText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 13.5,
     fontWeight: '700',
   },
@@ -5993,7 +6002,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     height: 42,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     borderWidth: 1,
   },
   diagActionBtnText: {
@@ -6004,30 +6013,30 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 9,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: RADII.button,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   diagTestBtnText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
   },
   diagCard: {
-    backgroundColor: '#152332',
-    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
 
   // Date Picker Card Styles
   datePickerCard: {
-    backgroundColor: '#101e2b',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#1d364d',
-    borderRadius: 12,
+    borderColor: COLORS.border,
+    borderRadius: RADII.card,
     padding: 12,
     marginTop: 10,
     marginBottom: 4,
@@ -6036,42 +6045,42 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   datePickerLabel: {
-    color: '#e2e8f0',
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '700',
   },
   datePickerHint: {
-    color: '#8b9cb0',
-    fontSize: 11.5,
+    color: COLORS.textSecondary,
+    fontSize: 12,
     marginTop: 2,
   },
   datePickerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#16283b',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#244563',
+    borderColor: COLORS.borderStrong,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: RADII.button,
   },
   datePickerBtnText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
   datePickerChangeBadge: {
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    backgroundColor: COLORS.successSoft,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.4)',
+    borderColor: COLORS.successBorder,
   },
   datePickerChangeBadgeText: {
-    color: '#34d399',
+    color: COLORS.success,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -6091,15 +6100,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#132832',
+    backgroundColor: COLORS.surface,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1c4542',
+    borderColor: COLORS.accentBorder,
   },
   carouselSessionBadgeText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -6112,16 +6121,16 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#23384c',
+    backgroundColor: COLORS.surfaceMuted,
   },
   carouselDotActive: {
     width: 16,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
   },
   carouselCounterText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '600',
     marginLeft: 4,
@@ -6130,13 +6139,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   heroCarouselCard: {
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderRadius: 14,
     paddingVertical: 9,
     paddingHorizontal: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#20354b',
+    borderColor: COLORS.border,
     overflow: 'hidden',
   },
   heroTopRow: {
@@ -6150,34 +6159,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#142d2a',
+    backgroundColor: COLORS.accentSoft,
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#234842',
+    borderColor: COLORS.accentBorder,
   },
   timingBadgeText: {
-    color: '#a9dfca',
-    fontSize: 10,
+    color: COLORS.accent,
+    fontSize: 11,
     fontWeight: '700',
   },
   timingBadgeOverdue: {
-    backgroundColor: '#332214',
-    borderColor: '#5c3e24',
+    backgroundColor: COLORS.warningSoft,
+    borderColor: COLORS.warningBorder,
   },
   timingBadgeTextOverdue: {
-    color: '#f0b484',
+    color: COLORS.warning,
   },
   cardPageBadge: {
-    backgroundColor: '#1e3347',
+    backgroundColor: COLORS.surfaceMuted,
     paddingVertical: 1.5,
     paddingHorizontal: 6,
     borderRadius: 6,
   },
   cardPageBadgeText: {
-    color: '#adb3bf',
-    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontSize: 11,
     fontWeight: '600',
   },
   heroVisualPillBox: {
@@ -6185,23 +6194,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#0f1c29',
+    backgroundColor: COLORS.surface,
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 8,
     width: '100%',
     marginVertical: 3,
     borderWidth: 1,
-    borderColor: '#1c2e42',
+    borderColor: COLORS.border,
   },
   heroVisualFormText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 11,
     fontWeight: '600',
   },
   heroInstructionText: {
-    color: '#a9dfca',
-    fontSize: 10.5,
+    color: COLORS.accent,
+    fontSize: 11,
     fontStyle: 'italic',
     textAlign: 'center',
     width: '100%',
@@ -6212,13 +6221,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#a9dfca',
-    borderRadius: 10,
+    backgroundColor: COLORS.accent,
+    borderRadius: RADII.button,
     height: 36,
     marginTop: 6,
   },
   takeAllSessionBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -6233,12 +6242,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   guidanceBoxWarning: {
-    backgroundColor: '#261b11',
-    borderColor: '#54361e',
+    backgroundColor: COLORS.warningSoft,
+    borderColor: COLORS.warningBorder,
   },
   guidanceBoxCritical: {
-    backgroundColor: '#321414',
-    borderColor: '#692525',
+    backgroundColor: COLORS.dangerSoft,
+    borderColor: COLORS.dangerBorder,
   },
   guidanceHeader: {
     flexDirection: 'row',
@@ -6247,30 +6256,30 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   guidanceTitle: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   guidanceTitleWarning: {
-    color: '#f0b484',
+    color: COLORS.warning,
   },
   guidanceTitleCritical: {
-    color: '#ff7675',
+    color: COLORS.danger,
   },
   guidanceMessage: {
-    color: '#cbd5e1',
-    fontSize: 10,
+    color: COLORS.text,
+    fontSize: 11,
     lineHeight: 13,
     width: '100%',
   },
 
   updateCard: {
-    backgroundColor: '#0f1f2e',
-    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     padding: 16,
     marginTop: 14,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#1e3347',
+    borderColor: COLORS.border,
   },
   updateHeaderRow: {
     flexDirection: 'row',
@@ -6287,28 +6296,28 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#162e3d',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   updateTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#f5f3f0',
+    color: COLORS.text,
   },
   updateSub: {
     fontSize: 11,
-    color: '#7e90a6',
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
   checkUpdateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: RADII.button,
   },
   checkUpdateBtnStacked: {
     width: '100%',
@@ -6316,25 +6325,25 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   checkUpdateBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 12,
     fontWeight: '700',
   },
   updateAlertBox: {
-    backgroundColor: '#122b30',
+    backgroundColor: COLORS.infoSoft,
     borderRadius: 10,
     padding: 12,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: '#1b4d45',
+    borderColor: COLORS.accentBorder,
   },
   updateAlertTitle: {
-    color: '#5eead4',
+    color: COLORS.accent,
     fontSize: 13,
     fontWeight: '700',
   },
   updateAlertNotes: {
-    color: '#c4d7d1',
+    color: COLORS.accent,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 6,
@@ -6344,13 +6353,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#5eead4',
+    backgroundColor: COLORS.accent,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: RADII.button,
     marginTop: 10,
   },
   downloadUpdateBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -6361,10 +6370,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#172b3c',
+    borderTopColor: COLORS.border,
   },
   upToDateText: {
-    color: '#34d399',
+    color: COLORS.success,
     fontSize: 12,
     fontWeight: '500',
   },

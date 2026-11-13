@@ -30,12 +30,12 @@ Verify Complete Undo Flow And Correction Options
     # Step 2: Go to Today tab and take dose
     Click Element    android=new UiSelector().descriptionContains(", Bugün").clickable(true)
     Wait Until Page Contains    ${MEDICATION}    15s
-    ${late_take}=    Set Variable    android=new UiSelector().text("Şimdi Al (Geç)")
+    ${late_take}=    Set Variable    android=new UiSelector().text("Aldım")
     ${late_visible}=    Run Keyword And Return Status    Wait Until Page Contains Element    ${late_take}    5s
     IF    ${late_visible}
         Click Element    ${late_take}
     ELSE
-        Click Element    android=new UiSelector().text("Al")
+        Click Element    android=new UiSelector().text("Aldım")
     END
 
     # Step 3: Verify Toast "Geri Al" appears, click it, and verify undo
@@ -62,7 +62,7 @@ Verify Complete Undo Flow And Correction Options
     IF    ${late_visible2}
         Click Element    ${late_take}
     ELSE
-        Click Element    android=new UiSelector().text("Al")
+        Click Element    android=new UiSelector().text("Aldım")
     END
 
     # Step 7: Verify stock dropped to 29
@@ -72,11 +72,11 @@ Verify Complete Undo Flow And Correction Options
     Wait Until Page Contains Element    android=new UiSelector().text("29")    15s
     Page Should Contain Text    29
 
-    # Step 8: Return to Today tab and expand "Alınan Dozlar"
+    # Step 8: Return to Today tab and expand "Alınan dozlar"
     Click Element    android=new UiSelector().descriptionContains(", Bugün").clickable(true)
     Wait Until Page Contains    Bugün    15s
-    Wait Until Page Contains Element    android=new UiSelector().textContains("Alınan Dozlar")    10s
-    Click Element    android=new UiSelector().textContains("Alınan Dozlar")
+    Wait Until Page Contains Element    android=new UiSelector().textContains("Alınan dozlar")    10s
+    Click Element    android=new UiSelector().textContains("Alınan dozlar")
     Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)    10s
 
     # Step 9: Tap the taken record row on Today ("Düzelt") and confirm in dialog
@@ -101,7 +101,7 @@ Verify Complete Undo Flow And Correction Options
     IF    ${late_visible3}
         Click Element    ${late_take}
     ELSE
-        Click Element    android=new UiSelector().text("Al")
+        Click Element    android=new UiSelector().text("Aldım")
     END
 
     # Step 12: Verify stock dropped to 29

@@ -1,7 +1,7 @@
 {
-  "version": "1.2.16",
+  "version": "1.3.0",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.2.16: Bildirim izni kapalıyken Bugün ekranında uyarı gösterilir; Aç düğmesi gerekirse telefon ayarlarını açar.",
-  "publishedAt": "2026-11-12T19:23:00Z"
+  "releaseNotes": "v1.3.0: Yeni sade ve sıcak görünüm. Krem zemin, kiremit vurgular; Bugün ekranında haftalık şerit, günlük ilerleme çubuğu ve tek dokunuşla Aldım düğmesi. Tüm sayfalar aynı temayı kullanır.",
+  "publishedAt": "2026-11-13T16:56:00Z"
 }

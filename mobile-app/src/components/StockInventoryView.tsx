@@ -14,6 +14,7 @@ import {
 import { Translations } from '../i18n/translations';
 import { useResponsive } from '../useResponsive';
 
+import { COLORS, RADII } from '../theme';
 export interface StockInventoryViewProps {
   doses: Dose[];
   today: string;
@@ -79,7 +80,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
   if (activeDoses.length === 0) {
     return (
       <View style={styles.emptyCard}>
-        <Ionicons name="cube-outline" size={48} color="#a9dfca" />
+        <Ionicons name="cube-outline" size={48} color={COLORS.accent} />
         <Text style={styles.emptyCardTitle}>{t.stockEmptyTitle}</Text>
         <Text style={styles.emptyCardSub}>{t.stockEmptyDesc}</Text>
       </View>
@@ -100,7 +101,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
           activeOpacity={0.7}
         >
           <View style={styles.triageHeader}>
-            <View style={[styles.dot, { backgroundColor: '#ef4444' }]} />
+            <View style={[styles.dot, { backgroundColor: COLORS.danger }]} />
             <Text style={styles.triageCountCritical}>{criticalCount}</Text>
           </View>
           <Text style={styles.triageLabelCritical}>{t.stockTriageCritical}</Text>
@@ -117,7 +118,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
           activeOpacity={0.7}
         >
           <View style={styles.triageHeader}>
-            <View style={[styles.dot, { backgroundColor: '#f59e0b' }]} />
+            <View style={[styles.dot, { backgroundColor: COLORS.warning }]} />
             <Text style={styles.triageCountLow}>{lowCount}</Text>
           </View>
           <Text style={styles.triageLabelLow}>{t.stockTriageLow}</Text>
@@ -134,7 +135,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
           activeOpacity={0.7}
         >
           <View style={styles.triageHeader}>
-            <View style={[styles.dot, { backgroundColor: '#10b981' }]} />
+            <View style={[styles.dot, { backgroundColor: COLORS.success }]} />
             <Text style={styles.triageCountGood}>{goodCount}</Text>
           </View>
           <Text style={styles.triageLabelGood}>{t.stockTriageGood}</Text>
@@ -175,9 +176,9 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
           const isCritical = projection.statusTier === 'critical';
           const isLow = projection.statusTier === 'low';
 
-          const tierColor = isCritical ? '#ef4444' : isLow ? '#f59e0b' : '#10b981';
-          const tierBg = isCritical ? '#2c1618' : isLow ? '#2c2314' : '#102622';
-          const tierBorder = isCritical ? '#5c2428' : isLow ? '#5c431d' : '#1d4a3e';
+          const tierColor = isCritical ? COLORS.danger : isLow ? COLORS.warning : COLORS.success;
+          const tierBg = isCritical ? COLORS.dangerSoft : isLow ? COLORS.warningSoft : COLORS.accentSoft;
+          const tierBorder = isCritical ? COLORS.dangerBorder : isLow ? COLORS.warningBorder : COLORS.successBorder;
 
           return (
             <View key={dose.id} style={[styles.stockCard, isTablet && styles.stockCardTablet]}>
@@ -216,7 +217,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
 
                 {/* Run-out estimation */}
                 <View style={styles.runOutRow}>
-                  <Ionicons name="calendar-outline" size={13} color="#adb3bf" />
+                  <Ionicons name="calendar-outline" size={13} color={COLORS.textSecondary} />
                   <Text style={styles.runOutText}>
                     {t.stockRunOutDate}:{' '}
                     <Text style={{ color: tierColor, fontWeight: '600' }}>
@@ -251,7 +252,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
                     <Ionicons
                       name="remove"
                       size={16}
-                      color={projection.currentStock <= 0 ? '#4b5563' : '#f5f3f0'}
+                      color={projection.currentStock <= 0 ? COLORS.textMuted : COLORS.text}
                     />
                   </TouchableOpacity>
 
@@ -268,7 +269,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
                     style={styles.stepperBtn}
                     onPress={() => handleAdjustStock(dose, 1)}
                   >
-                    <Ionicons name="add" size={16} color="#f5f3f0" />
+                    <Ionicons name="add" size={16} color={COLORS.text} />
                   </TouchableOpacity>
                 </View>
 
@@ -278,7 +279,7 @@ export const StockInventoryView: React.FC<StockInventoryViewProps> = ({
                   onPress={() => handleAddBox(dose, projection.boxSize)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="cube" size={14} color="#081624" />
+                  <Ionicons name="cube" size={14} color={COLORS.onAccent} />
                   <Text style={styles.addBoxBtnText}>
                     {t.stockAddBox} (+{projection.boxSize})
                   </Text>
@@ -303,35 +304,35 @@ const styles = StyleSheet.create({
   },
   triageCard: {
     flex: 1,
-    backgroundColor: '#152332',
-    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     padding: 10,
     borderWidth: 1.5,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   triageCardCritical: {
-    backgroundColor: '#1c171a',
-    borderColor: '#3d1f23',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.dangerBorder,
   },
   triageCardActiveCritical: {
-    borderColor: '#ef4444',
-    backgroundColor: '#2c1618',
+    borderColor: COLORS.danger,
+    backgroundColor: COLORS.dangerSoft,
   },
   triageCardLow: {
-    backgroundColor: '#1c1b18',
-    borderColor: '#3d301f',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.warningBorder,
   },
   triageCardActiveLow: {
-    borderColor: '#f59e0b',
-    backgroundColor: '#2c2314',
+    borderColor: COLORS.warning,
+    backgroundColor: COLORS.warningSoft,
   },
   triageCardGood: {
-    backgroundColor: '#13211f',
-    borderColor: '#193930',
+    backgroundColor: COLORS.accentSoft,
+    borderColor: COLORS.successBorder,
   },
   triageCardActiveGood: {
-    borderColor: '#10b981',
-    backgroundColor: '#102622',
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.accentSoft,
   },
   triageHeader: {
     flexDirection: 'row',
@@ -345,38 +346,38 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   triageCountCritical: {
-    color: '#ef4444',
+    color: COLORS.danger,
     fontSize: 18,
     fontWeight: '800',
   },
   triageCountLow: {
-    color: '#f59e0b',
+    color: COLORS.warning,
     fontSize: 18,
     fontWeight: '800',
   },
   triageCountGood: {
-    color: '#10b981',
+    color: COLORS.success,
     fontSize: 18,
     fontWeight: '800',
   },
   triageLabelCritical: {
-    color: '#fca5a5',
+    color: COLORS.danger,
     fontSize: 11,
     fontWeight: '700',
   },
   triageLabelLow: {
-    color: '#fde68a',
+    color: COLORS.warning,
     fontSize: 11,
     fontWeight: '700',
   },
   triageLabelGood: {
-    color: '#a7f3d0',
+    color: COLORS.success,
     fontSize: 11,
     fontWeight: '700',
   },
   triageSub: {
-    color: '#94a3b8',
-    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontSize: 11,
     marginTop: 2,
   },
   filterRow: {
@@ -389,21 +390,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   filterChipActive: {
-    backgroundColor: '#a9dfca',
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
   filterChipText: {
-    color: '#adb3bf',
-    fontSize: 11.5,
+    color: COLORS.textSecondary,
+    fontSize: 12,
     fontWeight: '600',
   },
   filterChipTextActive: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontWeight: '700',
   },
   tabletGrid: {
@@ -412,10 +413,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   stockCard: {
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
     marginBottom: 12,
     overflow: 'hidden',
   },
@@ -434,13 +435,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   medName: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
   medMeta: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -464,13 +465,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   runOutText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
   },
   progressBarTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#0d1822',
+    backgroundColor: COLORS.bg,
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -483,19 +484,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#0d1a27',
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderTopColor: '#1a2938',
+    borderTopColor: COLORS.border,
     gap: 8,
     flexWrap: 'wrap',
   },
   stepperBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   stepperBtn: {
     paddingHorizontal: 10,
@@ -510,43 +511,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   stepperValueText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '700',
   },
   stepperUnitText: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
     fontSize: 11,
   },
   addBoxBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 8,
+    borderRadius: RADII.button,
   },
   addBoxBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 12,
     fontWeight: '700',
   },
   emptyCard: {
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 28,
     alignItems: 'center',
     marginVertical: 16,
   },
   emptyCardTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 17,
     fontWeight: '700',
     marginTop: 12,
   },
   emptyCardSub: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 6,

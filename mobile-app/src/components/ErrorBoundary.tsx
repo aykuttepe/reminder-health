@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../logger';
 import { getTranslations, STORAGE_KEY_LANGUAGE, type Language } from '../i18n/translations';
 
+import { COLORS, RADII } from '../theme';
 interface Props {
   children: ReactNode;
 }
@@ -77,7 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <View style={styles.container}>
           <View style={styles.iconBox}>
-            <Ionicons name="warning-outline" size={48} color="#f0b484" />
+            <Ionicons name="warning-outline" size={48} color={COLORS.warning} />
           </View>
 
           <Text style={styles.title}>{t.errorBoundaryTitle}</Text>
@@ -90,12 +91,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.primaryBtn} onPress={this.handleRestart} activeOpacity={0.8}>
-              <Ionicons name="refresh-outline" size={20} color="#081624" />
+              <Ionicons name="refresh-outline" size={20} color={COLORS.onAccent} />
               <Text style={styles.primaryBtnText}>{t.errorBoundaryRetry}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.secondaryBtn} onPress={this.handleShareReport} activeOpacity={0.8}>
-              <Ionicons name="share-outline" size={18} color="#a9dfca" />
+              <Ionicons name="share-outline" size={18} color={COLORS.accent} />
               <Text style={styles.secondaryBtnText}>{t.errorBoundaryShare}</Text>
             </TouchableOpacity>
           </View>
@@ -110,7 +111,7 @@ export class ErrorBoundary extends Component<Props, State> {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#081624',
+    backgroundColor: COLORS.bg,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -119,22 +120,22 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#281a17',
+    backgroundColor: COLORS.dangerSoft,
     borderWidth: 1,
-    borderColor: '#5c3325',
+    borderColor: COLORS.warningBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
   title: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 10,
   },
   subtitle: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
     fontSize: 13.5,
     lineHeight: 20,
     textAlign: 'center',
@@ -143,24 +144,24 @@ const styles = StyleSheet.create({
   errorBox: {
     maxHeight: 120,
     width: '100%',
-    backgroundColor: '#0f1d2c',
+    backgroundColor: COLORS.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1e384f',
+    borderColor: COLORS.border,
     marginBottom: 24,
   },
   errorBoxContent: {
     padding: 12,
   },
   errorTitle: {
-    color: '#f0b484',
+    color: COLORS.warning,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   errorText: {
-    color: '#cbd5e1',
+    color: COLORS.text,
     fontSize: 12,
     fontFamily: 'monospace',
   },
@@ -175,12 +176,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: RADII.button,
   },
   primaryBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -190,14 +191,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#122435',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#224666',
+    borderColor: COLORS.borderStrong,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: RADII.button,
   },
   secondaryBtnText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 14,
     fontWeight: '600',
   },

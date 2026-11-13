@@ -14,7 +14,7 @@ ${APP}           ${CURDIR}/../../mobile-app/android/app/build/outputs/apk/releas
 Medication List Opens                       İlaçlarım    Tedavi Planı          medications.png
 History Opens                               Geçmiş       Son 7 Gün             history.png
 Settings Opens                              Ayarlar      Kullanıcı Profili     settings.png
-Today Opens                                 Bugün        Günün Kalanı          today.png
+Today Opens                                 Bugün        Bekleyen dozlar          today.png
 
 *** Keywords ***
 Open Reminder Application

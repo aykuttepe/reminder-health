@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { COLORS, MIN_TOUCH, RADII, SPACING } from '../theme';
 const ITEM_H = 52;
 const VISIBLE = 5; // odd, so one row sits in the centre band
 const PAD = ITEM_H * ((VISIBLE - 1) / 2);
@@ -100,18 +101,18 @@ export function TimePickerModal({
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={() => {}}>
           <View style={styles.header}>
-            <Ionicons name="time-outline" size={18} color="#a9dfca" />
+            <Ionicons name="time-outline" size={18} color={COLORS.accent} />
             <Text style={styles.title}>{title}</Text>
           </View>
 
           <Text style={styles.preview}>{pad2(hour)}:{pad2(minute)}</Text>
 
           <View style={styles.wheels}>
+            {/* Centre band that marks the selected row in both columns; drawn first so it sits behind the digits. */}
+            <View pointerEvents="none" style={styles.centerBand} />
             <Wheel values={hours} value={hour} onChange={setHour} />
             <Text style={styles.colon}>:</Text>
             <Wheel values={minutes} value={minute} onChange={setMinute} />
-            {/* Centre band that marks the selected row in both columns. */}
-            <View pointerEvents="none" style={styles.centerBand} />
           </View>
 
           <View style={styles.actions}>
@@ -119,7 +120,7 @@ export function TimePickerModal({
               <Text style={styles.cancelText}>{cancelLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.confirmBtn} onPress={() => onConfirm(`${pad2(hour)}:${pad2(minute)}`)} activeOpacity={0.8}>
-              <Ionicons name="checkmark" size={18} color="#081624" />
+              <Ionicons name="checkmark" size={18} color={COLORS.onAccent} />
               <Text style={styles.confirmText}>{confirmLabel}</Text>
             </TouchableOpacity>
           </View>
@@ -130,24 +131,24 @@ export function TimePickerModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(4,10,18,0.72)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 340, backgroundColor: '#0f1f2c', borderRadius: 20, borderWidth: 1, borderColor: '#28394a', padding: 20 },
+  backdrop: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { width: '100%', maxWidth: 340, backgroundColor: COLORS.surface, borderRadius: RADII.card, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.xl },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', marginBottom: 6 },
-  title: { color: '#f5f3f0', fontSize: 16, fontWeight: '700' },
-  preview: { color: '#a9dfca', fontSize: 34, fontWeight: '800', textAlign: 'center', letterSpacing: 2, marginBottom: 6 },
+  title: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
+  preview: { color: COLORS.accent, fontSize: 34, fontWeight: '800', textAlign: 'center', letterSpacing: 2, marginBottom: 6 },
   wheels: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: ITEM_H * VISIBLE, position: 'relative' },
   wheel: { width: 96, height: ITEM_H * VISIBLE, overflow: 'hidden' },
   item: { height: ITEM_H, justifyContent: 'center', alignItems: 'center' },
-  itemText: { fontSize: 22, color: '#5c6e80', fontWeight: '500' },
-  itemTextSelected: { fontSize: 30, color: '#f5f3f0', fontWeight: '800' },
-  colon: { color: '#a9dfca', fontSize: 28, fontWeight: '800', marginHorizontal: 4 },
+  itemText: { fontSize: 22, color: COLORS.textMuted, fontWeight: '500' },
+  itemTextSelected: { fontSize: 30, color: COLORS.text, fontWeight: '800' },
+  colon: { color: COLORS.accent, fontSize: 28, fontWeight: '800', marginHorizontal: 4 },
   centerBand: {
     position: 'absolute', left: 8, right: 8, top: PAD, height: ITEM_H,
-    borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#2f5c50', backgroundColor: 'rgba(169,223,202,0.06)', borderRadius: 8,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: COLORS.accentBorder, backgroundColor: COLORS.accentSoft, borderRadius: RADII.sm,
   },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: '#33485c', alignItems: 'center', justifyContent: 'center' },
-  cancelText: { color: '#adb3bf', fontSize: 15, fontWeight: '600' },
-  confirmBtn: { flex: 1.4, height: 46, borderRadius: 12, backgroundColor: '#a9dfca', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  confirmText: { color: '#081624', fontSize: 15, fontWeight: '700' },
+  cancelBtn: { flex: 1, height: MIN_TOUCH, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.borderStrong, alignItems: 'center', justifyContent: 'center' },
+  cancelText: { color: COLORS.textSecondary, fontSize: 15, fontWeight: '600' },
+  confirmBtn: { flex: 1.4, height: MIN_TOUCH, borderRadius: RADII.button, backgroundColor: COLORS.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  confirmText: { color: COLORS.onAccent, fontSize: 15, fontWeight: '700' },
 });

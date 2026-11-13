@@ -39,8 +39,8 @@ Taken Action Records Dose Reduces Stock And Can Be Undone
     History Should Show Today Record    Alındı
     # Correction path from Today must refund the stock taken via the notification.
     Click Element    ${TAB_TODAY}
-    Wait Until Page Contains Element    android=new UiSelector().textContains("Alınan Dozlar")    15s
-    Click Element    android=new UiSelector().textContains("Alınan Dozlar")
+    Wait Until Page Contains Element    android=new UiSelector().textContains("Alınan dozlar")    15s
+    Click Element    android=new UiSelector().textContains("Alınan dozlar")
     Wait Until Page Contains Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)    10s
     Click Element    android=new UiSelector().descriptionContains(", Kaydı düzelt").clickable(true)
     Wait Until Page Contains    Bu kayıt geri alınacak    10s
@@ -136,8 +136,8 @@ Test Notification Should Be Gone
 Take Dose From Today Card
     Wait Until Page Contains Element    ${TAB_TODAY}    30s
     # The body tap switches to Today even if the app was last left on another tab. The button reads
-    # "Al" before the dose time and "Şimdi Al (Geç)" after it, so the test must not depend on the clock.
-    ${take}=    Set Variable    android=new UiSelector().textMatches("^(Al|Şimdi Al.*)$")
+    # "Aldım" both before and after the dose time; lateness is shown as a tag on the card.
+    ${take}=    Set Variable    android=new UiSelector().text("Aldım")
     Wait Until Page Contains Element    ${take}    20s
     Click Element    ${take}
     Stock Should Be    29

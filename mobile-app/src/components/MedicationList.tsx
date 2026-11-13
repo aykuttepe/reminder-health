@@ -17,6 +17,8 @@ import { Translations } from '../i18n/translations';
 import { StockInventoryView } from './StockInventoryView';
 import { useResponsive } from '../useResponsive';
 
+import { COLORS, RADII } from '../theme';
+import { SectionHeader } from './today/SectionHeader';
 export interface MedicationListProps {
   doses: Dose[];
   today: string;
@@ -66,7 +68,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
           <Ionicons
             name="calendar-outline"
             size={15}
-            color={subTab === 'plan' ? '#081624' : '#adb3bf'}
+            color={subTab === 'plan' ? COLORS.onAccent : COLORS.textSecondary}
           />
           <Text
             style={[styles.segmentText, subTab === 'plan' && styles.segmentTextActive]}
@@ -83,7 +85,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
           <Ionicons
             name="cube-outline"
             size={15}
-            color={subTab === 'stock' ? '#081624' : '#adb3bf'}
+            color={subTab === 'stock' ? COLORS.onAccent : COLORS.textSecondary}
           />
           <Text
             style={[styles.segmentText, subTab === 'stock' && styles.segmentTextActive]}
@@ -111,16 +113,15 @@ export const MedicationList: React.FC<MedicationListProps> = ({
       ) : (
         <>
           <View style={styles.medsHeader}>
-            <Text style={styles.sectionTitle}>
-              {language === 'en'
-                ? `DAILY PLAN (${activeDoses.length} Meds)`
-                : `GÜNLÜK PLAN (${activeDoses.length} İlaç)`}
-            </Text>
+            <SectionHeader
+              title={language === 'en' ? 'Daily plan' : 'Günlük plan'}
+              count={activeDoses.length}
+            />
           </View>
 
       {activeDoses.length === 0 ? (
         <View style={[styles.emptyCard, { marginHorizontal: 0, marginBottom: 16 }]}>
-          <Ionicons name="medkit-outline" size={48} color="#a9dfca" />
+          <Ionicons name="medkit-outline" size={48} color={COLORS.accent} />
           <Text style={styles.emptyCardTitle}>{t.noMedsRecordedTitle}</Text>
           <Text style={styles.emptyCardSub}>{t.noMedsRecordedDesc}</Text>
         </View>
@@ -157,7 +158,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
                         <Ionicons
                           name={durationInfo.isExpired ? 'checkmark-circle' : 'hourglass-outline'}
                           size={10}
-                          color={durationInfo.isExpired ? '#94a3b8' : '#a9dfca'}
+                          color={durationInfo.isExpired ? COLORS.textSecondary : COLORS.accent}
                         />
                         <Text style={[styles.durationTagText, durationInfo.isExpired && styles.durationTagTextExpired]}>
                           {durationInfo.badgeText}
@@ -188,7 +189,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
                       accessible
                       accessibilityLabel={language === 'en' ? 'Reminders muted' : 'Bildirimler sessizde'}
                     >
-                      <Ionicons name="notifications-off-outline" size={12} color="#f0b484" />
+                      <Ionicons name="notifications-off-outline" size={12} color={COLORS.warning} />
                       <Text style={styles.mutedPillText}>{language === 'en' ? 'Muted' : 'Sessiz'}</Text>
                     </View>
                   )}
@@ -199,7 +200,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
                 </Text>
                 {!durationInfo.isContinuous && (
                   <View style={styles.medCardDurationRow}>
-                    <Ionicons name="calendar-outline" size={11} color="#a9dfca" />
+                    <Ionicons name="calendar-outline" size={11} color={COLORS.accent} />
                     <Text style={styles.medCardDurationText}>
                       {dose.startDate} - {dose.endDate || calculateEndDate(dose.startDate || today, dose.durationDays || 7)} (
                       {language === 'en' ? `${dose.durationDays}-Day Treatment` : `${dose.durationDays} Günlük Tedavi`})
@@ -213,7 +214,7 @@ export const MedicationList: React.FC<MedicationListProps> = ({
       )}
 
       <TouchableOpacity style={styles.fullAddBtn} onPress={() => openEditor()}>
-        <Ionicons name="add" size={20} color="#f5f3f0" />
+        <Ionicons name="add" size={20} color={COLORS.text} />
         <Text style={styles.fullAddBtnText}>{t.addMedicine}</Text>
       </TouchableOpacity>
         </>
@@ -227,26 +228,26 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   sectionTitle: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   emptyCard: {
-    backgroundColor: '#152332',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     marginVertical: 12,
   },
   emptyCardTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '700',
     marginTop: 12,
   },
   emptyCardSub: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 6,
@@ -257,12 +258,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   medCard: {
-    backgroundColor: '#152332',
-    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   medCardTablet: {
     width: '48.8%',
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   medCardTime: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -289,55 +290,55 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#13332d',
+    backgroundColor: COLORS.accentSoft,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   durationTagExpired: {
-    backgroundColor: '#1e293b',
+    backgroundColor: COLORS.surfaceMuted,
   },
   durationTagText: {
-    color: '#a9dfca',
-    fontSize: 10,
+    color: COLORS.accent,
+    fontSize: 11,
     fontWeight: '700',
   },
   durationTagTextExpired: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
   },
   cycleTag: {
-    backgroundColor: '#143532',
+    backgroundColor: COLORS.accentSoft,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   cycleTagText: {
-    color: '#a9dfca',
-    fontSize: 10,
+    color: COLORS.accent,
+    fontSize: 11,
     fontWeight: '600',
   },
   cycleTagOff: {
-    backgroundColor: '#232c37',
+    backgroundColor: COLORS.surfaceMuted,
   },
   cycleTagOffText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
   },
   stockPill: {
-    backgroundColor: '#1a2938',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   stockPillText: {
-    color: '#adb3bf',
-    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontSize: 11,
     fontWeight: '600',
   },
   stockPillLow: {
-    backgroundColor: '#332214',
+    backgroundColor: COLORS.warningSoft,
   },
   stockPillLowText: {
-    color: '#f0b484',
+    color: COLORS.warning,
     fontWeight: '700',
   },
   medCardNameRow: {
@@ -353,22 +354,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: '#2d2516',
+    backgroundColor: COLORS.warningSoft,
     borderWidth: 1,
-    borderColor: '#59441f',
+    borderColor: COLORS.warningBorder,
   },
   mutedPillText: {
-    color: '#f0b484',
+    color: COLORS.warning,
     fontSize: 11,
     fontWeight: '700',
   },
   medCardName: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
   },
   medCardSub: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 3,
   },
@@ -379,7 +380,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   medCardDurationText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 11,
   },
   fullAddBtn: {
@@ -387,26 +388,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#1a2a3a',
+    backgroundColor: COLORS.surface,
     height: 48,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#2e4155',
+    borderColor: COLORS.borderStrong,
   },
   fullAddBtnText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
   },
   segmentContainer: {
     flexDirection: 'row',
-    backgroundColor: '#101c28',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 4,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   segmentBtn: {
     flex: 1,
@@ -415,22 +416,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 9,
-    borderRadius: 9,
+    borderRadius: RADII.button,
   },
   segmentBtnActive: {
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
   },
   segmentText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 13,
     fontWeight: '600',
   },
   segmentTextActive: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontWeight: '700',
   },
   segmentBadge: {
-    backgroundColor: '#ef4444',
+    backgroundColor: COLORS.danger,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -439,8 +440,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
+    color: COLORS.text,
+    fontSize: 11,
     fontWeight: '800',
   },
 });

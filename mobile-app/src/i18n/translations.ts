@@ -316,6 +316,17 @@ export interface Translations {
   errorBoundaryNoDetail: string;
   errorBoundaryRetry: string;
   errorBoundaryShare: string;
+  // Today screen redesign
+  todayProgressTitle: string;
+  todayProgressCount: string; // {taken} / {total}
+  pendingDosesTitle: string;
+  takenDosesTitle: string;
+  takeDone: string;
+  skipDose: string;
+  everyDay: string;
+  doseOptions: string;
+  profileAvatarLabel: string;
+  weekStripLabel: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -330,7 +341,7 @@ export const translations: Record<Language, Translations> = {
     appTitle: 'Reminder Health',
     defaultGreeting: 'Sana uygun bir rutin.',
     greetingPrefix: 'Merhaba',
-    allDone: '🎉 Bugünkü tüm ilaçlar alındı',
+    allDone: 'Bugünkü tüm ilaçlar alındı',
     progressDone: 'tamamlandı',
     todayScheduleReady: 'Günün ilaç planı hazır',
 
@@ -340,7 +351,7 @@ export const translations: Record<Language, Translations> = {
     noMedsRecordedTitle: 'Kayıtlı İlaç Yok',
     noMedsRecordedDesc: 'Henüz herhangi bir ilaç kaydetmediniz. Kutunun üzerindeki karekodu tarayarak veya manuel ekleyerek başlayabilirsiniz.',
     addFirstMedicine: '+ İlk İlacını Ekle',
-    addMedicine: '+ Yeni İlaç Ekle',
+    addMedicine: 'Yeni İlaç Ekle',
 
     // Actions
     take: 'Al',
@@ -629,6 +640,16 @@ export const translations: Record<Language, Translations> = {
     errorBoundaryNoDetail: 'Detay bulunamadı',
     errorBoundaryRetry: 'Yeniden Dene',
     errorBoundaryShare: 'Raporu Paylaş',
+    todayProgressTitle: 'Günlük ilerleme',
+    todayProgressCount: '{taken} / {total} doz alındı',
+    pendingDosesTitle: 'Bekleyen dozlar',
+    takenDosesTitle: 'Alınan dozlar',
+    takeDone: 'Aldım',
+    skipDose: 'Dozu atla',
+    everyDay: 'Her gün',
+    doseOptions: 'İlaç seçenekleri',
+    profileAvatarLabel: 'Profil',
+    weekStripLabel: 'Bu hafta',
   },
 
   en: {
@@ -642,7 +663,7 @@ export const translations: Record<Language, Translations> = {
     appTitle: 'Reminder Health',
     defaultGreeting: 'A routine that fits you.',
     greetingPrefix: 'Hello',
-    allDone: '🎉 All medications taken for today',
+    allDone: 'All medications taken for today',
     progressDone: 'completed',
     todayScheduleReady: 'Today\'s medication schedule is ready',
 
@@ -652,7 +673,7 @@ export const translations: Record<Language, Translations> = {
     noMedsRecordedTitle: 'No Medications Recorded',
     noMedsRecordedDesc: 'You haven\'t added any medications yet. Start by scanning the box barcode or adding manually.',
     addFirstMedicine: '+ Add First Medication',
-    addMedicine: '+ Add Medication',
+    addMedicine: 'Add Medication',
 
     // Actions
     take: 'Take',
@@ -941,6 +962,16 @@ export const translations: Record<Language, Translations> = {
     errorBoundaryNoDetail: 'No details available',
     errorBoundaryRetry: 'Try Again',
     errorBoundaryShare: 'Share Report',
+    todayProgressTitle: 'Daily progress',
+    todayProgressCount: '{taken} / {total} doses taken',
+    pendingDosesTitle: 'Pending doses',
+    takenDosesTitle: 'Taken doses',
+    takeDone: 'Taken',
+    skipDose: 'Skip dose',
+    everyDay: 'Every day',
+    doseOptions: 'Medicine options',
+    profileAvatarLabel: 'Profile',
+    weekStripLabel: 'This week',
   },
 };
 

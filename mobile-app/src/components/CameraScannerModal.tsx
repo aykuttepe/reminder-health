@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { parseITSKarekod, ITSParsedData } from '../itsParser';
 import { findMedicineByGTIN, CatalogMedicine, TURKISH_MED_CATALOG } from '../data/medCatalog';
 
+import { COLORS, RADII } from '../theme';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SCAN_AREA_SIZE = Math.min(Math.round(SCREEN_WIDTH * 0.72), 340);
 
@@ -148,7 +149,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         {/* Permission Check */}
         {!permission?.granted ? (
           <View style={styles.permissionContainer}>
-            <Ionicons name="camera-outline" size={54} color="#a9dfca" />
+            <Ionicons name="camera-outline" size={54} color={COLORS.accent} />
             <Text style={styles.permissionTitle}>
               {lang === 'en' ? 'Camera Permission Required' : 'Kamera İzni Gerekli'}
             </Text>
@@ -184,7 +185,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               {/* Top Bar */}
               <View style={styles.topBar}>
                 <TouchableOpacity style={styles.iconCircleBtn} onPress={onClose}>
-                  <Ionicons name="close" size={24} color="#f5f3f0" />
+                  <Ionicons name="close" size={24} color={COLORS.text} />
                 </TouchableOpacity>
 
                 <View style={styles.headerTitleBox}>
@@ -200,7 +201,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   style={[styles.iconCircleBtn, flash && styles.iconCircleBtnActive]}
                   onPress={() => setFlash(!flash)}
                 >
-                  <Ionicons name={flash ? 'flashlight' : 'flashlight-outline'} size={20} color={flash ? '#081624' : '#f5f3f0'} />
+                  <Ionicons name={flash ? 'flashlight' : 'flashlight-outline'} size={20} color={flash ? COLORS.onAccent : COLORS.text} />
                 </TouchableOpacity>
               </View>
 
@@ -229,13 +230,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                   style={styles.presetsToggleBtn}
                   onPress={() => setShowTestPresets(!showTestPresets)}
                 >
-                  <Ionicons name="flask-outline" size={16} color="#a9dfca" />
+                  <Ionicons name="flask-outline" size={16} color={COLORS.accent} />
                   <Text style={styles.presetsToggleBtnText}>
                     {showTestPresets
                       ? (lang === 'en' ? 'Hide Sample List' : 'Örnek Listeyi Gizle')
                       : (lang === 'en' ? 'No Box? Try Sample Medication' : 'Kutu Bulunmuyorsa: Örnek İlaç Dene')}
                   </Text>
-                  <Ionicons name={showTestPresets ? 'chevron-down' : 'chevron-up'} size={14} color="#a9dfca" />
+                  <Ionicons name={showTestPresets ? 'chevron-down' : 'chevron-up'} size={14} color={COLORS.accent} />
                 </TouchableOpacity>
 
                 {showTestPresets && (
@@ -257,7 +258,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                           style={styles.presetChip}
                           onPress={() => handlePresetSelect(item.gtin)}
                         >
-                          <Ionicons name="barcode-outline" size={12} color="#a9dfca" />
+                          <Ionicons name="barcode-outline" size={12} color={COLORS.accent} />
                           <Text style={styles.presetChipText}>{item.name}</Text>
                         </TouchableOpacity>
                       ))}
@@ -276,7 +277,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#081624',
+    backgroundColor: COLORS.bg,
   },
   permissionContainer: {
     flex: 1,
@@ -285,13 +286,13 @@ const styles = StyleSheet.create({
     padding: 30,
   },
   permissionTitle: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: '700',
     marginTop: 16,
   },
   permissionSub: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -299,15 +300,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   permissionBtn: {
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: RADII.button,
     width: '100%',
     alignItems: 'center',
   },
   permissionBtnText: {
-    color: '#081624',
+    color: COLORS.onAccent,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -316,14 +317,14 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   permissionCancelText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 14,
   },
 
   overlay: {
     flex: 1,
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(8, 22, 36, 0.45)',
+    backgroundColor: COLORS.overlay,
   },
   topBar: {
     flexDirection: 'row',
@@ -332,19 +333,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 54 : 32,
     paddingBottom: 16,
-    backgroundColor: 'rgba(8, 22, 36, 0.75)',
+    backgroundColor: COLORS.overlay,
   },
   headerTitleBox: {
     alignItems: 'center',
   },
   headerTitle: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
   },
   headerSub: {
-    color: '#cbd5e1',
+    color: COLORS.text,
     fontSize: 11,
     marginTop: 2,
   },
@@ -352,15 +353,15 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: 'rgba(21, 37, 53, 0.85)',
+    backgroundColor: COLORS.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#223c52',
+    borderColor: COLORS.border,
   },
   iconCircleBtnActive: {
-    backgroundColor: '#a9dfca',
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
 
   scannerWrapper: {
@@ -372,7 +373,7 @@ const styles = StyleSheet.create({
     height: SCAN_AREA_SIZE,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(169, 223, 202, 0.3)',
+    borderColor: COLORS.accentBorder,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 26,
     height: 26,
-    borderColor: '#a9dfca',
+    borderColor: COLORS.accent,
   },
   cornerTL: {
     top: -2,
@@ -415,16 +416,16 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: 'rgba(169, 223, 202, 0.6)',
+    backgroundColor: COLORS.accent,
   },
   scanInstruction: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 12.5,
     textAlign: 'center',
     marginTop: 18,
     paddingHorizontal: 36,
     lineHeight: 18,
-    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowColor: COLORS.shadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
@@ -438,28 +439,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(18, 37, 51, 0.9)',
+    backgroundColor: COLORS.overlay,
     borderWidth: 1,
-    borderColor: '#24455f',
+    borderColor: COLORS.borderStrong,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: RADII.button,
   },
   presetsToggleBtnText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 12,
     fontWeight: '700',
   },
   presetsCard: {
-    backgroundColor: '#101e2b',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#233d52',
-    borderRadius: 12,
+    borderColor: COLORS.border,
+    borderRadius: RADII.card,
     padding: 12,
     marginTop: 8,
   },
   presetsCardTitle: {
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 8,
@@ -473,15 +474,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#182f42',
+    backgroundColor: COLORS.surfaceMuted,
     paddingVertical: 6,
     paddingHorizontal: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#254a67',
+    borderColor: COLORS.borderStrong,
   },
   presetChipText: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 11,
     fontWeight: '600',
   },

@@ -8,6 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { DayAdherence, DaySummary, HistorySlot } from '../medicationPlan';
 
+import { COLORS, MIN_TOUCH, RADII, SPACING, TYPE } from '../theme';
 export interface HistoryDay {
   date: string;
   label: string;
@@ -50,7 +51,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     <View>
       <View style={styles.adherenceCard}>
         <View style={styles.adherencePill}>
-          <Ionicons name="trending-up" size={16} color="#a9dfca" />
+          <Ionicons name="trending-up" size={16} color={COLORS.accent} />
           <Text style={styles.adherencePillText}>{language === 'en' ? 'Last 7 Days' : 'Son 7 Gün'}</Text>
         </View>
         <Text style={styles.adherenceSub}>
@@ -75,9 +76,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 : `${day.summary.total} dozun ${day.summary.taken} tanesi alındı`}`}
               onPress={() => setSelectedHistoryDate(day.date)}
             >
-              <Text style={styles.weekPillLabel}>{day.label}</Text>
-              <Text style={styles.weekPillNum}>{day.dayNum}</Text>
-              <View style={[styles.weekDot, dotStyles[day.adherence]]} />
+              <Text style={[styles.weekPillLabel, selectedHistoryDate === day.date && styles.weekPillTextActive]}>{day.label}</Text>
+              <Text style={[styles.weekPillNum, selectedHistoryDate === day.date && styles.weekPillTextActive]}>{day.dayNum}</Text>
+              <View style={[styles.weekDot, dotStyles[day.adherence], selectedHistoryDate === day.date && styles.weekDotOnAccent]} />
             </TouchableOpacity>
           ))}
         </View>
@@ -133,8 +134,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       )}
 
       {historySlots.length > 0 ? (
-        historySlots.map((slot) => slot.status === 'pending' ? (
-          <View key={slot.slotId} style={styles.doseRow} testID={`record-history-${slot.slotId}`}>
+        <View style={styles.listCard}>
+        {historySlots.map((slot, idx) => slot.status === 'pending' ? (
+          <View key={slot.slotId} style={[styles.doseRow, idx > 0 && styles.rowDivider]} testID={`record-history-${slot.slotId}`}>
             <Text style={styles.doseRowTime}>{slot.time}</Text>
             <View style={styles.doseRowMain}>
               <Text style={styles.doseRowName}>{slot.dose.name}</Text>
@@ -160,10 +162,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 </TouchableOpacity>
               </View>
             </View>
-            <Ionicons name="ellipse-outline" size={20} color="#adb3bf" />
+            <Ionicons name="ellipse-outline" size={20} color={COLORS.textSecondary} />
           </View>
         ) : (
-          <TouchableOpacity key={slot.slotId} style={styles.doseRow}
+          <TouchableOpacity key={slot.slotId} style={[styles.doseRow, idx > 0 && styles.rowDivider]}
             testID={`revert-history-${slot.slotId}`} accessibilityRole="button"
             accessibilityLabel={`${slot.dose.name}, ${slot.time}, ${language === 'en' ? 'Correct record' : 'Kaydı düzelt'}`}
             onPress={() => onRevertRecord(slot)}>
@@ -185,15 +187,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               <Ionicons
                 name={slot.status === 'taken' ? 'checkmark-circle' : 'close-circle'}
                 size={20}
-                color={slot.status === 'taken' ? '#a9dfca' : '#e6ba93'}
+                color={slot.status === 'taken' ? COLORS.success : COLORS.amber}
               />
               <View style={styles.correctChip}>
-                <Ionicons name="create-outline" size={12} color="#adb3bf" />
+                <Ionicons name="create-outline" size={12} color={COLORS.textSecondary} />
                 <Text style={styles.correctChipText}>{language === 'en' ? 'Correct' : 'Düzelt'}</Text>
               </View>
             </View>
           </TouchableOpacity>
-        ))
+        ))}
+        </View>
       ) : (
         <Text style={styles.quietEmpty}>
           {language === 'en' ? 'No records yet.' : 'Henüz kayıt bulunmuyor.'}
@@ -203,21 +206,23 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   );
 };
 
-// Dot per day: mint all taken, amber partly, red missed, hollow ring while today is still open.
+// Dot per day: sage all taken, amber partly, red missed, hollow ring while today is still open.
 const dotStyles = StyleSheet.create({
-  none: { backgroundColor: '#2a3a4a' },
-  complete: { backgroundColor: '#a9dfca' },
-  partial: { backgroundColor: '#e6ba93' },
-  missed: { backgroundColor: '#ff9696' },
-  open: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#a9dfca' },
+  none: { backgroundColor: COLORS.surfaceMuted },
+  complete: { backgroundColor: COLORS.success },
+  partial: { backgroundColor: COLORS.amber },
+  missed: { backgroundColor: COLORS.danger },
+  open: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: COLORS.accent },
 });
 
 const styles = StyleSheet.create({
   adherenceCard: {
-    backgroundColor: '#152332',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.card,
+    marginBottom: SPACING.xl,
   },
   adherencePill: {
     flexDirection: 'row',
@@ -225,40 +230,48 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   adherencePillText: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 15,
     fontWeight: '700',
   },
   adherenceSub: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 4,
     marginBottom: 14,
   },
   weekStrip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: SPACING.xxs,
   },
   weekPill: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: MIN_TOUCH,
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    backgroundColor: '#192838',
-    width: 44,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADII.button,
   },
   weekPillActive: {
-    backgroundColor: '#1a3c36',
-    borderWidth: 1,
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
+  },
+  weekPillTextActive: {
+    color: COLORS.onAccent,
+  },
+  weekDotOnAccent: {
+    borderWidth: 1.5,
+    borderColor: COLORS.onAccent,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   weekPillLabel: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '500',
   },
   weekPillNum: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '700',
     marginVertical: 4,
@@ -279,32 +292,40 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   legendText: {
-    color: '#8899a8',
+    color: COLORS.textSecondary,
     fontSize: 11,
   },
   daySummary: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginBottom: 8,
   },
   sectionTitle: {
-    color: '#adb3bf',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginTop: 16,
-    marginBottom: 8,
+    color: COLORS.text,
+    fontSize: TYPE.heading,
+    fontWeight: '700',
+    marginBottom: SPACING.xxs,
+  },
+  listCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADII.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.card,
+  },
+  rowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
   doseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a2736',
-    gap: 12,
+    paddingVertical: SPACING.md,
+    minHeight: 64,
+    gap: SPACING.md,
   },
   doseRowTime: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
     width: 50,
@@ -313,12 +334,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   doseRowName: {
-    color: '#f5f3f0',
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: '600',
   },
   doseRowSub: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -328,26 +349,27 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   recordBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    minHeight: MIN_TOUCH,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADII.button,
     borderWidth: 1,
   },
   recordBtnTaken: {
-    backgroundColor: '#1a3c36',
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
   recordBtnTakenText: {
-    color: '#a9dfca',
+    color: COLORS.onAccent,
     fontSize: 13,
     fontWeight: '600',
   },
   recordBtnSkipped: {
-    backgroundColor: '#2a2320',
-    borderColor: '#e6ba93',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.borderStrong,
   },
   recordBtnSkippedText: {
-    color: '#e6ba93',
+    color: COLORS.textSecondary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -361,17 +383,17 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   correctChipText: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: '500',
   },
   listHint: {
-    color: '#8899a8',
-    fontSize: 12,
-    marginBottom: 6,
+    color: COLORS.textSecondary,
+    fontSize: TYPE.caption,
+    marginBottom: SPACING.sm,
   },
   quietEmpty: {
-    color: '#adb3bf',
+    color: COLORS.textSecondary,
     fontSize: 13,
     paddingVertical: 12,
   },

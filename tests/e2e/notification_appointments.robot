@@ -64,7 +64,7 @@ Add Appointment For Tomorrow
 Open Profile Appointments
     # Re-selecting Ayarlar while on it keeps the scroll offset; switching tabs lands on the main page.
     Click Element    ${TAB_TODAY}
-    Wait Until Page Contains Element    android=new UiSelector().text("Günün Kalanı")    15s
+    Wait Until Page Contains Element    android=new UiSelector().text("Bekleyen dozlar")    15s
     Click Element    ${TAB_SETTINGS}
     Wait Until Page Contains Element    android=new UiSelector().text("AYAR KATEGORİLERİ")    15s
     Click Element    android=new UiSelector().text("Kullanıcı Profili")

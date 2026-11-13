@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { COLORS, RADII } from '../theme';
 export interface StockThresholdSliderProps {
   value: number;
   onChange: (newValue: number) => void;
@@ -127,7 +128,7 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
             activeOpacity={0.7}
             accessibilityLabel={language === 'en' ? 'Decrease threshold' : 'Eşiği azalt'}
           >
-            <Ionicons name="remove" size={16} color={value <= min ? '#4b5563' : '#a9dfca'} />
+            <Ionicons name="remove" size={16} color={value <= min ? COLORS.textMuted : COLORS.accent} />
           </TouchableOpacity>
 
           {/* Numeric Input */}
@@ -152,7 +153,7 @@ export const StockThresholdSlider: React.FC<StockThresholdSliderProps> = ({
             activeOpacity={0.7}
             accessibilityLabel={language === 'en' ? 'Increase threshold' : 'Eşiği artır'}
           >
-            <Ionicons name="add" size={16} color={value >= max ? '#4b5563' : '#a9dfca'} />
+            <Ionicons name="add" size={16} color={value >= max ? COLORS.textMuted : COLORS.accent} />
           </TouchableOpacity>
 
           <Text style={styles.unitText}>{language === 'en' ? 'Doses' : 'Doz'}</Text>
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontSize: 12,
-    color: '#8e9aa8',
+    color: COLORS.textSecondary,
     lineHeight: 16,
   },
   manualEntryRow: {
@@ -255,9 +256,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   inputWrapper: {
-    backgroundColor: '#0c1926',
+    backgroundColor: COLORS.surface,
     borderWidth: 1.5,
-    borderColor: '#22364c',
+    borderColor: COLORS.border,
     borderRadius: 9,
     paddingHorizontal: 8,
     height: 38,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   textInput: {
-    color: '#a9dfca',
+    color: COLORS.accent,
     fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
@@ -275,21 +276,21 @@ const styles = StyleSheet.create({
   stepperBtn: {
     width: 34,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#162838',
+    borderRadius: RADII.button,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#243b50',
+    borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepperBtnDisabled: {
     opacity: 0.4,
-    borderColor: '#192533',
+    borderColor: COLORS.border,
   },
   unitText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: COLORS.textSecondary,
     marginLeft: 2,
   },
   sliderSection: {
@@ -302,13 +303,13 @@ const styles = StyleSheet.create({
   },
   trackBase: {
     height: 8,
-    backgroundColor: '#182838',
+    backgroundColor: COLORS.surface,
     borderRadius: 4,
     width: '100%',
   },
   trackActive: {
     height: 8,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     borderRadius: 4,
     position: 'absolute',
     left: 0,
@@ -318,11 +319,11 @@ const styles = StyleSheet.create({
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
-    backgroundColor: '#a9dfca',
+    backgroundColor: COLORS.accent,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2.5,
-    borderColor: '#081624',
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#081624',
+    backgroundColor: COLORS.bg,
   },
   scaleRow: {
     flexDirection: 'row',
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
   },
   scaleText: {
     fontSize: 11,
-    color: '#64748b',
+    color: COLORS.textMuted,
     fontWeight: '500',
   },
   chipRow: {
@@ -356,20 +357,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#132130',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#203244',
+    borderColor: COLORS.border,
   },
   chipActive: {
-    backgroundColor: '#163832',
-    borderColor: '#a9dfca',
+    backgroundColor: COLORS.accentSoft,
+    borderColor: COLORS.accent,
   },
   chipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8e9aa8',
+    color: COLORS.textSecondary,
   },
   chipTextActive: {
-    color: '#a9dfca',
+    color: COLORS.accent,
   },
 });
