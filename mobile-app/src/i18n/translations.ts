@@ -350,7 +350,7 @@ export const translations: Record<Language, Translations> = {
     noMedsTodayDesc: 'Bugün için planlanmış bir dozunuz bulunmuyor. Yeni bir ilaç ekleyerek rutininizi oluşturun.',
     noMedsRecordedTitle: 'Kayıtlı İlaç Yok',
     noMedsRecordedDesc: 'Henüz herhangi bir ilaç kaydetmediniz. Kutunun üzerindeki karekodu tarayarak veya manuel ekleyerek başlayabilirsiniz.',
-    addFirstMedicine: '+ İlk İlacını Ekle',
+    addFirstMedicine: 'İlk İlacını Ekle',
     addMedicine: 'Yeni İlaç Ekle',
 
     // Actions
@@ -672,7 +672,7 @@ export const translations: Record<Language, Translations> = {
     noMedsTodayDesc: 'You have no doses scheduled for today. Create your routine by adding your first medication.',
     noMedsRecordedTitle: 'No Medications Recorded',
     noMedsRecordedDesc: 'You haven\'t added any medications yet. Start by scanning the box barcode or adding manually.',
-    addFirstMedicine: '+ Add First Medication',
+    addFirstMedicine: 'Add First Medication',
     addMedicine: 'Add Medication',
 
     // Actions

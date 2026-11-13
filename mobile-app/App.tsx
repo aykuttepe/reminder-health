@@ -67,6 +67,7 @@ import { CalendarModal, formatLocalizedDate, formatTurkishDate } from './src/com
 import { AppointmentEditorModal } from './src/components/AppointmentEditorModal';
 import { StockThresholdSlider } from './src/components/StockThresholdSlider';
 import { appointmentDayBadge } from './src/components/today/AppointmentSummary';
+import { BrandMark } from './src/components/BrandMark';
 import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
@@ -2235,9 +2236,7 @@ function MainApp() {
         <View style={[styles.header, isTablet && { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}>
           <View style={styles.brandRow}>
             <View style={styles.brandLogo} accessible accessibilityRole="image" accessibilityLabel="Rutin">
-              <View style={styles.brandMark}>
-                <MaterialCommunityIcons name="pill" size={16} color={COLORS.onAccent} />
-              </View>
+              <BrandMark size={30} />
               <Text style={styles.brandText} maxFontSizeMultiplier={1.3}>Rutin</Text>
             </View>
             <TouchableOpacity
@@ -5215,7 +5214,6 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: SPACING.page, paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md },
   brandLogo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  brandMark: { width: 28, height: 28, borderRadius: RADII.sm, backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center' },
   brandText: { color: COLORS.accent, fontSize: TYPE.title, fontWeight: '800', letterSpacing: -0.3 },
   avatarBtn: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'flex-end', justifyContent: 'center', marginRight: -SPACING.xxs },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },

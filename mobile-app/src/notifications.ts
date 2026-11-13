@@ -481,7 +481,7 @@ export async function initNotifications(lang: 'tr' | 'en' = 'tr'): Promise<void>
           name: text.name,
           importance: cfg.importance,
           vibrationPattern: [0, 500, 250, 500],
-          lightColor: '#059669',
+          lightColor: '#CD5336',
           sound: cfg.sound ?? null,
           enableVibrate: true,
           showBadge: true,

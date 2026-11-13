@@ -13,7 +13,7 @@
     "android": {
       "package": "com.aykuttepe.rutin",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#CD5336",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -36,8 +36,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#059669"
+          "icon": "./assets/notification-icon.png",
+          "color": "#CD5336"
         }
       ],
       [
