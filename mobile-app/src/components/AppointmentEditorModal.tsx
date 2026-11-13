@@ -10,6 +10,7 @@ import {
   Switch,
 } from 'react-native';
 import { showNotice } from '../notice';
+import { useKeyboardAwareScroll } from '../useKeyboardAwareScroll';
 import { Ionicons } from '@expo/vector-icons';
 // React Native's SafeAreaView is iOS-only; on edge-to-edge Android the header sat under the status bar
 // and its close / Kaydet buttons could not be tapped.
@@ -227,6 +228,7 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
   };
 
   const specialtiesList = isEn ? POPULAR_SPECIALTIES_EN : POPULAR_SPECIALTIES_TR;
+  const keyboard = useKeyboardAwareScroll(visible);
 
   return (
     <Modal
@@ -249,7 +251,12 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
+        <ScrollView
+          ref={keyboard.scrollRef}
+          {...keyboard.scrollProps}
+          style={[styles.scroll, { marginBottom: keyboard.keyboardInset }]}
+          contentContainerStyle={[styles.content, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}
+        >
           {/* Branş / Uzmanlık */}
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>{isEn ? 'Medical Specialty' : 'Tıbbi Branş / Uzmanlık'}</Text>

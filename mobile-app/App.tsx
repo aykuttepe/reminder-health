@@ -70,6 +70,7 @@ import { StockThresholdSlider } from './src/components/StockThresholdSlider';
 import { appointmentDayBadge } from './src/components/today/AppointmentSummary';
 import { BrandMark } from './src/components/BrandMark';
 import { showNotice } from './src/notice';
+import { useKeyboardAwareScroll } from './src/useKeyboardAwareScroll';
 import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
@@ -1516,6 +1517,7 @@ function MainApp() {
     durationMode, durationDays, startDate, currentGTIN, currentExpiryDate, muted,
   ]);
   const editorBaselineRef = useRef<string | null>(null);
+  const editorKeyboard = useKeyboardAwareScroll(editorOpen);
   useEffect(() => {
     // Runs on the first render after openEditor's state updates, so the baseline is the opening form.
     editorBaselineRef.current = editorOpen ? editorSnapshot() : null;
@@ -4668,7 +4670,12 @@ function MainApp() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalContent, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
+            <ScrollView
+              ref={editorKeyboard.scrollRef}
+              {...editorKeyboard.scrollProps}
+              style={[styles.modalScroll, { marginBottom: editorKeyboard.keyboardInset }]}
+              contentContainerStyle={[styles.modalContent, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}
+            >
               {/* Scan Barcode / Karekod Banner Button */}
               <TouchableOpacity
                 style={styles.scanBarcodeBtn}

@@ -26,6 +26,9 @@ adb shell am start -n com.aykuttepe.rutin/.MainActivity
 ## Large text
 `adb shell settings put system font_scale 1.5` (also 1.3, 2.0). The activity restarts and any open editor closes; reopen it. Always reset to `1.0` afterwards.
 
+## Keyboard
+The emulator reports its pointer as a stylus, so Gboard shows a floating handwriting toolbar or a floating keyboard that never resizes the app. For a docked keyboard: `adb shell settings put secure stylus_handwriting_enabled 0`, `adb shell am force-stop com.google.android.inputmethod.latin`, then tap fields with `adb shell input touchscreen tap X Y`. Restore with `adb shell settings delete secure stylus_handwriting_enabled`.
+
 ## Gotchas
 - Back (`keyevent 4`) with an edited form now opens "Değişiklikler kaydedilmedi"; confirm with `ui.sh tap "Sil ve Kapat"`.
 - Leave the emulator empty when done: delete test medicines via editor → İlacı Sil → confirm.

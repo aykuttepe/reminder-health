@@ -52,8 +52,9 @@ Appointment Reminders Follow Add Edit Complete And Delete
 *** Keywords ***
 Add Appointment For Tomorrow
     Click Element    ${TAB_TODAY}
-    Wait Until Page Contains Element    android=new UiSelector().text("Randevu Ekle")    15s
-    Click Element    android=new UiSelector().text("Randevu Ekle")
+    # With no upcoming appointment Today shows this card; tapping it opens the appointment form.
+    Wait Until Page Contains Element    android=new UiSelector().text("Yaklaşan Randevu Yok")    15s
+    Click Element    android=new UiSelector().text("Yaklaşan Randevu Yok")
     Wait Until Page Contains Element    android=new UiSelector().text("Yeni Randevu Ekle")    15s
     # EditText order in the form: specialty, doctor name, hospital, phone.
     Input Text    android=new UiSelector().className("android.widget.EditText").instance(1)    ${DOCTOR}
