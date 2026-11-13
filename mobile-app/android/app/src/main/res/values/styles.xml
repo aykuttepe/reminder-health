@@ -16,5 +16,13 @@
     <item name="android:windowBackground">@drawable/rutin_dialog_background</item>
     <item name="android:textColorPrimary">@color/textPrimary</item>
     <item name="android:textColorSecondary">@color/textSecondary</item>
+    <item name="buttonBarPositiveButtonStyle">@style/RutinDialogButton</item>
+    <item name="buttonBarNegativeButtonStyle">@style/RutinDialogButton</item>
+    <item name="buttonBarNeutralButtonStyle">@style/RutinDialogButton</item>
+  </style>
+  <!-- Keep button labels as written: Android's all-caps transform ignores Turkish casing ("Sil" became "SIL"). -->
+  <style name="RutinDialogButton" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+    <item name="android:textAllCaps">false</item>
+    <item name="textAllCaps">false</item>
   </style>
 </resources>

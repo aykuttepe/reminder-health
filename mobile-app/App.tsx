@@ -19,6 +19,7 @@ import {
   AppState,
   Share,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { useResponsive } from './src/useResponsive';
 
@@ -175,6 +176,15 @@ const LEAD_TIME_OPTIONS = [
 
 const SYNC_INTERVAL_OPTIONS = [1, 3, 5, 10, 15, 30];
 
+// Above this system text scale the ±15 buttons move under the clock (1.3 still fits on one row).
+const STACKED_TIME_PICKER_FONT_SCALE = 1.35;
+// Growth caps keep the clock readable without letting it outgrow its boxes.
+const CLOCK_LABEL_MAX_FONT_SCALE = 1.4;
+const CLOCK_DIGIT_MAX_FONT_SCALE = 1.6;
+const STEPPER_MAX_FONT_SCALE = 1.6;
+// Four quick-time chips share one row; beyond this they would touch their borders.
+const QUICK_TIME_CHIP_MAX_FONT_SCALE = 1.6;
+
 /**
  * Dual Clock Picker Component:
  * - Pure numeric pad (keyboardType="number-pad")
@@ -200,6 +210,8 @@ function TimeSlotPicker({
   const [isMinuteFocused, setIsMinuteFocused] = useState(false);
   const hourRef = useRef<TextInput>(null);
   const minuteRef = useRef<TextInput>(null);
+  const { fontScale } = useWindowDimensions();
+  const stacked = fontScale > STACKED_TIME_PICKER_FONT_SCALE;
 
   useEffect(() => {
     if (!isHourFocused && !isMinuteFocused) {
@@ -276,82 +288,99 @@ function TimeSlotPicker({
     onChange(`${formattedH}:${formattedM}`);
   };
 
+  const stepLabel = lang === 'en' ? '15 min' : '15 dk';
+  const renderStep = (delta: number) => (
+    <TouchableOpacity
+      style={styles.stepBtn}
+      onPress={() => onStep(delta)}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${delta < 0 ? '-' : '+'}${stepLabel}`}
+    >
+      <Ionicons name={delta < 0 ? 'remove' : 'add'} size={16} color={COLORS.accent} />
+      <Text style={styles.stepBtnText} numberOfLines={1} maxFontSizeMultiplier={STEPPER_MAX_FONT_SCALE}>{stepLabel}</Text>
+    </TouchableOpacity>
+  );
+
+  const clock = (
+    <View style={[styles.dualClockContainer, stacked && styles.dualClockContainerStacked]}>
+      {/* Hour Input Block */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.clockBox, isHourFocused && styles.clockBoxFocused]}
+        onPress={() => hourRef.current?.focus()}
+      >
+        <Text style={[styles.clockBoxLabel, isHourFocused && styles.clockBoxLabelFocused]} numberOfLines={1} maxFontSizeMultiplier={CLOCK_LABEL_MAX_FONT_SCALE}>
+          {lang === 'en' ? 'HOUR' : 'SAAT'}
+        </Text>
+        <TextInput
+          ref={hourRef}
+          style={styles.clockDigitInput}
+          maxFontSizeMultiplier={CLOCK_DIGIT_MAX_FONT_SCALE}
+          value={hourText}
+          onChangeText={handleHourChange}
+          onFocus={() => setIsHourFocused(true)}
+          onBlur={handleHourBlur}
+          keyboardType="number-pad"
+          maxLength={2}
+          selectTextOnFocus={true}
+          placeholder="09"
+          placeholderTextColor={COLORS.textMuted}
+        />
+      </TouchableOpacity>
+
+      <Text style={styles.clockSeparator}>:</Text>
+
+      {/* Minute Input Block */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.clockBox, isMinuteFocused && styles.clockBoxFocused]}
+        onPress={() => minuteRef.current?.focus()}
+      >
+        <Text style={[styles.clockBoxLabel, isMinuteFocused && styles.clockBoxLabelFocused]} numberOfLines={1} maxFontSizeMultiplier={CLOCK_LABEL_MAX_FONT_SCALE}>
+          {lang === 'en' ? 'MIN' : 'DAKİKA'}
+        </Text>
+        <TextInput
+          ref={minuteRef}
+          style={styles.clockDigitInput}
+          maxFontSizeMultiplier={CLOCK_DIGIT_MAX_FONT_SCALE}
+          value={minuteText}
+          onChangeText={handleMinuteChange}
+          onFocus={() => setIsMinuteFocused(true)}
+          onBlur={handleMinuteBlur}
+          onKeyPress={({ nativeEvent }) => {
+            if (nativeEvent.key === 'Backspace' && (!minuteText || minuteText.length === 0)) {
+              hourRef.current?.focus();
+            }
+          }}
+          keyboardType="number-pad"
+          maxLength={2}
+          selectTextOnFocus={true}
+          placeholder="00"
+          placeholderTextColor={COLORS.textMuted}
+        />
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Large system text: the clock gets its own row so the hour/minute boxes never clip.
+  if (stacked) {
+    return (
+      <View style={styles.timeStepperStack}>
+        {clock}
+        <View style={styles.timeStepperRow}>
+          {renderStep(-15)}
+          {renderStep(15)}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.timeStepperRow}>
-      <TouchableOpacity
-        style={styles.stepBtn}
-        onPress={() => onStep(-15)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="remove" size={16} color={COLORS.accent} />
-        <Text style={styles.stepBtnText}>{lang === 'en' ? '15 min' : '15 dk'}</Text>
-      </TouchableOpacity>
-
-      <View style={styles.dualClockContainer}>
-        {/* Hour Input Block */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={[styles.clockBox, isHourFocused && styles.clockBoxFocused]}
-          onPress={() => hourRef.current?.focus()}
-        >
-          <Text style={[styles.clockBoxLabel, isHourFocused && styles.clockBoxLabelFocused]}>
-            {lang === 'en' ? 'HOUR' : 'SAAT'}
-          </Text>
-          <TextInput
-            ref={hourRef}
-            style={styles.clockDigitInput}
-            value={hourText}
-            onChangeText={handleHourChange}
-            onFocus={() => setIsHourFocused(true)}
-            onBlur={handleHourBlur}
-            keyboardType="number-pad"
-            maxLength={2}
-            selectTextOnFocus={true}
-            placeholder="09"
-            placeholderTextColor={COLORS.textMuted}
-          />
-        </TouchableOpacity>
-
-        <Text style={styles.clockSeparator}>:</Text>
-
-        {/* Minute Input Block */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={[styles.clockBox, isMinuteFocused && styles.clockBoxFocused]}
-          onPress={() => minuteRef.current?.focus()}
-        >
-          <Text style={[styles.clockBoxLabel, isMinuteFocused && styles.clockBoxLabelFocused]}>
-            {lang === 'en' ? 'MIN' : 'DAKİKA'}
-          </Text>
-          <TextInput
-            ref={minuteRef}
-            style={styles.clockDigitInput}
-            value={minuteText}
-            onChangeText={handleMinuteChange}
-            onFocus={() => setIsMinuteFocused(true)}
-            onBlur={handleMinuteBlur}
-            onKeyPress={({ nativeEvent }) => {
-              if (nativeEvent.key === 'Backspace' && (!minuteText || minuteText.length === 0)) {
-                hourRef.current?.focus();
-              }
-            }}
-            keyboardType="number-pad"
-            maxLength={2}
-            selectTextOnFocus={true}
-            placeholder="00"
-            placeholderTextColor={COLORS.textMuted}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.stepBtn}
-        onPress={() => onStep(15)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="add" size={16} color={COLORS.accent} />
-        <Text style={styles.stepBtnText}>{lang === 'en' ? '15 min' : '15 dk'}</Text>
-      </TouchableOpacity>
+      {renderStep(-15)}
+      {clock}
+      {renderStep(15)}
     </View>
   );
 }
@@ -1470,6 +1499,32 @@ function MainApp() {
       setMuted(false);
     }
     setEditorOpen(true);
+  };
+
+  // Every field the editor can change; compared against the opening state to detect unsaved edits.
+  const editorSnapshot = () => JSON.stringify([
+    name, amount, times, slotAmounts, mealCondition, formType, instructions, stock, stockThreshold,
+    frequencyType, cyclePhase1Days, cyclePhase1Amount, cyclePhase2Days, cyclePhase2Amount, cycleStartDate,
+    durationMode, durationDays, startDate, currentGTIN, currentExpiryDate, muted,
+  ]);
+  const editorBaselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Runs on the first render after openEditor's state updates, so the baseline is the opening form.
+    editorBaselineRef.current = editorOpen ? editorSnapshot() : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorOpen]);
+
+  const requestCloseEditor = () => {
+    const baseline = editorBaselineRef.current;
+    if (baseline === null || baseline === editorSnapshot()) {
+      setEditorOpen(false);
+      return;
+    }
+    Keyboard.dismiss();
+    Alert.alert(t.discardChangesTitle, t.discardChangesMessage, [
+      { text: t.keepEditing, style: 'cancel' },
+      { text: t.discardChangesConfirm, style: 'destructive', onPress: () => setEditorOpen(false) },
+    ]);
   };
 
   const handleDoseCountChange = (count: number) => {
@@ -4592,10 +4647,10 @@ function MainApp() {
         )}
 
         {/* Add / Edit Modal */}
-        <Modal visible={editorOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditorOpen(false)}>
+        <Modal visible={editorOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={requestCloseEditor}>
           <SafeAreaView style={styles.modalSafe}>
             <View style={[styles.modalHeader, isTablet && { maxWidth: modalMaxWidth, alignSelf: 'center', width: '100%' }]}>
-              <TouchableOpacity onPress={() => setEditorOpen(false)}>
+              <TouchableOpacity onPress={requestCloseEditor} accessibilityRole="button" accessibilityLabel={t.cancel} hitSlop={12}>
                 <Ionicons name="close" size={26} color={COLORS.text} />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>{editingId ? t.modalEditTitle : t.modalAddTitle}</Text>
@@ -4705,20 +4760,25 @@ function MainApp() {
                 {/* Dose count selector chips */}
                 <View style={styles.doseCountSelectorRow}>
                   {[
-                    { count: 1, label: language === 'en' ? '1 Dose (Single)' : '1 Doz (Tek Sefer)' },
-                    { count: 2, label: language === 'en' ? '2 Doses (Morning/Evening)' : '2 Doz (Sabah/Akşam)' },
-                    { count: 3, label: language === 'en' ? '3 Doses (3x Daily)' : '3 Doz (Günde 3)' },
-                  ].map(item => (
-                    <TouchableOpacity
-                      key={item.count}
-                      style={[styles.doseCountChip, times.length === item.count && styles.doseCountChipActive]}
-                      onPress={() => handleDoseCountChange(item.count)}
-                    >
-                      <Text style={[styles.doseCountChipText, times.length === item.count && styles.doseCountChipTextActive]}>
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                    { count: 1, title: language === 'en' ? '1 dose' : '1 doz', hint: language === 'en' ? 'Once' : 'Tek sefer' },
+                    { count: 2, title: language === 'en' ? '2 doses' : '2 doz', hint: language === 'en' ? 'Morning · Evening' : 'Sabah · Akşam' },
+                    { count: 3, title: language === 'en' ? '3 doses' : '3 doz', hint: language === 'en' ? '3 times a day' : 'Günde 3' },
+                  ].map(item => {
+                    const active = times.length === item.count;
+                    return (
+                      <TouchableOpacity
+                        key={item.count}
+                        style={[styles.doseCountChip, active && styles.doseCountChipActive]}
+                        onPress={() => handleDoseCountChange(item.count)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={`${item.title}, ${item.hint}`}
+                      >
+                        <Text style={[styles.doseCountChipText, active && styles.doseCountChipTextActive]}>{item.title}</Text>
+                        <Text style={[styles.doseCountChipHint, active && styles.doseCountChipHintActive]}>{item.hint}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 {/* Time Slots Cards */}
@@ -4758,21 +4818,26 @@ function MainApp() {
                       {/* Quick Meal Preset Chips */}
                       <View style={styles.slotPresetsRow}>
                         {[
-                          { label: language === 'en' ? '08:00 Morning' : '08:00 Sabah', time: '08:00' },
-                          { label: language === 'en' ? '13:00 Noon' : '13:00 Öğle', time: '13:00' },
-                          { label: language === 'en' ? '19:00 Evening' : '19:00 Akşam', time: '19:00' },
-                          { label: language === 'en' ? '22:30 Night' : '22:30 Gece', time: '22:30' },
-                        ].map(p => (
-                          <TouchableOpacity
-                            key={p.time}
-                            style={[styles.slotPresetChip, slotTime === p.time && styles.slotPresetChipActive]}
-                            onPress={() => setSlotTime(idx, p.time)}
-                          >
-                            <Text style={[styles.slotPresetChipText, slotTime === p.time && styles.slotPresetChipTextActive]}>
-                              {p.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                          { label: language === 'en' ? 'Morning' : 'Sabah', time: '08:00' },
+                          { label: language === 'en' ? 'Noon' : 'Öğle', time: '13:00' },
+                          { label: language === 'en' ? 'Evening' : 'Akşam', time: '19:00' },
+                          { label: language === 'en' ? 'Night' : 'Gece', time: '22:30' },
+                        ].map(p => {
+                          const active = slotTime === p.time;
+                          return (
+                            <TouchableOpacity
+                              key={p.time}
+                              style={[styles.slotPresetChip, active && styles.slotPresetChipActive]}
+                              onPress={() => setSlotTime(idx, p.time)}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: active }}
+                              accessibilityLabel={`${p.time} ${p.label}`}
+                            >
+                              <Text style={[styles.slotPresetChipTime, active && styles.slotPresetChipTextActive]} numberOfLines={1} maxFontSizeMultiplier={QUICK_TIME_CHIP_MAX_FONT_SCALE}>{p.time}</Text>
+                              <Text style={[styles.slotPresetChipText, active && styles.slotPresetChipTextActive]} numberOfLines={1} maxFontSizeMultiplier={QUICK_TIME_CHIP_MAX_FONT_SCALE}>{p.label}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
 
                       {/* Saate Özel Doz Miktarı */}
@@ -4909,7 +4974,7 @@ function MainApp() {
                         <View style={styles.presetRow}>
                           <TouchableOpacity style={[styles.presetBtn, styles.presetBtnHighlight]} onPress={() => applyCyclePreset(4, '1.5 tablet', 3, '1 tablet', 'variable')}>
                             <Text style={styles.presetBtnHighlightText}>
-                              {language === 'en' ? '⭐ 4 days 1.5 dose / 3 days 1 dose' : '⭐ 4 gün 1.5 doz / 3 gün 1 doz'}
+                              {language === 'en' ? '4 days 1.5 dose / 3 days 1 dose' : '4 gün 1.5 doz / 3 gün 1 doz'}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -5617,7 +5682,7 @@ const styles = StyleSheet.create({
   cycleBoxTitle: { color: COLORS.accent, fontSize: 12, fontWeight: '700', marginBottom: 8 },
   presetRow: { flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   presetBtn: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6 },
-  presetBtnHighlight: { borderColor: COLORS.successBorder, backgroundColor: COLORS.accentSoft },
+  presetBtnHighlight: { borderColor: COLORS.accentBorder, backgroundColor: COLORS.accentSoft },
   presetBtnText: { color: COLORS.textSecondary, fontSize: 11 },
   presetBtnHighlightText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
   twoColRow: { flexDirection: 'row', gap: 10 },
@@ -5631,16 +5696,18 @@ const styles = StyleSheet.create({
 
   // Professional Time Section Styles
   timeSectionBox: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 14, borderWidth: 1, borderColor: COLORS.border, marginTop: 14 },
-  timeSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+  timeSectionHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   timeSectionTitle: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
   timeSectionSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-  addSlotMiniBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.accentSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.accent },
+  addSlotMiniBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: MIN_TOUCH, backgroundColor: COLORS.accentSoft, paddingHorizontal: 12, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.accent },
   addSlotMiniBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
   doseCountSelectorRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  doseCountChip: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  doseCountChip: { flex: 1, minHeight: 56, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.button, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   doseCountChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
-  doseCountChipText: { color: COLORS.textSecondary, fontSize: 11 },
-  doseCountChipTextActive: { color: COLORS.accent, fontWeight: '700' },
+  doseCountChipText: { color: COLORS.text, fontSize: TYPE.bodySmall, fontWeight: '700', textAlign: 'center' },
+  doseCountChipTextActive: { color: COLORS.accent },
+  doseCountChipHint: { color: COLORS.textSecondary, fontSize: TYPE.micro, textAlign: 'center', marginTop: 2 },
+  doseCountChipHintActive: { color: COLORS.accent },
   timeSlotCard: { backgroundColor: COLORS.surface, borderRadius: RADII.card, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   timeSlotCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   timeSlotBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.accentSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
@@ -5648,7 +5715,8 @@ const styles = StyleSheet.create({
   removeSlotBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2 },
   removeSlotBtnText: { color: COLORS.danger, fontSize: 11 },
   timeStepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
-  stepBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: COLORS.surfaceMuted, height: 42, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.borderStrong },
+  timeStepperStack: { gap: 10 },
+  stepBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: COLORS.surfaceMuted, minHeight: MIN_TOUCH, paddingHorizontal: 4, borderRadius: RADII.button, borderWidth: 1, borderColor: COLORS.borderStrong },
   stepBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '600' },
   dualClockContainer: {
     flex: 2.2,
@@ -5657,9 +5725,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
+  dualClockContainerStacked: {
+    flex: 0,
+    alignSelf: 'stretch',
+  },
   clockBox: {
     flex: 1,
-    height: 48,
+    minHeight: 56,
     backgroundColor: COLORS.bg,
     borderRadius: 8,
     borderWidth: 1.5,
@@ -5694,7 +5766,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     minWidth: 38,
-    height: 28,
     padding: 0,
     letterSpacing: 1,
   },
@@ -5706,9 +5777,10 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   slotPresetsRow: { flexDirection: 'row', gap: 6 },
-  slotPresetChip: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 6, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  slotPresetChip: { flex: 1, minHeight: MIN_TOUCH, paddingVertical: 4, paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', borderRadius: RADII.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   slotPresetChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accent },
-  slotPresetChipText: { color: COLORS.textSecondary, fontSize: 11 },
+  slotPresetChipTime: { color: COLORS.text, fontSize: TYPE.caption, fontWeight: '700', textAlign: 'center' },
+  slotPresetChipText: { color: COLORS.textSecondary, fontSize: TYPE.micro, textAlign: 'center' },
   slotPresetChipTextActive: { color: COLORS.accent, fontWeight: '700' },
 
   // Duration Badges & Boxes
@@ -6070,15 +6142,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   datePickerChangeBadge: {
-    backgroundColor: COLORS.successSoft,
+    backgroundColor: COLORS.accentSoft,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: COLORS.successBorder,
+    borderColor: COLORS.accentBorder,
   },
   datePickerChangeBadgeText: {
-    color: COLORS.success,
+    color: COLORS.accent,
     fontSize: 11,
     fontWeight: '700',
   },

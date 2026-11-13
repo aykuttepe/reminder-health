@@ -100,6 +100,10 @@ export interface Translations {
   mealCondition: string;
   timesPerDay: string;
   addTime: string;
+  discardChangesTitle: string;
+  discardChangesMessage: string;
+  discardChangesConfirm: string;
+  keepEditing: string;
   removeTime: string;
   slotAmountLabel: string;
   slotAmountPlaceholder: string;
@@ -427,7 +431,11 @@ export const translations: Record<Language, Translations> = {
     medForm: 'İlaç Formu',
     mealCondition: 'Açlık / Tokluk Durumu',
     timesPerDay: 'Günlük Doz Saatleri',
-    addTime: '+ Saat Ekle',
+    addTime: 'Saat Ekle',
+    discardChangesTitle: 'Değişiklikler kaydedilmedi',
+    discardChangesMessage: 'Yaptığın değişiklikler silinsin mi?',
+    discardChangesConfirm: 'Sil ve Kapat',
+    keepEditing: 'Düzenlemeye Devam Et',
     removeTime: 'Kaldır',
     slotAmountLabel: 'Bu Saatin Doz Miktarı',
     slotAmountPlaceholder: 'Örn. 2 tablet (farklıysa girin)',
@@ -749,7 +757,11 @@ export const translations: Record<Language, Translations> = {
     medForm: 'Medication Form',
     mealCondition: 'Meal Timing',
     timesPerDay: 'Daily Dose Times',
-    addTime: '+ Add Time',
+    addTime: 'Add Time',
+    discardChangesTitle: 'Unsaved changes',
+    discardChangesMessage: 'Discard the changes you made?',
+    discardChangesConfirm: 'Discard',
+    keepEditing: 'Keep Editing',
     removeTime: 'Remove',
     slotAmountLabel: 'Dose Amount for this Time',
     slotAmountPlaceholder: 'E.g. 2 tablets (if different)',

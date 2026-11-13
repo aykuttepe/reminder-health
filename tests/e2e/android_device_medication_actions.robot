@@ -105,6 +105,9 @@ Close Unsaved Editor If Open
         # Back closes the editor without saving (and first dismisses the keyboard if it is open).
         Press Keycode    4
         Sleep    1s
+        # An edited form asks before discarding; confirm so the next step starts from a list screen.
+        ${asks}=    Run Keyword And Return Status    Page Should Contain Element    android=new UiSelector().text("Sil ve Kapat")
+        IF    ${asks}    Click Element    android=new UiSelector().text("Sil ve Kapat")
     END
 
 Open Treatment Plan
