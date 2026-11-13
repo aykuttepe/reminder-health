@@ -147,7 +147,9 @@ test('day summary and adherence state reflect taken, skipped and unmarked doses'
   assert.equal(dayAdherence(day({ taken: 2 }), false), 'complete');
   assert.equal(dayAdherence(day({ taken: 1, unrecorded: 1 }), true), 'open');
   assert.equal(dayAdherence(day({ taken: 1, unrecorded: 1 }), false), 'partial');
-  assert.equal(dayAdherence(day({ skipped: 2 }), false), 'missed');
+  assert.equal(dayAdherence(day({ skipped: 2 }), false), 'skipped');
+  assert.equal(dayAdherence(day({ skipped: 1, unrecorded: 1 }), false), 'missed');
+  assert.equal(dayAdherence(day({ taken: 1, skipped: 1 }), false), 'partial');
   assert.equal(dayAdherence(day({ unrecorded: 2 }), true), 'open');
 });
 

@@ -349,16 +349,59 @@ export function buildHistorySlots(doses: Dose[], date: string,
     .sort((a, b) => a.time.localeCompare(b.time));
 }
 
-/** A back-dated start date must not turn days before the app knew the medicine into missed doses.
- * The first tracked day is the earliest status day or record kept for the dose. */
-function trackedOn(dose: Dose, date: string): boolean {
+/** Earliest status day or record kept for the dose, or null when it has none yet. */
+function firstTrackedDayOf(dose: Dose): string | null {
   const days = [dose.statusDate, ...Object.keys(dose.dailyStatuses ?? {}), ...Object.keys(dose.doseRecords ?? {})]
     .filter((day): day is string => !!day);
-  return days.length === 0 || date >= days.reduce((first, day) => (day < first ? day : first));
+  return days.length === 0 ? null : days.reduce((first, day) => (day < first ? day : first));
+}
+
+/** A back-dated start date must not turn days before the app knew the medicine into missed doses. */
+function trackedOn(dose: Dose, date: string): boolean {
+  const first = firstTrackedDayOf(dose);
+  return first === null || date >= first;
+}
+
+/** Earliest day any medicine (deleted ones included) was tracked; History cannot go further back. */
+export function firstTrackedDay(doses: Dose[]): string | null {
+  return doses.reduce<string | null>((first, dose) => {
+    const day = firstTrackedDayOf(dose);
+    return day !== null && (first === null || day < first) ? day : first;
+  }, null);
+}
+
+export function addDaysToKey(key: string, days: number): string {
+  const date = dateFromKey(key);
+  date.setDate(date.getDate() + days);
+  return localDateKey(date);
+}
+
+export const HISTORY_WINDOW_DAYS = 7;
+
+/**
+ * Last day of the seven-day History window that contains `selected`. Windows end on today or a
+ * whole number of weeks before it, so the newest window is always "the last 7 days".
+ */
+export function historyWindowEnd(selected: string, today: string): string {
+  const daysBack = Math.max(0, getCalendarDayDiff(selected, today));
+  return addDaysToKey(today, -HISTORY_WINDOW_DAYS * Math.floor(daysBack / HISTORY_WINDOW_DAYS));
+}
+
+/** Monday-first calendar rows for a month (monthIndex 0-11); cells outside the month are null. */
+export function monthGridKeys(year: number, monthIndex: number): (string | null)[][] {
+  const first = new Date(year, monthIndex, 1);
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const leading = (first.getDay() + 6) % 7; // Monday = 0
+  const cells: (string | null)[] = [
+    ...Array.from({ length: leading }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => localDateKey(new Date(year, monthIndex, i + 1))),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, row) => cells.slice(row * 7, row * 7 + 7));
 }
 
 export type DaySummary = { total: number; taken: number; skipped: number; unrecorded: number };
-export type DayAdherence = 'none' | 'complete' | 'partial' | 'missed' | 'open';
+export type DayAdherence = 'none' | 'complete' | 'partial' | 'missed' | 'skipped' | 'open';
 
 export function summarizeDay(doses: Dose[], date: string): DaySummary {
   const slots = buildHistorySlots(doses, date, { includeUnrecorded: true });
@@ -375,7 +418,9 @@ export function dayAdherence(summary: DaySummary, isToday: boolean): DayAdherenc
   if (summary.total === 0) return 'none';
   if (summary.taken === summary.total) return 'complete';
   if (isToday && summary.unrecorded > 0) return 'open';
-  return summary.taken === 0 ? 'missed' : 'partial';
+  if (summary.taken > 0) return 'partial';
+  // Every dose was deliberately skipped: not taken, but not forgotten either, so it is not shown as missed.
+  return summary.unrecorded === 0 ? 'skipped' : 'missed';
 }
 
 /** Taken versus due doses over already summarized days; today's unmarked doses are not due yet. */

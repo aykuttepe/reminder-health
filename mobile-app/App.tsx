@@ -127,7 +127,7 @@ import { getTranslations, STORAGE_KEY_LANGUAGE, type Language } from './src/i18n
 import {
   localDateKey, dateFromKey, normalizeDoseDay, slotStatus, updateDoseSlot,
   calculateEndDate, getDurationInfo, adjustTimeMinutes, parseDoseAmount,
-  formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots, summarizeDay, dayAdherence, adherenceOverDays,
+  formatStock, getCycleInfo, getCalendarDayDiff, buildHistorySlots, summarizeDay, dayAdherence, firstTrackedDay,
   type MealCondition, type MedicineForm, type FrequencyType, type Dose, type ScheduledSlot, type AppointmentItem,
 } from './src/medicationPlan';
 import { COLORS, MIN_TOUCH, RADII, SPACING, TYPE } from './src/theme';
@@ -402,21 +402,12 @@ function MainApp() {
   const [exactAlarmAllowed, setExactAlarmAllowed] = useState<boolean | null>(null);
   const [scheduleInfo, setScheduleInfo] = useState<string | null>(null);
   const [doses, setDoses] = useState<Dose[]>(() => initialDoses.map(d => normalizeDoseDay(d)));
-  const pastWeekHistory = Array.from({ length: 7 }, (_, index) => {
-    const date = dateFromKey(today);
-    date.setDate(date.getDate() - 6 + index);
-    const key = localDateKey(date);
-    const summary = summarizeDay(doses, key);
-    return {
-      date: key,
-      dayNum: date.getDate(),
-      label: date.toLocaleDateString(language === 'en' ? 'en-US' : 'tr-TR', { weekday: 'short' }),
-      isToday: index === 6,
-      summary,
-      adherence: dayAdherence(summary, index === 6),
-    };
-  });
-  const weekAdherence = adherenceOverDays(pastWeekHistory, today);
+  // History asks for any day it shows (week strip, month grid, selected day).
+  const getHistoryDay = useCallback((date: string) => {
+    const summary = summarizeDay(doses, date);
+    return { summary, adherence: dayAdherence(summary, date === today) };
+  }, [doses, today]);
+  const historyFirstDay = useMemo(() => firstTrackedDay(doses), [doses]);
   const [selectedHistoryDate, setSelectedHistoryDate] = useState(localDateKey);
   const [expandedTaken, setExpandedTaken] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -2454,14 +2445,13 @@ function MainApp() {
 
           {tab === 'Geçmiş' && (
             <HistoryView
-              pastWeekHistory={pastWeekHistory}
               selectedHistoryDate={selectedHistoryDate}
               setSelectedHistoryDate={setSelectedHistoryDate}
               historySlots={historySlots}
               onRevertRecord={(slot) => confirmRevertRecord(slot.dose.id, slot.time, selectedHistoryDate)}
               onRecordSlot={(slot, status) => applyRecord(slot.dose.id, slot.time, selectedHistoryDate, status)}
-              weekAdherence={weekAdherence}
-              selectedDaySummary={summarizeDay(doses, selectedHistoryDate)}
+              getDay={getHistoryDay}
+              firstTrackedDay={historyFirstDay}
               today={today}
               language={language}
               dateFromKey={dateFromKey}
