@@ -1,7 +1,7 @@
 {
-  "version": "1.3.4",
+  "version": "1.3.5",
   "apkUrl": "https://github.com/aykuttepe/reminder-health/releases/latest/download/app-release.apk",
   "appName": "Rutin",
-  "releaseNotes": "v1.3.4: Saat seçicide dakika etiketi DK olarak kısaltıldı, büyük yazıda bölünmüyor.",
-  "publishedAt": "2026-11-13T21:14:00Z"
+  "releaseNotes": "v1.3.5: İlaç ve randevu formlarında klavye açılınca yazdığın kutu artık klavyenin üstünde görünür.",
+  "publishedAt": "2026-11-13T21:43:00Z"
 }
