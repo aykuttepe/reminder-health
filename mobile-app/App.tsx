@@ -69,6 +69,7 @@ import { AppointmentEditorModal } from './src/components/AppointmentEditorModal'
 import { StockThresholdSlider } from './src/components/StockThresholdSlider';
 import { appointmentDayBadge } from './src/components/today/AppointmentSummary';
 import { BrandMark } from './src/components/BrandMark';
+import { showNotice } from './src/notice';
 import { TodayView } from './src/components/TodayView';
 import { MedicationList } from './src/components/MedicationList';
 import { HistoryView } from './src/components/HistoryView';
@@ -493,9 +494,10 @@ function MainApp() {
     try {
       await Linking.openURL(updateInfo.downloadUrl);
     } catch {
-      Alert.alert(
+      showNotice(
         language === 'en' ? 'Download Error' : 'İndirme Hatası',
-        language === 'en' ? 'Could not open update download link.' : 'Güncelleme bağlantısı açılamadı.'
+        language === 'en' ? 'Could not open update download link.' : 'Güncelleme bağlantısı açılamadı.',
+        language,
       );
     }
   };
@@ -1501,6 +1503,12 @@ function MainApp() {
     setEditorOpen(true);
   };
 
+  // What an empty per-time amount falls back to. A variable cycle uses its phase amounts, not the
+  // top-level amount (getCycleInfo), so naming "1 adet" there promised the wrong dose.
+  const slotAmountHint = frequencyType === 'variable'
+    ? t.slotAmountByPhase.replace('{p1}', cyclePhase1Amount.trim() || '—').replace('{p2}', cyclePhase2Amount.trim() || '—')
+    : amount.trim() ? t.slotAmountDefault.replace('{amount}', amount.trim()) : t.slotAmountPlaceholder;
+
   // Every field the editor can change; compared against the opening state to detect unsaved edits.
   const editorSnapshot = () => JSON.stringify([
     name, amount, times, slotAmounts, mealCondition, formType, instructions, stock, stockThreshold,
@@ -1548,9 +1556,10 @@ function MainApp() {
 
   const saveDose = () => {
     if (!name.trim()) {
-      Alert.alert(
+      showNotice(
         language === 'en' ? 'Missing Information' : 'Eksik Bilgi',
-        language === 'en' ? 'Please enter medication name.' : 'Lütfen ilaç adını giriniz.'
+        language === 'en' ? 'Please enter medication name.' : 'Lütfen ilaç adını giriniz.',
+        language,
       );
       return;
     }
@@ -2157,7 +2166,7 @@ function MainApp() {
     });
     try {
       if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert(errorTitle, t.backupShareUnavailable);
+        showNotice(errorTitle, t.backupShareUnavailable, language);
         return;
       }
       // Only the latest export stays in the cache: the file holds health data.
@@ -2171,7 +2180,7 @@ function MainApp() {
       logger.info('Backup', 'Yedek dışa aktarıldı', { medicines: backup.doses.length });
     } catch (error) {
       logger.error('Backup', 'Yedek dışa aktarılamadı', error);
-      Alert.alert(errorTitle, t.backupExportFailed);
+      showNotice(errorTitle, t.backupExportFailed, language);
     }
   };
 
@@ -2221,7 +2230,7 @@ function MainApp() {
     triggerHaptic();
     // A sync or account switch finishing after the restore would overwrite the restored doses.
     if (isSyncingRef.current || authBusy) {
-      Alert.alert(errorTitle, t.restoreBusy);
+      showNotice(errorTitle, t.restoreBusy, language);
       return;
     }
     let text: string;
@@ -2230,25 +2239,25 @@ function MainApp() {
       const picked = await File.pickFileAsync({ mimeTypes: '*/*' });
       if (picked.canceled) return;
       if (picked.result.size > MAX_BACKUP_CHARS) {
-        Alert.alert(errorTitle, t.backupErrorTooLarge);
+        showNotice(errorTitle, t.backupErrorTooLarge, language);
         return;
       }
       text = await picked.result.text();
     } catch (error) {
       logger.error('Backup', 'Yedek dosyası okunamadı', error);
-      Alert.alert(errorTitle, t.backupReadFailed);
+      showNotice(errorTitle, t.backupReadFailed, language);
       return;
     }
     const result = parseBackup(text);
     if (!result.ok) {
       logger.warn('Backup', 'Geçersiz yedek dosyası', { error: result.error, detail: result.detail });
-      Alert.alert(errorTitle, backupErrorMessage(result));
+      showNotice(errorTitle, backupErrorMessage(result), language);
       return;
     }
     // Without a verified session (local mode, signed out) the phone is still bound to its last account.
     const accountId = session?.user.id ?? await boundAccountId(localStore);
     if (isBackupForeignToAccount(result.backup.ownerId, accountId)) {
-      Alert.alert(errorTitle, t.backupForeignAccount);
+      showNotice(errorTitle, t.backupForeignAccount, language);
       return;
     }
     confirmRestore(result.backup);
@@ -4361,7 +4370,7 @@ function MainApp() {
                               message: text,
                             });
                           } catch (err) {
-                            Alert.alert(language === 'en' ? 'Share Failed' : 'Paylaşılamadı', language === 'en' ? 'Could not export logs.' : 'Günlük panoya aktarılamadı.');
+                            showNotice(language === 'en' ? 'Share Failed' : 'Paylaşılamadı', language === 'en' ? 'Could not export logs.' : 'Günlük panoya aktarılamadı.', language);
                           }
                         }}
                       >
@@ -4861,7 +4870,7 @@ function MainApp() {
                             ]}
                             value={slotAmounts[slotTime] ?? ''}
                             onChangeText={val => setSlotAmountForTime(slotTime, val)}
-                            placeholder={amount ? `${amount} (${language === 'en' ? 'default' : 'varsayılan'})` : t.slotAmountPlaceholder}
+                            placeholder={slotAmountHint}
                             placeholderTextColor={COLORS.textMuted}
                           />
                         </View>
@@ -5206,9 +5215,10 @@ function MainApp() {
                 style={styles.refillBtn}
                 onPress={() => {
                   setStock(s => String((Number(s) || 0) + 30));
-                  Alert.alert(
+                  showNotice(
                     language === 'en' ? 'Box Added' : 'Kutu Eklendi',
-                    language === 'en' ? '+30 units added to stock.' : '+30 tablet stoğa eklendi.'
+                    language === 'en' ? '+30 units added to stock.' : '+30 tablet stoğa eklendi.',
+                    language,
                   );
                 }}
               >

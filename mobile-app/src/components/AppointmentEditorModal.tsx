@@ -8,8 +8,8 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Alert,
 } from 'react-native';
+import { showNotice } from '../notice';
 import { Ionicons } from '@expo/vector-icons';
 // React Native's SafeAreaView is iOS-only; on edge-to-edge Android the header sat under the status bar
 // and its close / Kaydet buttons could not be tapped.
@@ -186,17 +186,19 @@ export const AppointmentEditorModal: React.FC<AppointmentEditorModalProps> = ({
 
   const handleSave = () => {
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      Alert.alert(
+      showNotice(
         isEn ? 'Appointment Date Required' : 'Randevu Tarihi Gerekli',
-        isEn ? 'Please select an appointment date.' : 'Lütfen randevu tarihini seçiniz.'
+        isEn ? 'Please select an appointment date.' : 'Lütfen randevu tarihini seçiniz.',
+        isEn ? 'en' : 'tr',
       );
       return;
     }
 
     if (hasBloodTest && (!bloodTestDate || !/^\d{4}-\d{2}-\d{2}$/.test(bloodTestDate))) {
-      Alert.alert(
+      showNotice(
         isEn ? 'Lab Test Date Required' : 'Tahlil Tarihi Gerekli',
-        isEn ? 'Please select a date for the fasting lab test.' : 'Lütfen kan tahlili tarihini seçiniz veya tahlil seçeneğini kapatınız.'
+        isEn ? 'Please select a date for the fasting lab test.' : 'Lütfen kan tahlili tarihini seçiniz veya tahlil seçeneğini kapatınız.',
+        isEn ? 'en' : 'tr',
       );
       return;
     }

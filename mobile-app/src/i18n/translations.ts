@@ -107,6 +107,9 @@ export interface Translations {
   removeTime: string;
   slotAmountLabel: string;
   slotAmountPlaceholder: string;
+  slotAmountDefault: string;
+  slotAmountByPhase: string;
+  ok: string;
   instructions: string;
   instructionsPlaceholder: string;
   stockTracking: string;
@@ -439,6 +442,9 @@ export const translations: Record<Language, Translations> = {
     removeTime: 'Kaldır',
     slotAmountLabel: 'Bu Saatin Doz Miktarı',
     slotAmountPlaceholder: 'Örn. 2 tablet (farklıysa girin)',
+    slotAmountDefault: '{amount} (varsayılan)',
+    slotAmountByPhase: '{p1} / {p2} (aşamaya göre)',
+    ok: 'Tamam',
     instructions: 'Talimatlar & Notlar',
     instructionsPlaceholder: 'Örn. Bol su ile çiğnemeden içiniz.',
     stockTracking: 'Kutu & Stok Takibi',
@@ -765,6 +771,9 @@ export const translations: Record<Language, Translations> = {
     removeTime: 'Remove',
     slotAmountLabel: 'Dose Amount for this Time',
     slotAmountPlaceholder: 'E.g. 2 tablets (if different)',
+    slotAmountDefault: '{amount} (default)',
+    slotAmountByPhase: '{p1} / {p2} (by phase)',
+    ok: 'OK',
     instructions: 'Instructions & Notes',
     instructionsPlaceholder: 'E.g. Swallow with water, do not chew.',
     stockTracking: 'Box & Stock Tracking',
