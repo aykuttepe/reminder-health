@@ -86,7 +86,7 @@ import {
   type SyncDose,
 } from './src/syncManager';
 import { logger, type LogEntry, type LogLevel } from './src/logger';
-import { IS_STORE_BUILD, canScheduleExactAlarms } from './src/distribution';
+import { IS_STORE_BUILD, NEEDS_APP_LAUNCH_SETUP, canScheduleExactAlarms, openAutoStartSettings } from './src/distribution';
 import {
   BACKUP_MIME_TYPE,
   MAX_BACKUP_CHARS,
@@ -3394,7 +3394,9 @@ function MainApp() {
                         {[
                           { icon: 'battery-charging' as const, title: t.reliabilityBatteryTitle, desc: t.reliabilityBatteryDesc, open: () => openBatteryOptimizationSettings(!IS_STORE_BUILD) },
                           { icon: 'alarm' as const, title: t.reliabilityExactTitle, desc: t.reliabilityExactDesc, open: openExactAlarmSettings },
-                          { icon: 'hardware-chip-outline' as const, title: t.reliabilityVendorTitle, desc: t.reliabilityVendorDesc, open: () => openChannelNotificationSettings() },
+                          { icon: 'hardware-chip-outline' as const, title: t.reliabilityVendorTitle,
+                            desc: NEEDS_APP_LAUNCH_SETUP ? t.reliabilityVendorDescHonor : t.reliabilityVendorDesc,
+                            open: openAutoStartSettings },
                         ].map((item, index) => (
                           <React.Fragment key={item.title}>
                             {index > 0 && <View style={styles.settingDivider} />}

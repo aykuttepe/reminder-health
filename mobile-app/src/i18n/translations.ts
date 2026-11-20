@@ -307,6 +307,7 @@ export interface Translations {
   reliabilityExactDesc: string;
   reliabilityVendorTitle: string;
   reliabilityVendorDesc: string;
+  reliabilityVendorDescHonor: string;
   reliabilityOpenSettings: string;
   reliabilityOpened: string;
   reliabilityTestButton: string;
@@ -638,6 +639,7 @@ export const translations: Record<Language, Translations> = {
     reliabilityExactDesc: '"Alarmlar ve hatırlatıcılar" iznini açık tutun.',
     reliabilityVendorTitle: 'Telefon üreticisi ayarları',
     reliabilityVendorDesc: 'Samsung, Xiaomi, Huawei gibi telefonlarda "Otomatik başlatma" ve arka planda çalışma iznini açın.',
+    reliabilityVendorDescHonor: 'Uygulama kapalıyken hatırlatma gelmesi için gerekli. Açılan "Uygulama başlatma" ekranında Rutin için "Otomatik yönet"i kapatın; "Otomatik başlatma", "İkincil başlatma" ve "Arka planda çalış" seçeneklerini açın.',
     reliabilityOpenSettings: 'Ayarları Aç',
     reliabilityOpened: 'Telefon ayarları açıldı',
     reliabilityTestButton: 'Deneme Alarmı Çal (5 sn sonra)',
@@ -967,6 +969,7 @@ export const translations: Record<Language, Translations> = {
     reliabilityExactDesc: 'Keep the "Alarms & reminders" permission on.',
     reliabilityVendorTitle: 'Phone maker settings',
     reliabilityVendorDesc: 'On Samsung, Xiaomi, Huawei and similar phones, allow auto-start and background activity.',
+    reliabilityVendorDescHonor: 'Needed for reminders while the app is closed. On the "App launch" screen, turn off "Manage automatically" for Rutin and turn on "Auto-launch", "Secondary launch" and "Run in background".',
     reliabilityOpenSettings: 'Open Settings',
     reliabilityOpened: 'Phone settings opened',
     reliabilityTestButton: 'Play Test Alarm (in 5 s)',

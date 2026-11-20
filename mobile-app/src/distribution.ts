@@ -3,8 +3,18 @@ import { NativeModules, Platform } from 'react-native';
 export type DistributionChannel = 'github' | 'play' | 'unknown';
 
 // RutinNativeModule.kt (Android only); absent on iOS and in web previews.
-const rutinNative: { channel?: unknown; canScheduleExactAlarms?: () => Promise<boolean> } | undefined =
-  NativeModules.RutinNative;
+const rutinNative: {
+  channel?: unknown;
+  manufacturer?: unknown;
+  canScheduleExactAlarms?: () => Promise<boolean>;
+  openAutoStartSettings?: () => Promise<'vendor' | 'details'>;
+} | undefined = NativeModules.RutinNative;
+
+/** Lower-case Build.MANUFACTURER on Android (e.g. "honor", "samsung"); empty elsewhere. */
+export const DEVICE_MANUFACTURER = typeof rutinNative?.manufacturer === 'string' ? rutinNative.manufacturer : '';
+
+/** Honor and Huawei stop swiped-away apps unless "App launch" is set to manual, so they need explicit steps. */
+export const NEEDS_APP_LAUNCH_SETUP = DEVICE_MANUFACTURER === 'honor' || DEVICE_MANUFACTURER === 'huawei';
 
 export const DISTRIBUTION_CHANNEL: DistributionChannel =
   rutinNative?.channel === 'github' || rutinNative?.channel === 'play' ? rutinNative.channel : 'unknown';
@@ -24,5 +34,20 @@ export async function canScheduleExactAlarms(): Promise<boolean> {
   } catch {
     // Unknown is treated as allowed so a bridge failure never nags the user.
     return true;
+  }
+}
+
+/**
+ * Opens the maker's auto-start screen (Honor/Huawei "App launch", Xiaomi "Autostart" ...) or, when the
+ * phone has none, the app's details page. False only when nothing could be opened.
+ */
+export async function openAutoStartSettings(): Promise<boolean> {
+  if (Platform.OS !== 'android' || !rutinNative?.openAutoStartSettings) return false;
+  try {
+    await rutinNative.openAutoStartSettings();
+    return true;
+  } catch (error) {
+    console.warn('openAutoStartSettings failed:', error);
+    return false;
   }
 }
